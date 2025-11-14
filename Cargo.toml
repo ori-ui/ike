@@ -1,0 +1,21 @@
+[package]
+name = "ike"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glutin = "0.32"
+glutin-winit = "0.5"
+
+[dependencies.winit]
+version = "0.30"
+default-features = false
+features = [
+  "wayland",
+  "wayland-dlopen",
+  "x11",
+]
+
+[dependencies.skia-safe]
+version = "0.90"
+features = ["gl", "textlayout"]
