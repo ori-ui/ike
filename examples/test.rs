@@ -4,11 +4,15 @@ use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
     context::{ContextAttributesBuilder, PossiblyCurrentContext},
     display::GetGlDisplay,
-    prelude::{GlDisplay, NotCurrentGlContext},
+    prelude::{GlDisplay, NotCurrentGlContext, PossiblyCurrentGlContext},
     surface::{GlSurface, Surface, SurfaceAttributesBuilder, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
-use ike::{Tree, WidgetId, widgets::Label};
+use ike::{
+    Size, Tree, WidgetId,
+    skia::{SkiaCanvas, SkiaFonts},
+    widgets::{Aligned, Button, Label},
+};
 use skia_safe::{Color, gpu::gl::FramebufferInfo};
 use winit::{
     application::ApplicationHandler,
@@ -25,11 +29,14 @@ fn main() {
     let mut cx = tree.build();
 
     let label = Label::new(&mut cx, "wahoo");
+    let button = Button::new(&mut cx, label);
+    let aligned = Aligned::new(&mut cx, 0.5, 0.5, button);
 
     let mut state = State {
         window: None,
+        fonts: SkiaFonts::new(),
         tree,
-        root: label.cast(),
+        root: aligned.upcast(),
     };
 
     event_loop.run_app(&mut state).unwrap();
@@ -37,11 +44,14 @@ fn main() {
 
 struct State {
     window: Option<GlWindow>,
+    fonts: SkiaFonts,
     tree: Tree,
     root: WidgetId,
 }
 
 struct GlWindow {
+    gl_config: glutin::config::Config,
+    fb_info: FramebufferInfo,
     skia_surface: skia_safe::Surface,
     gl_surface: Surface<WindowSurface>,
     skia_context: skia_safe::gpu::DirectContext,
@@ -51,7 +61,7 @@ struct GlWindow {
 
 impl ApplicationHandler for State {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let (_, config) = DisplayBuilder::new()
+        let (_, gl_config) = DisplayBuilder::new()
             .build(event_loop, ConfigTemplateBuilder::new(), |configs| {
                 configs
                     .reduce(|acc, cfg| match cfg.num_samples() > acc.num_samples() {
@@ -63,14 +73,19 @@ impl ApplicationHandler for State {
             .unwrap();
 
         let window =
-            glutin_winit::finalize_window(event_loop, Window::default_attributes(), &config)
+            glutin_winit::finalize_window(event_loop, Window::default_attributes(), &gl_config)
                 .unwrap();
 
         let handle = window.window_handle().unwrap().as_raw();
 
         let attrs = ContextAttributesBuilder::new().build(Some(handle));
 
-        let gl_context = unsafe { config.display().create_context(&config, &attrs).unwrap() };
+        let gl_context = unsafe {
+            gl_config
+                .display()
+                .create_context(&gl_config, &attrs)
+                .unwrap()
+        };
 
         let size = window.inner_size();
 
@@ -81,9 +96,9 @@ impl ApplicationHandler for State {
         );
 
         let gl_surface = unsafe {
-            config
+            gl_config
                 .display()
-                .create_window_surface(&config, &attrs)
+                .create_window_surface(&gl_config, &attrs)
                 .unwrap()
         };
 
@@ -94,7 +109,7 @@ impl ApplicationHandler for State {
                 return std::ptr::null();
             }
 
-            config.display().get_proc_address(name)
+            gl_config.display().get_proc_address(name)
         })
         .unwrap();
 
@@ -103,7 +118,7 @@ impl ApplicationHandler for State {
         let fb_info = unsafe {
             let mut fboid: ffi::c_int = 0;
 
-            let get_integerv = config.display().get_proc_address(c"glGetIntegerv");
+            let get_integerv = gl_config.display().get_proc_address(c"glGetIntegerv");
             assert!(!get_integerv.is_null());
 
             let get_integerv: unsafe extern "C" fn(ffi::c_uint, *mut ffi::c_int) =
@@ -120,8 +135,8 @@ impl ApplicationHandler for State {
 
         let render_target = skia_safe::gpu::backend_render_targets::make_gl(
             (size.width as i32, size.height as i32),
-            config.num_samples() as usize,
-            config.stencil_size() as usize,
+            gl_config.num_samples() as usize,
+            gl_config.stencil_size() as usize,
             fb_info,
         );
 
@@ -136,6 +151,8 @@ impl ApplicationHandler for State {
         .unwrap();
 
         self.window = Some(GlWindow {
+            gl_config,
+            fb_info,
             skia_surface,
             gl_surface,
             skia_context,
@@ -153,13 +170,54 @@ impl ApplicationHandler for State {
         match event {
             WindowEvent::RedrawRequested => {
                 if let Some(ref mut window) = self.window {
-                    let mut canvas = window.skia_surface.canvas();
+                    window.gl_context.make_current(&window.gl_surface).unwrap();
+
+                    let canvas = window.skia_surface.canvas();
                     canvas.clear(Color::WHITE);
 
+                    let size = window.window.inner_size();
+
+                    self.tree.layout(
+                        &mut self.fonts,
+                        &self.root,
+                        Size::new(size.width as f32, size.height as f32),
+                    );
+
+                    let mut canvas = SkiaCanvas::new(canvas, &mut self.fonts);
                     self.tree.draw(&self.root, &mut canvas);
 
                     window.skia_context.flush_and_submit();
                     window.gl_surface.swap_buffers(&window.gl_context).unwrap();
+                }
+            }
+
+            WindowEvent::Resized(size) => {
+                if let Some(ref mut window) = self.window {
+                    let render_target = skia_safe::gpu::backend_render_targets::make_gl(
+                        (size.width as i32, size.height as i32),
+                        window.gl_config.num_samples() as usize,
+                        window.gl_config.stencil_size() as usize,
+                        window.fb_info,
+                    );
+
+                    let skia_surface = skia_safe::gpu::surfaces::wrap_backend_render_target(
+                        &mut window.skia_context,
+                        &render_target,
+                        skia_safe::gpu::SurfaceOrigin::BottomLeft,
+                        skia_safe::ColorType::RGBA8888,
+                        None,
+                        None,
+                    )
+                    .unwrap();
+
+                    window.skia_surface = skia_surface;
+                    window.window.request_redraw();
+
+                    window.gl_surface.resize(
+                        &window.gl_context,
+                        NonZeroU32::new(size.width).unwrap(),
+                        NonZeroU32::new(size.height).unwrap(),
+                    );
                 }
             }
 

@@ -1,31 +1,35 @@
-use skia_safe::{Color, FontStyle};
+use crate::{
+    Color, CornerRadius, Offset, Size,
+    math::{Affine, Rect},
+    text::Paragraph,
+};
 
-use crate::{Size, text::Paragraph};
+#[derive(Clone, PartialEq, PartialOrd)]
+pub enum Shader {
+    Solid(Color),
+}
+
+#[derive(Clone, PartialEq, PartialOrd)]
+pub struct Paint {
+    pub shader: Shader,
+}
+
+impl From<Color> for Paint {
+    fn from(color: Color) -> Self {
+        Self {
+            shader: Shader::Solid(color),
+        }
+    }
+}
 
 pub trait Fonts {
-    fn measure(&mut self, paragraph: &Paragraph) -> Size;
+    fn measure(&mut self, paragraph: &Paragraph, max_width: f32) -> Size;
 }
 
 pub trait Canvas {
-    fn text(&mut self, text: &str);
-}
+    fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas));
 
-pub struct SkiaFonts {}
+    fn draw_rect(&mut self, rect: Rect, corners: CornerRadius, paint: &Paint);
 
-impl Canvas for &skia_safe::Canvas {
-    fn text(&mut self, text: &str) {
-        let fonts = skia_safe::FontMgr::new();
-        let font = fonts
-            .match_family("Ubuntu")
-            .match_style(FontStyle::normal())
-            .unwrap();
-
-        let font = skia_safe::Font::new(font, Some(20.0));
-        let blob = skia_safe::TextBlob::new(text, &font);
-
-        let mut paint = skia_safe::Paint::default();
-        paint.set_color(Color::BLACK);
-
-        self.draw_text_blob(blob.unwrap(), skia_safe::Point::new(20.0, 200.0), &paint);
-    }
+    fn draw_text(&mut self, paragraph: &Paragraph, max_width: f32, offset: Offset);
 }

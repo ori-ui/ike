@@ -1,23 +1,37 @@
-use crate::{Canvas, DrawCx, LayoutCx, Size, Space, Widget, WidgetId, widget::BuildCx};
+use crate::{
+    Canvas, DrawCx, LayoutCx, Offset, Size, Space, Widget, WidgetId,
+    text::{Paragraph, TextAlign, TextStyle, TextWrap},
+    widget::BuildCx,
+};
 
 pub struct Label {
-    text: String,
+    paragraph: Paragraph,
 }
 
 impl Label {
     pub fn new(cx: &mut BuildCx<'_>, text: impl ToString) -> WidgetId<Self> {
-        cx.insert(Self {
-            text: text.to_string(),
-        })
+        let mut paragraph = Paragraph::new(16.0, TextAlign::Start, TextWrap::None);
+
+        paragraph.push(
+            text.to_string(),
+            TextStyle {
+                font_size: 16.0,
+                font_family: String::from("Noto Sans"),
+            },
+        );
+
+        cx.insert(Self { paragraph })
     }
 }
 
 impl Widget for Label {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
-        space.min
+        cx.fonts()
+            .measure(&self.paragraph, space.max.width)
+            .min(space.max)
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
-        canvas.text(&self.text);
+        canvas.draw_text(&self.paragraph, cx.width(), Offset::all(0.0));
     }
 }
