@@ -9,7 +9,7 @@ use glutin::{
 };
 use glutin_winit::DisplayBuilder;
 use ike::{
-    Size, Tree, WidgetId,
+    Point, PointerMoveEvent, Size, Tree, WidgetId,
     skia::{SkiaCanvas, SkiaFonts},
     widgets::{Aligned, Button, Label},
 };
@@ -168,23 +168,60 @@ impl ApplicationHandler for State {
         event: WindowEvent,
     ) {
         match event {
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some(ref window) = self.window {
+                    let logical = position.to_logical(window.window.scale_factor());
+
+                    let event = PointerMoveEvent {
+                        position: Point::new(logical.x, logical.y),
+                        id: None,
+                    };
+
+                    self.tree.pointer_event(
+                        &mut self.fonts,
+                        &self.root,
+                        &ike::PointerEvent::Move(event),
+                    );
+
+                    if self.tree.needs_draw(&self.root) {
+                        window.window.request_redraw();
+                    }
+                }
+            }
+
             WindowEvent::RedrawRequested => {
                 if let Some(ref mut window) = self.window {
                     window.gl_context.make_current(&window.gl_surface).unwrap();
 
-                    let canvas = window.skia_surface.canvas();
-                    canvas.clear(Color::WHITE);
-
-                    let size = window.window.inner_size();
+                    let size = window
+                        .window
+                        .inner_size()
+                        .to_logical(window.window.scale_factor());
 
                     self.tree.layout(
                         &mut self.fonts,
                         &self.root,
-                        Size::new(size.width as f32, size.height as f32),
+                        Size::new(size.width, size.height),
                     );
 
-                    let mut canvas = SkiaCanvas::new(canvas, &mut self.fonts);
-                    self.tree.draw(&self.root, &mut canvas);
+                    let canvas = window.skia_surface.canvas();
+                    canvas.clear(Color::WHITE);
+                    canvas.save();
+                    canvas.scale((
+                        window.window.scale_factor() as f32,
+                        window.window.scale_factor() as f32,
+                    ));
+
+                    {
+                        let mut canvas = SkiaCanvas::new(canvas, &mut self.fonts);
+                        self.tree.draw(&self.root, &mut canvas);
+
+                        if self.tree.needs_draw(&self.root) {
+                            window.window.request_redraw();
+                        }
+                    }
+
+                    canvas.restore();
 
                     window.skia_context.flush_and_submit();
                     window.gl_surface.swap_buffers(&window.gl_context).unwrap();

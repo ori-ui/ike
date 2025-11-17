@@ -11,6 +11,21 @@ impl Matrix {
     pub const IDENTITY: Self = Self {
         matrix: [1.0, 0.0, 0.0, 1.0],
     };
+
+    pub fn determinant(self) -> f32 {
+        let [a, b, c, d] = self.matrix;
+
+        a * d - b * c
+    }
+
+    pub fn inverse(self) -> Self {
+        let inv_det = self.determinant();
+        let [a, b, c, d] = self.matrix;
+
+        Self {
+            matrix: [d * inv_det, -b * inv_det, -c * inv_det, a * inv_det],
+        }
+    }
 }
 
 impl Mul for Matrix {
@@ -70,6 +85,21 @@ impl Affine {
         matrix: Matrix::IDENTITY,
         offset: Offset::new(0.0, 0.0),
     };
+
+    pub fn inverse(self) -> Self {
+        Self {
+            matrix: self.matrix.inverse(),
+            offset: -self.offset,
+        }
+    }
+}
+
+impl Mul<Point> for Affine {
+    type Output = Point;
+
+    fn mul(self, rhs: Point) -> Self::Output {
+        self.matrix * rhs + self.offset
+    }
 }
 
 impl Mul<Offset> for Affine {

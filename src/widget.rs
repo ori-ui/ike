@@ -1,10 +1,13 @@
-use std::any::Any;
+use std::{
+    any::Any,
+    fmt,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+};
 
 use crate::{
-    Canvas, Point, WidgetId,
-    canvas::Fonts,
-    math::{Affine, Rect, Size, Space},
-    tree::Tree,
+    Canvas, DrawCx, EventCx, LayoutCx, PointerEvent,
+    math::{Affine, Size, Space},
 };
 
 pub trait Widget: Any {
@@ -15,7 +18,12 @@ pub trait Widget: Any {
         let _ = scene;
     }
 
-    fn on_pointer_event(&mut self) {}
+    fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> bool {
+        let _ = cx;
+        let _ = event;
+
+        false
+    }
 
     fn accepts_pointer() -> bool
     where
@@ -39,11 +47,46 @@ pub trait Widget: Any {
     }
 }
 
+pub trait AnyWidget: Widget {
+    fn downcast_ref(any: &dyn Widget) -> &Self;
+
+    fn downcast_mut(any: &mut dyn Widget) -> &mut Self;
+}
+
+impl AnyWidget for dyn Widget {
+    fn downcast_ref(any: &dyn Widget) -> &Self {
+        any
+    }
+
+    fn downcast_mut(any: &mut dyn Widget) -> &mut Self {
+        any
+    }
+}
+
+impl<T> AnyWidget for T
+where
+    T: Widget,
+{
+    fn downcast_ref(any: &dyn Widget) -> &Self {
+        (any as &dyn Any).downcast_ref().unwrap()
+    }
+
+    fn downcast_mut(any: &mut dyn Widget) -> &mut Self {
+        (any as &mut dyn Any).downcast_mut().unwrap()
+    }
+}
+
 pub struct WidgetState {
-    pub(crate) affine: Affine,
+    pub(crate) transform: Affine,
     pub(crate) size: Size,
     pub(crate) parent: Option<WidgetId>,
     pub(crate) children: Vec<WidgetId>,
+
+    pub(crate) is_hovered: bool,
+    pub(crate) has_hovered: bool,
+
+    pub(crate) needs_layout: bool,
+    pub(crate) needs_draw: bool,
 
     pub(crate) accepts_pointer: bool,
     pub(crate) accepts_focus: bool,
@@ -53,120 +96,78 @@ pub struct WidgetState {
 impl WidgetState {
     pub fn new<T: Widget>() -> Self {
         Self {
-            affine: Affine::IDENTITY,
+            transform: Affine::IDENTITY,
             size: Size::new(0.0, 0.0),
             parent: None,
             children: Vec::new(),
+
+            is_hovered: false,
+            has_hovered: false,
+
+            needs_layout: true,
+            needs_draw: true,
 
             accepts_focus: T::accepts_focus(),
             accepts_pointer: T::accepts_pointer(),
             accepts_text: T::accepts_text(),
         }
     }
-}
 
-pub struct LayoutCx<'a> {
-    pub(crate) fonts: &'a mut dyn Fonts,
-    pub(crate) tree: &'a mut Tree,
-    pub(crate) state: &'a mut WidgetState,
-}
-
-pub struct DrawCx<'a> {
-    pub(crate) tree: &'a mut Tree,
-    pub(crate) state: &'a WidgetState,
-}
-
-pub struct BuildCx<'a> {
-    pub(crate) tree: &'a mut Tree,
-}
-
-impl LayoutCx<'_> {
-    pub fn fonts(&mut self) -> &mut dyn Fonts {
-        self.fonts
-    }
-
-    pub fn children(&self) -> &[WidgetId] {
-        &self.state.children
-    }
-
-    pub fn layout_child(&mut self, i: usize, space: Space) -> Size {
-        let child = &self.state.children[i];
-
-        self.tree.with(child, |tree, widget, state| {
-            let mut cx = LayoutCx {
-                fonts: self.fonts,
-                tree,
-                state,
-            };
-
-            let size = widget.layout(&mut cx, space);
-            state.size = size;
-
-            size
-        })
-    }
-
-    pub fn place_child(&mut self, i: usize, point: Point) {
-        let child = &self.state.children[i];
-
-        let state = self.tree.widget_state_mut(child);
-        state.affine.offset = point - Point::all(0.0);
+    pub fn merge(&mut self, child: &Self) {
+        self.has_hovered |= child.has_hovered;
+        self.needs_layout |= child.needs_layout;
+        self.needs_draw |= child.needs_draw;
     }
 }
 
-impl BuildCx<'_> {
-    pub fn insert<T>(&mut self, widget: T) -> WidgetId<T>
-    where
-        T: Widget,
-    {
-        self.tree.insert(widget)
-    }
-
-    pub fn add_child<T, U>(&mut self, parent: &WidgetId<T>, child: WidgetId<U>)
-    where
-        T: ?Sized,
-        U: ?Sized,
-    {
-        self.tree.add_child(parent, child);
-    }
-
-    pub fn replace_child<T, U>(&mut self, parent: &WidgetId<T>, index: usize, child: WidgetId<U>)
-    where
-        T: ?Sized,
-        U: ?Sized,
-    {
-        self.tree.replace_child(parent, index, child);
-    }
+#[repr(C)] // we want to be able to cast by reference, so a stable layout is required
+pub struct WidgetId<T: ?Sized = dyn Widget> {
+    pub(crate) index: u32,
+    pub(crate) generation: u32,
+    pub(crate) marker: PhantomData<T>,
 }
 
-macro_rules! impl_contexts {
-    ($cx:ty { $($tt:tt)* }) => {
-        impl $cx {
-            $($tt)*
+impl<T: ?Sized> WidgetId<T> {
+    pub fn upcast(self) -> WidgetId {
+        WidgetId {
+            index: self.index,
+            generation: self.generation,
+            marker: PhantomData,
         }
-    };
-    ($cx:ty, $($cxs:ty),* $(,)* { $($tt:tt)* }) => {
-        impl_contexts!($cx { $($tt)* });
-        impl_contexts!($($cxs),* { $($tt)* });
+    }
+
+    pub(crate) fn clone_internal(&self) -> Self {
+        Self {
+            index: self.index,
+            generation: self.generation,
+            marker: PhantomData,
+        }
     }
 }
 
-impl_contexts! {
-    DrawCx<'_> {
-        pub fn size(&self) -> Size {
-            self.state.size
-        }
+impl WidgetId<dyn Widget> {
+    pub fn downcast_ref_unchecked<T>(&self) -> &WidgetId<T> {
+        unsafe { &*(self as *const _ as *const WidgetId<T>) }
+    }
+}
 
-        pub fn width(&self) -> f32 {
-            self.size().width
-        }
+impl<T: ?Sized, U: ?Sized> PartialEq<WidgetId<U>> for WidgetId<T> {
+    fn eq(&self, other: &WidgetId<U>) -> bool {
+        self.index == other.index && self.generation == other.generation
+    }
+}
 
-        pub fn height(&self) -> f32 {
-            self.size().height
-        }
+impl<T: ?Sized> Eq for WidgetId<T> {}
 
-        pub fn rect(&self) -> Rect {
-            Rect::min_size(Point::all(0.0), self.size())
-        }
+impl<T: ?Sized> Hash for WidgetId<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+        self.generation.hash(state);
+    }
+}
+
+impl<T: ?Sized> fmt::Debug for WidgetId<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.index, self.generation)
     }
 }

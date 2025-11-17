@@ -1,69 +1,13 @@
 use std::{
-    any::Any,
-    fmt,
-    hash::{Hash, Hasher},
     marker::PhantomData,
     mem,
     ops::{Index, IndexMut},
 };
 
 use crate::{
-    BuildCx, Canvas, DrawCx, LayoutCx, Size, Space,
-    canvas::Fonts,
-    widget::{Widget, WidgetState},
+    BuildCx, Canvas, DrawCx, Fonts, LayoutCx, Size, Space, Widget,
+    widget::{AnyWidget, WidgetId, WidgetState},
 };
-
-#[repr(C)] // we want to be able to cast by reference, so a stable layout is required
-pub struct WidgetId<T: ?Sized = dyn Widget> {
-    index: u32,
-    generation: u32,
-    marker: PhantomData<T>,
-}
-
-impl<T: ?Sized> WidgetId<T> {
-    pub fn upcast(self) -> WidgetId {
-        WidgetId {
-            index: self.index,
-            generation: self.generation,
-            marker: PhantomData,
-        }
-    }
-
-    pub(crate) fn clone_internal(&self) -> Self {
-        Self {
-            index: self.index,
-            generation: self.generation,
-            marker: PhantomData,
-        }
-    }
-}
-
-impl WidgetId<dyn Widget> {
-    pub fn downcast_ref_unchecked<T>(&self) -> &WidgetId<T> {
-        unsafe { &*(self as *const _ as *const WidgetId<T>) }
-    }
-}
-
-impl<T: ?Sized, U: ?Sized> PartialEq<WidgetId<U>> for WidgetId<T> {
-    fn eq(&self, other: &WidgetId<U>) -> bool {
-        self.index == other.index && self.generation == other.generation
-    }
-}
-
-impl<T: ?Sized> Eq for WidgetId<T> {}
-
-impl<T: ?Sized> Hash for WidgetId<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.index.hash(state);
-        self.generation.hash(state);
-    }
-}
-
-impl<T: ?Sized> fmt::Debug for WidgetId<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.index, self.generation)
-    }
-}
 
 pub struct Tree {
     entries: Vec<Entry>,
@@ -126,7 +70,7 @@ impl Tree {
 
         if let Some(state) = entry.state.take() {
             if let Some(parent) = state.parent {
-                let parent_state = self.widget_state_mut(&parent);
+                let parent_state = self.widget_state_mut(parent.index);
 
                 if let Some(i) = parent_state.children.iter().position(|x| *x == id) {
                     parent_state.children.remove(i);
@@ -172,10 +116,10 @@ impl Tree {
         T: ?Sized,
         U: ?Sized,
     {
-        let child_state = self.widget_state_mut(&child);
+        let child_state = self.widget_state_mut(child.index);
         child_state.parent = Some(parent.clone_internal().upcast());
 
-        let parent_state = self.widget_state_mut(parent);
+        let parent_state = self.widget_state_mut(parent.index);
         parent_state.children.push(child.upcast());
     }
 
@@ -183,7 +127,7 @@ impl Tree {
     where
         T: ?Sized,
     {
-        let parent_state = self.widget_state_mut(parent);
+        let parent_state = self.widget_state_mut(parent.index);
         parent_state.children.swap(index_a, index_b);
     }
 
@@ -192,10 +136,10 @@ impl Tree {
         T: ?Sized,
         U: ?Sized,
     {
-        let child_state = self.widget_state_mut(&child);
+        let child_state = self.widget_state_mut(child.index);
         child_state.parent = Some(parent.clone_internal().upcast());
 
-        let parent_state = self.widget_state_mut(parent);
+        let parent_state = self.widget_state_mut(parent.index);
         let prev_child = mem::replace(&mut parent_state.children[index], child.upcast());
 
         let entry = &mut self.entries[prev_child.index as usize];
@@ -214,10 +158,11 @@ impl Tree {
         let mut widget = entry.widget.take();
         let mut state = entry.state.take();
 
-        let output = if let (Some(widget), Some(state)) = (widget.as_mut(), state.as_mut()) {
+        let output = {
+            let widget = widget.as_mut().unwrap();
+            let state = state.as_mut().unwrap();
+
             f(self, widget.as_mut(), state)
-        } else {
-            panic!();
         };
 
         let entry = &mut self.entries[id.index as usize];
@@ -228,18 +173,28 @@ impl Tree {
         output
     }
 
-    pub(crate) fn widget_state<T: ?Sized>(&self, id: &WidgetId<T>) -> &WidgetState {
-        let entry = &self.entries[id.index as usize];
-        debug_assert_eq!(entry.generation, id.generation);
-
+    pub(crate) fn widget_state(&self, index: u32) -> &WidgetState {
+        let entry = &self.entries[index as usize];
         entry.state.as_ref().unwrap()
     }
 
-    pub(crate) fn widget_state_mut<T: ?Sized>(&mut self, id: &WidgetId<T>) -> &mut WidgetState {
-        let entry = &mut self.entries[id.index as usize];
-        debug_assert_eq!(entry.generation, id.generation);
-
+    pub(crate) fn widget_state_mut(&mut self, index: u32) -> &mut WidgetState {
+        let entry = &mut self.entries[index as usize];
         entry.state.as_mut().unwrap()
+    }
+
+    pub fn needs_layout<T>(&self, id: &WidgetId<T>) -> bool
+    where
+        T: ?Sized,
+    {
+        self.widget_state(id.index).needs_layout
+    }
+
+    pub fn needs_draw<T>(&self, id: &WidgetId<T>) -> bool
+    where
+        T: ?Sized,
+    {
+        self.widget_state(id.index).needs_draw
     }
 
     pub fn build(&mut self) -> BuildCx<'_> {
@@ -248,6 +203,8 @@ impl Tree {
 
     pub fn layout(&mut self, fonts: &mut dyn Fonts, root: &WidgetId, size: Size) {
         self.with(root, |tree, widget, state| {
+            state.needs_layout = false;
+
             let mut cx = LayoutCx { fonts, tree, state };
             let space = Space::new(Size::new(0.0, 0.0), size);
 
@@ -258,7 +215,9 @@ impl Tree {
 
     pub fn draw(&mut self, root: &WidgetId, canvas: &mut dyn Canvas) {
         self.with(root, |tree, widget, state| {
-            canvas.transform(state.affine, &mut |canvas| {
+            canvas.transform(state.transform, &mut |canvas| {
+                state.needs_draw = false;
+
                 let mut cx = DrawCx { tree, state };
 
                 widget.draw(&mut cx, canvas);
@@ -296,34 +255,5 @@ where
     #[track_caller]
     fn index_mut(&mut self, id: WidgetId<T>) -> &mut Self::Output {
         self.get_mut(id).unwrap()
-    }
-}
-
-pub trait AnyWidget: Widget {
-    fn downcast_ref(any: &dyn Widget) -> &Self;
-
-    fn downcast_mut(any: &mut dyn Widget) -> &mut Self;
-}
-
-impl AnyWidget for dyn Widget {
-    fn downcast_ref(any: &dyn Widget) -> &Self {
-        any
-    }
-
-    fn downcast_mut(any: &mut dyn Widget) -> &mut Self {
-        any
-    }
-}
-
-impl<T> AnyWidget for T
-where
-    T: Widget,
-{
-    fn downcast_ref(any: &dyn Widget) -> &Self {
-        (any as &dyn Any).downcast_ref().unwrap()
-    }
-
-    fn downcast_mut(any: &mut dyn Widget) -> &mut Self {
-        (any as &mut dyn Any).downcast_mut().unwrap()
     }
 }

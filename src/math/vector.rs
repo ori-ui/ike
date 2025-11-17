@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, Sub},
+    ops::{Add, Neg, Sub},
 };
 
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -174,5 +174,13 @@ impl Sub for Offset {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
         }
+    }
+}
+
+impl Neg for Offset {
+    type Output = Offset;
+
+    fn neg(self) -> Self::Output {
+        Self::new(-self.x, -self.y)
     }
 }

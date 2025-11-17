@@ -1,6 +1,6 @@
 use crate::{
-    BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Paint, Point, Size, Space, Widget,
-    WidgetId,
+    BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, LayoutCx, Paint, Point, PointerEvent,
+    Size, Space, Widget, WidgetId,
 };
 
 pub struct Button {
@@ -32,10 +32,18 @@ impl Widget for Button {
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
-        canvas.draw_rect(
-            cx.rect(),
-            CornerRadius::all(8.0),
-            &Paint::from(Color::GREEN),
-        );
+        let color = if cx.is_hovered() {
+            Color::RED
+        } else {
+            Color::GREEN
+        };
+
+        canvas.draw_rect(cx.rect(), CornerRadius::all(8.0), &Paint::from(color));
+    }
+
+    fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, _event: &PointerEvent) -> bool {
+        cx.request_draw();
+
+        true
     }
 }

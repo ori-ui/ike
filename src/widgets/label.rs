@@ -1,7 +1,6 @@
 use crate::{
-    Canvas, DrawCx, LayoutCx, Offset, Size, Space, Widget, WidgetId,
+    BuildCx, Canvas, DrawCx, LayoutCx, Offset, Size, Space, Widget, WidgetId,
     text::{Paragraph, TextAlign, TextStyle, TextWrap},
-    widget::BuildCx,
 };
 
 pub struct Label {
