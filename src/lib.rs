@@ -8,6 +8,7 @@ mod pointer;
 mod text;
 mod tree;
 mod widget;
+mod window;
 
 pub mod widgets;
 
@@ -21,3 +22,4 @@ pub use pointer::{PointerButton, PointerButtonEvent, PointerEvent, PointerId, Po
 pub use text::{Paragraph, TextAlign, TextStyle, TextWrap};
 pub use tree::Tree;
 pub use widget::{Widget, WidgetId};
+pub use window::{Window, WindowId, Windows};

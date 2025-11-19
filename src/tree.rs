@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    BuildCx, Canvas, DrawCx, Fonts, LayoutCx, Size, Space, Widget,
+    Canvas, DrawCx, Fonts, LayoutCx, Size, Space, Widget,
     widget::{AnyWidget, WidgetId, WidgetState},
 };
 
@@ -195,10 +195,6 @@ impl Tree {
         T: ?Sized,
     {
         self.widget_state(id.index).needs_draw
-    }
-
-    pub fn build(&mut self) -> BuildCx<'_> {
-        BuildCx { tree: self }
     }
 
     pub fn layout(&mut self, fonts: &mut dyn Fonts, root: &WidgetId, size: Size) {

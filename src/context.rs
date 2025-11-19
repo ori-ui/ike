@@ -2,13 +2,16 @@ use crate::{
     Fonts, Point, Size, Space, Tree, Widget, WidgetId,
     math::{Affine, Rect},
     widget::WidgetState,
+    window::Windows,
 };
 
 pub struct BuildCx<'a> {
+    pub(crate) windows: &'a mut Windows,
     pub(crate) tree: &'a mut Tree,
 }
 
 pub struct EventCx<'a> {
+    pub(crate) windows: &'a mut Windows,
     pub(crate) fonts: &'a mut dyn Fonts,
     pub(crate) tree: &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
