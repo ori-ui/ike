@@ -34,8 +34,8 @@ impl Paragraph {
     }
 
     pub fn push(&mut self, text: impl AsRef<str>, style: TextStyle) {
+        self.styles.push((style, self.text.len()));
         self.text.push_str(text.as_ref());
-        self.styles.push((style, text.as_ref().len()));
     }
 
     pub fn clear(&mut self) {
