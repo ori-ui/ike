@@ -33,5 +33,5 @@ pub use text::{
     TextLayoutLine, TextStyle, TextWrap,
 };
 pub use tree::Tree;
-pub use widget::{AnyWidgetId, CastWidgetId, Widget, WidgetId};
+pub use widget::{AnyWidgetId, Widget, WidgetId};
 pub use window::{Window, WindowId};

@@ -222,11 +222,9 @@ impl<T: ?Sized> fmt::Debug for WidgetId<T> {
     }
 }
 
-pub trait AnyWidgetId {
+pub trait AnyWidgetId: Copy {
     fn upcast(&self) -> WidgetId;
-}
 
-pub trait CastWidgetId {
     fn downcast_unchecked(id: WidgetId) -> Self;
 }
 
@@ -241,35 +239,12 @@ where
             marker:     PhantomData,
         }
     }
-}
 
-impl<T> CastWidgetId for WidgetId<T>
-where
-    T: ?Sized,
-{
     fn downcast_unchecked(id: WidgetId) -> Self {
-        Self {
+        WidgetId {
             index:      id.index,
             generation: id.generation,
             marker:     PhantomData,
         }
-    }
-}
-
-impl<T> AnyWidgetId for &T
-where
-    T: AnyWidgetId,
-{
-    fn upcast(&self) -> WidgetId {
-        T::upcast(self)
-    }
-}
-
-impl<T> AnyWidgetId for &mut T
-where
-    T: AnyWidgetId,
-{
-    fn upcast(&self) -> WidgetId {
-        T::upcast(self)
     }
 }
