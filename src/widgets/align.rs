@@ -1,4 +1,4 @@
-use crate::{BuildCx, LayoutCx, Point, Size, Space, Widget, WidgetId};
+use crate::{AnyWidgetId, BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId};
 
 pub struct Aligned {
     x: f32,
@@ -6,21 +6,24 @@ pub struct Aligned {
 }
 
 impl Aligned {
-    pub fn new(
-        cx: &mut BuildCx<'_>,
-        x: f32,
-        y: f32,
-        content: WidgetId<impl Widget>,
-    ) -> WidgetId<Self> {
+    pub fn new(cx: &mut impl BuildCx, x: f32, y: f32, content: impl AnyWidgetId) -> WidgetId<Self> {
         let this = cx.insert(Aligned { x, y });
 
-        cx.add_child(&this, content);
+        cx.add_child(this, content);
 
         this
     }
 
-    pub fn set_child(cx: &mut BuildCx<'_>, id: &WidgetId<Self>, child: WidgetId<impl Widget>) {
+    pub fn set_child(cx: &mut impl BuildCx, id: WidgetId<Self>, child: impl AnyWidgetId) {
         cx.replace_child(id, 0, child);
+    }
+
+    pub fn set_alignment(cx: &mut impl BuildCx, id: WidgetId<Self>, x: f32, y: f32) {
+        let this = cx.get_mut(id);
+        this.x = x;
+        this.y = y;
+
+        cx.request_layout(id);
     }
 }
 
@@ -41,7 +44,7 @@ impl Widget for Aligned {
         let excess_width = size.width - child_size.width;
         let excess_height = size.height - child_size.height;
 
-        let position = Point::new(excess_width * self.x, excess_height * self.y);
+        let position = Offset::new(excess_width * self.x, excess_height * self.y);
 
         cx.place_child(0, position);
 

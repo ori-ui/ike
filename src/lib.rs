@@ -1,3 +1,4 @@
+mod app;
 mod border;
 mod canvas;
 mod color;
@@ -12,14 +13,18 @@ mod window;
 
 pub mod widgets;
 
-pub use border::{BorderWidth, CornerRadius};
+pub use app::App;
+pub use border::{BorderWidth, CornerRadius, Padding};
 pub use canvas::{Canvas, Fonts, Paint, Shader};
 pub use color::Color;
 pub use context::{BuildCx, DrawCx, EventCx, LayoutCx};
 pub use curve::Curve;
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
-pub use pointer::{PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent};
+pub use pointer::{
+    Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,
+    PointerPropagate,
+};
 pub use text::{Paragraph, TextAlign, TextStyle, TextWrap};
 pub use tree::Tree;
-pub use widget::{Widget, WidgetId};
-pub use window::{Window, WindowId, Windows};
+pub use widget::{AnyWidgetId, DowncastWidgetId, Widget, WidgetId};
+pub use window::{Window, WindowId};

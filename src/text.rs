@@ -1,3 +1,5 @@
+use crate::Color;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TextAlign {
     Start,
@@ -36,6 +38,11 @@ impl Paragraph {
         self.styles.push((style, text.as_ref().len()));
     }
 
+    pub fn clear(&mut self) {
+        self.text.clear();
+        self.styles.clear();
+    }
+
     pub fn sections(&self) -> impl Iterator<Item = (&str, &TextStyle)> {
         let mut prev = 0;
 
@@ -52,4 +59,5 @@ impl Paragraph {
 pub struct TextStyle {
     pub font_size: f32,
     pub font_family: String,
+    pub color: Color,
 }

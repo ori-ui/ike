@@ -6,23 +6,29 @@ use std::{
 };
 
 use crate::{
-    Canvas, DrawCx, EventCx, LayoutCx, PointerEvent,
+    Canvas, DrawCx, EventCx, LayoutCx, PointerEvent, PointerPropagate,
+    context::UpdateCx,
     math::{Affine, Size, Space},
 };
 
 pub trait Widget: Any {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size;
 
-    fn draw(&mut self, cx: &mut DrawCx<'_>, scene: &mut dyn Canvas) {
+    fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         let _ = cx;
-        let _ = scene;
+        let _ = canvas;
     }
 
-    fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> bool {
+    fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
+        let _ = cx;
+        let _ = update;
+    }
+
+    fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
         let _ = cx;
         let _ = event;
 
-        false
+        PointerPropagate::Bubble
     }
 
     fn accepts_pointer() -> bool
@@ -45,6 +51,17 @@ pub trait Widget: Any {
     {
         false
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Update {
+    Hovered(bool),
+    Active(bool),
+    Focused(bool),
+    ChildAdded(usize),
+    ChildRemoved(usize),
+    ChildReplaced(usize),
+    ChildrenSwapped(usize, usize),
 }
 
 pub trait AnyWidget: Widget {
@@ -76,8 +93,10 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct WidgetState {
     pub(crate) transform: Affine,
+    pub(crate) global_transform: Affine,
     pub(crate) size: Size,
     pub(crate) parent: Option<WidgetId>,
     pub(crate) children: Vec<WidgetId>,
@@ -85,6 +104,13 @@ pub struct WidgetState {
     pub(crate) is_hovered: bool,
     pub(crate) has_hovered: bool,
 
+    pub(crate) is_focused: bool,
+    pub(crate) has_focused: bool,
+
+    pub(crate) is_active: bool,
+    pub(crate) has_active: bool,
+
+    pub(crate) needs_animation: bool,
     pub(crate) needs_layout: bool,
     pub(crate) needs_draw: bool,
 
@@ -97,6 +123,7 @@ impl WidgetState {
     pub fn new<T: Widget>() -> Self {
         Self {
             transform: Affine::IDENTITY,
+            global_transform: Affine::IDENTITY,
             size: Size::new(0.0, 0.0),
             parent: None,
             children: Vec::new(),
@@ -104,6 +131,13 @@ impl WidgetState {
             is_hovered: false,
             has_hovered: false,
 
+            is_focused: false,
+            has_focused: false,
+
+            is_active: false,
+            has_active: false,
+
+            needs_animation: false,
             needs_layout: true,
             needs_draw: true,
 
@@ -115,6 +149,9 @@ impl WidgetState {
 
     pub fn merge(&mut self, child: &Self) {
         self.has_hovered |= child.has_hovered;
+        self.has_active |= child.has_active;
+        self.has_focused |= child.has_focused;
+
         self.needs_layout |= child.needs_layout;
         self.needs_draw |= child.needs_draw;
     }
@@ -127,29 +164,22 @@ pub struct WidgetId<T: ?Sized = dyn Widget> {
     pub(crate) marker: PhantomData<T>,
 }
 
-impl<T: ?Sized> WidgetId<T> {
-    pub fn upcast(self) -> WidgetId {
-        WidgetId {
-            index: self.index,
-            generation: self.generation,
-            marker: PhantomData,
-        }
-    }
-
-    pub(crate) fn clone_internal(&self) -> Self {
-        Self {
-            index: self.index,
-            generation: self.generation,
-            marker: PhantomData,
-        }
-    }
-}
-
 impl WidgetId<dyn Widget> {
-    pub fn downcast_ref_unchecked<T>(&self) -> &WidgetId<T> {
+    pub fn downcast_ref_unchecked<T>(&self) -> &WidgetId<T>
+    where
+        T: ?Sized,
+    {
         unsafe { &*(self as *const _ as *const WidgetId<T>) }
     }
 }
+
+impl<T: ?Sized> Clone for WidgetId<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: ?Sized> Copy for WidgetId<T> {}
 
 impl<T: ?Sized, U: ?Sized> PartialEq<WidgetId<U>> for WidgetId<T> {
     fn eq(&self, other: &WidgetId<U>) -> bool {
@@ -169,5 +199,57 @@ impl<T: ?Sized> Hash for WidgetId<T> {
 impl<T: ?Sized> fmt::Debug for WidgetId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.index, self.generation)
+    }
+}
+
+pub trait AnyWidgetId {
+    fn upcast(&self) -> WidgetId;
+}
+
+pub trait DowncastWidgetId {
+    fn downcast_unchecked(id: WidgetId) -> Self;
+}
+
+impl<T> AnyWidgetId for WidgetId<T>
+where
+    T: ?Sized,
+{
+    fn upcast(&self) -> WidgetId {
+        WidgetId {
+            index: self.index,
+            generation: self.generation,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<T> DowncastWidgetId for WidgetId<T>
+where
+    T: ?Sized,
+{
+    fn downcast_unchecked(id: WidgetId) -> Self {
+        Self {
+            index: id.index,
+            generation: id.generation,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<T> AnyWidgetId for &T
+where
+    T: AnyWidgetId,
+{
+    fn upcast(&self) -> WidgetId {
+        T::upcast(self)
+    }
+}
+
+impl<T> AnyWidgetId for &mut T
+where
+    T: AnyWidgetId,
+{
+    fn upcast(&self) -> WidgetId {
+        T::upcast(self)
     }
 }

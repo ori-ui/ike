@@ -1,21 +1,17 @@
 use crate::{
-    Fonts, Point, Size, Space, Tree, Widget, WidgetId,
-    math::{Affine, Rect},
-    widget::WidgetState,
-    window::Windows,
+    AnyWidgetId, App, Fonts, Offset, Point, Size, Space, Tree, Widget, WidgetId,
+    math::Rect,
+    widget::{AnyWidget, WidgetState},
 };
 
-pub struct BuildCx<'a> {
-    pub(crate) windows: &'a mut Windows,
-    pub(crate) tree: &'a mut Tree,
+pub struct EventCx<'a> {
+    pub(crate) app: &'a mut App,
+    pub(crate) state: &'a mut WidgetState,
 }
 
-pub struct EventCx<'a> {
-    pub(crate) windows: &'a mut Windows,
-    pub(crate) fonts: &'a mut dyn Fonts,
+pub struct UpdateCx<'a> {
     pub(crate) tree: &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
-    pub(crate) transform: Affine,
 }
 
 pub struct LayoutCx<'a> {
@@ -29,38 +25,104 @@ pub struct DrawCx<'a> {
     pub(crate) state: &'a mut WidgetState,
 }
 
-impl BuildCx<'_> {
-    pub fn insert<T>(&mut self, widget: T) -> WidgetId<T>
+pub trait BuildCx {
+    fn app(&self) -> &App;
+    fn app_mut(&mut self) -> &mut App;
+
+    fn get<T>(&self, id: WidgetId<T>) -> &T
     where
+        T: ?Sized + AnyWidget,
+    {
+        &self.app().tree[id]
+    }
+
+    fn get_mut<T>(&mut self, id: WidgetId<T>) -> &mut T
+    where
+        T: ?Sized + AnyWidget,
+    {
+        &mut self.app_mut().tree[id]
+    }
+
+    fn insert<T>(&mut self, widget: T) -> WidgetId<T>
+    where
+        Self: Sized,
         T: Widget,
     {
-        self.tree.insert(widget)
+        self.app_mut().tree.insert(widget)
     }
 
-    pub fn add_child<T, U>(&mut self, parent: &WidgetId<T>, child: WidgetId<U>)
+    fn remove(&mut self, id: impl AnyWidgetId)
     where
-        T: ?Sized,
-        U: ?Sized,
+        Self: Sized,
     {
-        self.tree.add_child(parent, child);
+        self.app_mut().tree.remove(id.upcast());
     }
 
-    pub fn replace_child<T, U>(&mut self, parent: &WidgetId<T>, index: usize, child: WidgetId<U>)
+    fn add_child(&mut self, parent: impl AnyWidgetId, child: impl AnyWidgetId)
     where
-        T: ?Sized,
-        U: ?Sized,
+        Self: Sized,
     {
-        self.tree.replace_child(parent, index, child);
-    }
-}
-
-impl EventCx<'_> {
-    pub fn request_layout(&mut self) {
-        self.state.needs_layout = true;
+        let child = child.upcast();
+        self.app_mut().tree.add_child(parent, child);
+        self.app_mut().tree.request_layout(child);
     }
 
-    pub fn request_draw(&mut self) {
-        self.state.needs_draw = true;
+    fn remove_child(&mut self, parent: impl AnyWidgetId, index: usize)
+    where
+        Self: Sized,
+    {
+        let parent = parent.upcast();
+        let state = self.app().tree.widget_state(parent.index);
+        let child = state.children[index];
+        self.app_mut().tree.remove(child);
+        self.app_mut().tree.request_layout(child);
+    }
+
+    fn replace_child(&mut self, parent: impl AnyWidgetId, index: usize, child: impl AnyWidgetId)
+    where
+        Self: Sized,
+    {
+        let child = child.upcast();
+        self.app_mut().tree.replace_child(parent, index, child);
+        self.app_mut().tree.request_layout(child);
+    }
+
+    fn swap_children(&mut self, parent: impl AnyWidgetId, index_a: usize, index_b: usize)
+    where
+        Self: Sized,
+    {
+        let parent = parent.upcast();
+
+        self.app_mut().tree.swap_children(parent, index_a, index_b);
+        self.app_mut().tree.request_layout(parent);
+    }
+
+    fn children(&self, widget: impl AnyWidgetId) -> &[WidgetId] {
+        &self.app().tree.widget_state(widget.upcast().index).children
+    }
+
+    fn is_parent(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
+    where
+        Self: Sized,
+    {
+        let parent = parent.upcast();
+        let child = child.upcast();
+
+        self.app().tree.widget_state(child.index).parent == Some(parent)
+    }
+
+    fn request_layout(&mut self, id: impl AnyWidgetId)
+    where
+        Self: Sized,
+    {
+        self.app_mut().tree.request_layout(id);
+    }
+
+    fn request_draw(&mut self, id: impl AnyWidgetId)
+    where
+        Self: Sized,
+    {
+        self.app_mut().tree.request_draw(id);
     }
 }
 
@@ -69,14 +131,12 @@ impl LayoutCx<'_> {
         self.fonts
     }
 
-    pub fn children(&self) -> &[WidgetId] {
-        &self.state.children
-    }
-
     pub fn layout_child(&mut self, i: usize, space: Space) -> Size {
-        let child = &self.state.children[i];
+        let child = self.state.children[i];
 
-        self.tree.with(child, |tree, widget, state| {
+        self.tree.with_entry(child, |tree, widget, state| {
+            state.needs_layout = false;
+
             let mut cx = LayoutCx {
                 fonts: self.fonts,
                 tree,
@@ -90,11 +150,18 @@ impl LayoutCx<'_> {
         })
     }
 
-    pub fn place_child(&mut self, i: usize, point: Point) {
+    pub fn place_child(&mut self, i: usize, offset: Offset) {
         let child = &self.state.children[i];
 
         let state = self.tree.widget_state_mut(child.index);
-        state.transform.offset = point - Point::all(0.0);
+        state.transform.offset = offset;
+    }
+
+    pub fn child_size(&self, i: usize) -> Size {
+        let child = &self.state.children[i];
+
+        let state = self.tree.widget_state(child.index);
+        state.size
     }
 }
 
@@ -112,6 +179,31 @@ macro_rules! impl_contexts {
 
 impl_contexts! {
     EventCx<'_>,
+    UpdateCx<'_> {
+        pub fn request_layout(&mut self) {
+            self.state.needs_layout = true;
+        }
+
+        pub fn request_draw(&mut self) {
+            self.state.needs_draw = true;
+        }
+    }
+}
+
+impl_contexts! {
+    EventCx<'_>,
+    UpdateCx<'_>,
+    LayoutCx<'_>,
+    DrawCx<'_> {
+        pub fn children(&self) -> &[WidgetId] {
+            &self.state.children
+        }
+    }
+}
+
+impl_contexts! {
+    EventCx<'_>,
+    UpdateCx<'_>,
     DrawCx<'_> {
         pub fn size(&self) -> Size {
             self.state.size
@@ -131,6 +223,14 @@ impl_contexts! {
 
         pub fn is_hovered(&self) -> bool {
             self.state.is_hovered
+        }
+
+        pub fn is_active(&self) -> bool {
+            self.state.is_active
+        }
+
+        pub fn is_focused(&self) -> bool {
+            self.state.is_focused
         }
     }
 }

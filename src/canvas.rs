@@ -1,5 +1,5 @@
 use crate::{
-    Color, CornerRadius, Offset, Size,
+    BorderWidth, Color, CornerRadius, Offset, Size,
     math::{Affine, Rect},
     text::Paragraph,
 };
@@ -27,9 +27,13 @@ pub trait Fonts {
 }
 
 pub trait Canvas {
+    fn fonts(&mut self) -> &mut dyn Fonts;
+
     fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas));
 
     fn draw_rect(&mut self, rect: Rect, corners: CornerRadius, paint: &Paint);
+
+    fn draw_border(&mut self, rect: Rect, width: BorderWidth, radius: CornerRadius, paint: &Paint);
 
     fn draw_text(&mut self, paragraph: &Paragraph, max_width: f32, offset: Offset);
 }

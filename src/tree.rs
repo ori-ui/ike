@@ -5,8 +5,9 @@ use std::{
 };
 
 use crate::{
-    Canvas, DrawCx, Fonts, LayoutCx, Size, Space, Widget,
-    widget::{AnyWidget, WidgetId, WidgetState},
+    AnyWidgetId, Fonts, LayoutCx, Size, Space, Widget,
+    context::UpdateCx,
+    widget::{AnyWidget, Update, WidgetId, WidgetState},
 };
 
 pub struct Tree {
@@ -74,6 +75,14 @@ impl Tree {
 
                 if let Some(i) = parent_state.children.iter().position(|x| *x == id) {
                     parent_state.children.remove(i);
+
+                    self.with_entry(parent, |tree, widget, state| {
+                        let mut cx = UpdateCx { tree, state };
+
+                        widget.update(&mut cx, Update::ChildRemoved(i));
+                    });
+
+                    self.request_layout(parent);
                 }
             }
 
@@ -111,65 +120,115 @@ impl Tree {
         Some(T::downcast_mut(entry.widget.as_deref_mut()?))
     }
 
-    pub fn add_child<T, U>(&mut self, parent: &WidgetId<T>, child: WidgetId<U>)
-    where
-        T: ?Sized,
-        U: ?Sized,
-    {
+    pub fn add_child(&mut self, parent: impl AnyWidgetId, child: impl AnyWidgetId) {
+        let parent = parent.upcast();
+        let child = child.upcast();
+
+        self.debug_validate_id(parent);
+        self.debug_validate_id(child);
+
         let child_state = self.widget_state_mut(child.index);
-        child_state.parent = Some(parent.clone_internal().upcast());
+        child_state.parent = Some(parent.upcast());
 
         let parent_state = self.widget_state_mut(parent.index);
+
+        let index = parent_state.children.len();
         parent_state.children.push(child.upcast());
+
+        self.with_entry(parent, |tree, widget, state| {
+            let mut cx = UpdateCx { tree, state };
+
+            widget.update(&mut cx, Update::ChildAdded(index));
+        });
+
+        self.request_layout(parent);
     }
 
-    pub fn swap_children<T>(&mut self, parent: &WidgetId<T>, index_a: usize, index_b: usize)
-    where
-        T: ?Sized,
-    {
+    pub fn swap_children(&mut self, parent: impl AnyWidgetId, index_a: usize, index_b: usize) {
+        let parent = parent.upcast();
+
+        self.debug_validate_id(parent);
+
         let parent_state = self.widget_state_mut(parent.index);
         parent_state.children.swap(index_a, index_b);
+
+        self.with_entry(parent, |tree, widget, state| {
+            let mut cx = UpdateCx { tree, state };
+
+            widget.update(&mut cx, Update::ChildrenSwapped(index_a, index_b));
+        });
+
+        self.request_layout(parent);
     }
 
-    pub fn replace_child<T, U>(&mut self, parent: &WidgetId<T>, index: usize, child: WidgetId<U>)
-    where
-        T: ?Sized,
-        U: ?Sized,
-    {
+    pub fn replace_child(
+        &mut self,
+        parent: impl AnyWidgetId,
+        index: usize,
+        child: impl AnyWidgetId,
+    ) {
+        let parent = parent.upcast();
+        let child = child.upcast();
+
+        self.debug_validate_id(parent);
+        self.debug_validate_id(child);
+
         let child_state = self.widget_state_mut(child.index);
-        child_state.parent = Some(parent.clone_internal().upcast());
+        child_state.parent = Some(parent.upcast());
 
         let parent_state = self.widget_state_mut(parent.index);
         let prev_child = mem::replace(&mut parent_state.children[index], child.upcast());
 
-        let entry = &mut self.entries[prev_child.index as usize];
+        self.remove(prev_child);
 
-        entry.state.take();
-        entry.widget.take();
+        self.with_entry(parent, |tree, widget, state| {
+            let mut cx = UpdateCx { tree, state };
+
+            widget.update(&mut cx, Update::ChildReplaced(index));
+        });
+
+        self.request_layout(child);
     }
 
-    pub(crate) fn with<T: ?Sized, U>(
+    pub(crate) fn take_entry<T>(
         &mut self,
-        id: &WidgetId<T>,
+        id: WidgetId<T>,
+    ) -> Option<(Box<dyn Widget>, WidgetState)>
+    where
+        T: ?Sized,
+    {
+        self.debug_validate_id(id);
+
+        let entry = &mut self.entries[id.index as usize];
+        Some((entry.widget.take()?, entry.state.take()?))
+    }
+
+    pub(crate) fn insert_entry<T>(
+        &mut self,
+        id: WidgetId<T>,
+        widget: Box<dyn Widget>,
+        state: WidgetState,
+    ) where
+        T: ?Sized,
+    {
+        self.debug_validate_id(id);
+
+        let entry = &mut self.entries[id.index as usize];
+        entry.widget = Some(widget);
+        entry.state = Some(state);
+    }
+
+    pub(crate) fn with_entry<T, U>(
+        &mut self,
+        id: WidgetId<T>,
         f: impl FnOnce(&mut Self, &mut dyn Widget, &mut WidgetState) -> U,
-    ) -> U {
-        let entry = &mut self.entries[id.index as usize];
-
-        let mut widget = entry.widget.take();
-        let mut state = entry.state.take();
-
-        let output = {
-            let widget = widget.as_mut().unwrap();
-            let state = state.as_mut().unwrap();
-
-            f(self, widget.as_mut(), state)
-        };
-
-        let entry = &mut self.entries[id.index as usize];
-
-        entry.widget = widget;
-        entry.state = state;
-
+    ) -> U
+    where
+        T: ?Sized,
+    {
+        let (mut widget, mut state) = self.take_entry(id).unwrap();
+        let output = { f(self, widget.as_mut(), &mut state) };
+        self.insert_entry(id, widget, state);
         output
     }
 
@@ -183,22 +242,68 @@ impl Tree {
         entry.state.as_mut().unwrap()
     }
 
-    pub fn needs_layout<T>(&self, id: &WidgetId<T>) -> bool
+    pub(crate) fn debug_validate_id<T>(&self, id: WidgetId<T>)
     where
         T: ?Sized,
     {
+        let entry = &self.entries[id.index as usize];
+        debug_assert_eq!(id.generation, entry.generation);
+    }
+
+    pub(crate) fn propagate_state(&mut self, id: impl AnyWidgetId) {
+        let parent = self.with_entry(id.upcast(), |tree, _, state| {
+            if let Some(parent) = state.parent {
+                let parent_state = tree.widget_state_mut(parent.index);
+                parent_state.merge(state);
+            }
+
+            state.parent
+        });
+
+        if let Some(parent) = parent {
+            self.propagate_state(parent);
+        }
+    }
+
+    pub(crate) fn request_layout(&mut self, id: impl AnyWidgetId) {
+        let id = id.upcast();
+        self.debug_validate_id(id);
+
+        let state = self.widget_state_mut(id.index);
+        state.needs_layout = true;
+        state.needs_draw = true;
+
+        self.propagate_state(id);
+    }
+
+    pub(crate) fn request_draw(&mut self, id: impl AnyWidgetId) {
+        let id = id.upcast();
+        self.debug_validate_id(id);
+
+        let state = self.widget_state_mut(id.index);
+        state.needs_draw = true;
+
+        self.propagate_state(id);
+    }
+
+    pub fn needs_layout<T>(&self, id: WidgetId<T>) -> bool
+    where
+        T: ?Sized,
+    {
+        self.debug_validate_id(id);
         self.widget_state(id.index).needs_layout
     }
 
-    pub fn needs_draw<T>(&self, id: &WidgetId<T>) -> bool
+    pub fn needs_draw<T>(&self, id: WidgetId<T>) -> bool
     where
         T: ?Sized,
     {
+        self.debug_validate_id(id);
         self.widget_state(id.index).needs_draw
     }
 
-    pub fn layout(&mut self, fonts: &mut dyn Fonts, root: &WidgetId, size: Size) {
-        self.with(root, |tree, widget, state| {
+    pub fn layout(&mut self, fonts: &mut dyn Fonts, root: WidgetId, size: Size) {
+        self.with_entry(root, |tree, widget, state| {
             state.needs_layout = false;
 
             let mut cx = LayoutCx { fonts, tree, state };
@@ -206,22 +311,6 @@ impl Tree {
 
             let size = widget.layout(&mut cx, space);
             state.size = size;
-        });
-    }
-
-    pub fn draw(&mut self, root: &WidgetId, canvas: &mut dyn Canvas) {
-        self.with(root, |tree, widget, state| {
-            canvas.transform(state.transform, &mut |canvas| {
-                state.needs_draw = false;
-
-                let mut cx = DrawCx { tree, state };
-
-                widget.draw(&mut cx, canvas);
-
-                for child in &state.children {
-                    tree.draw(child, canvas);
-                }
-            });
         });
     }
 }
