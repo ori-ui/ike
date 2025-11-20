@@ -19,7 +19,7 @@ pub struct Paragraph {
     pub align:       TextAlign,
     pub wrap:        TextWrap,
     text:            String,
-    styles:          Vec<(TextStyle, usize)>,
+    styles:          Vec<(usize, TextStyle)>,
 }
 
 impl Paragraph {
@@ -34,7 +34,7 @@ impl Paragraph {
     }
 
     pub fn push(&mut self, text: impl AsRef<str>, style: TextStyle) {
-        self.styles.push((style, self.text.len()));
+        self.styles.push((self.text.len(), style));
         self.text.push_str(text.as_ref());
     }
 
@@ -51,13 +51,13 @@ impl Paragraph {
         let last = self
             .styles
             .last()
-            .map(|(style, start)| (&self.text[*start..], style));
+            .map(|(start, style)| (&self.text[*start..], style));
 
         self.styles
             .windows(2)
             .map(|sections| {
-                let (ref style, start) = sections[0];
-                let (_, end) = sections[1];
+                let (start, ref style) = sections[0];
+                let (end, _) = sections[1];
                 (&self.text[start..end], style)
             })
             .chain(last)
