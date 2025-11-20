@@ -3,10 +3,11 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     marker::PhantomData,
+    time::Duration,
 };
 
 use crate::{
-    Canvas, DrawCx, EventCx, LayoutCx, PointerEvent, PointerPropagate,
+    Canvas, DrawCx, EventCx, KeyEvent, LayoutCx, PointerEvent, PointerPropagate, Propagate,
     context::UpdateCx,
     math::{Affine, Size, Space},
 };
@@ -14,7 +15,16 @@ use crate::{
 pub trait Widget: Any {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size;
 
+    fn compose(&mut self, cx: &mut UpdateCx<'_>) {
+        let _ = cx;
+    }
+
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
+        let _ = cx;
+        let _ = canvas;
+    }
+
+    fn draw_over(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         let _ = cx;
         let _ = canvas;
     }
@@ -24,11 +34,23 @@ pub trait Widget: Any {
         let _ = update;
     }
 
+    fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {
+        let _ = cx;
+        let _ = dt;
+    }
+
     fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
         let _ = cx;
         let _ = event;
 
         PointerPropagate::Bubble
+    }
+
+    fn on_key_event(&mut self, cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {
+        let _ = cx;
+        let _ = event;
+
+        Propagate::Bubble
     }
 
     fn accepts_pointer() -> bool
@@ -39,13 +61,6 @@ pub trait Widget: Any {
     }
 
     fn accepts_focus() -> bool
-    where
-        Self: Sized,
-    {
-        false
-    }
-
-    fn accepts_text() -> bool
     where
         Self: Sized,
     {
@@ -95,63 +110,68 @@ where
 
 #[derive(Debug)]
 pub struct WidgetState {
-    pub(crate) transform: Affine,
+    pub(crate) transform:        Affine,
     pub(crate) global_transform: Affine,
-    pub(crate) size: Size,
-    pub(crate) parent: Option<WidgetId>,
-    pub(crate) children: Vec<WidgetId>,
+    pub(crate) size:             Size,
+    pub(crate) parent:           Option<WidgetId>,
+    pub(crate) children:         Vec<WidgetId>,
 
-    pub(crate) is_hovered: bool,
+    pub(crate) is_hovered:  bool,
     pub(crate) has_hovered: bool,
 
-    pub(crate) is_focused: bool,
+    pub(crate) is_focused:  bool,
     pub(crate) has_focused: bool,
 
-    pub(crate) is_active: bool,
+    pub(crate) is_active:  bool,
     pub(crate) has_active: bool,
 
-    pub(crate) needs_animation: bool,
-    pub(crate) needs_layout: bool,
-    pub(crate) needs_draw: bool,
+    pub(crate) needs_animate: bool,
+    pub(crate) needs_layout:  bool,
+    pub(crate) needs_draw:    bool,
 
     pub(crate) accepts_pointer: bool,
-    pub(crate) accepts_focus: bool,
-    pub(crate) accepts_text: bool,
+    pub(crate) accepts_focus:   bool,
 }
 
 impl WidgetState {
-    pub fn new<T: Widget>() -> Self {
+    pub(crate) fn new<T: Widget>() -> Self {
         Self {
-            transform: Affine::IDENTITY,
+            transform:        Affine::IDENTITY,
             global_transform: Affine::IDENTITY,
-            size: Size::new(0.0, 0.0),
-            parent: None,
-            children: Vec::new(),
+            size:             Size::new(0.0, 0.0),
+            parent:           None,
+            children:         Vec::new(),
 
-            is_hovered: false,
+            is_hovered:  false,
             has_hovered: false,
 
-            is_focused: false,
+            is_focused:  false,
             has_focused: false,
 
-            is_active: false,
+            is_active:  false,
             has_active: false,
 
-            needs_animation: false,
-            needs_layout: true,
-            needs_draw: true,
+            needs_animate: false,
+            needs_layout:  true,
+            needs_draw:    true,
 
-            accepts_focus: T::accepts_focus(),
+            accepts_focus:   T::accepts_focus(),
             accepts_pointer: T::accepts_pointer(),
-            accepts_text: T::accepts_text(),
         }
     }
 
-    pub fn merge(&mut self, child: &Self) {
+    pub(crate) fn reset(&mut self) {
+        self.has_hovered = self.is_hovered;
+        self.has_active = self.is_active;
+        self.has_focused = self.is_focused;
+    }
+
+    pub(crate) fn merge(&mut self, child: &Self) {
         self.has_hovered |= child.has_hovered;
         self.has_active |= child.has_active;
         self.has_focused |= child.has_focused;
 
+        self.needs_animate |= child.needs_animate;
         self.needs_layout |= child.needs_layout;
         self.needs_draw |= child.needs_draw;
     }
@@ -159,9 +179,9 @@ impl WidgetState {
 
 #[repr(C)] // we want to be able to cast by reference, so a stable layout is required
 pub struct WidgetId<T: ?Sized = dyn Widget> {
-    pub(crate) index: u32,
+    pub(crate) index:      u32,
     pub(crate) generation: u32,
-    pub(crate) marker: PhantomData<T>,
+    pub(crate) marker:     PhantomData<T>,
 }
 
 impl WidgetId<dyn Widget> {
@@ -206,7 +226,7 @@ pub trait AnyWidgetId {
     fn upcast(&self) -> WidgetId;
 }
 
-pub trait DowncastWidgetId {
+pub trait CastWidgetId {
     fn downcast_unchecked(id: WidgetId) -> Self;
 }
 
@@ -216,22 +236,22 @@ where
 {
     fn upcast(&self) -> WidgetId {
         WidgetId {
-            index: self.index,
+            index:      self.index,
             generation: self.generation,
-            marker: PhantomData,
+            marker:     PhantomData,
         }
     }
 }
 
-impl<T> DowncastWidgetId for WidgetId<T>
+impl<T> CastWidgetId for WidgetId<T>
 where
     T: ?Sized,
 {
     fn downcast_unchecked(id: WidgetId) -> Self {
         Self {
-            index: id.index,
+            index:      id.index,
             generation: id.generation,
-            marker: PhantomData,
+            marker:     PhantomData,
         }
     }
 }

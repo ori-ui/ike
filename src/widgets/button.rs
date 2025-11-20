@@ -1,31 +1,33 @@
 use crate::{
-    AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, LayoutCx,
-    Padding, Paint, PointerButtonEvent, PointerEvent, PointerPropagate, Size, Space, Widget,
-    WidgetId, context::UpdateCx, widget::Update,
+    AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent,
+    LayoutCx, NamedKey, Padding, Paint, PointerEvent, PointerPropagate, Propagate, Size, Space,
+    Widget, WidgetId, context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
-    padding: Padding,
-    border_width: BorderWidth,
+    padding:       Padding,
+    border_width:  BorderWidth,
     corner_radius: CornerRadius,
-    color: Color,
+    color:         Color,
     hovered_color: Color,
-    active_color: Color,
-    border_color: Color,
-    on_click: Box<dyn FnMut(&PointerButtonEvent)>,
+    active_color:  Color,
+    border_color:  Color,
+    focus_color:   Color,
+    on_click:      Box<dyn FnMut()>,
 }
 
 impl Button {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetId<Self> {
         let this = cx.insert(Button {
-            padding: Padding::all(8.0),
-            border_width: BorderWidth::all(1.0),
+            padding:       Padding::all(8.0),
+            border_width:  BorderWidth::all(1.0),
             corner_radius: CornerRadius::all(8.0),
-            color: Color::GREEN,
+            color:         Color::GREEN,
             hovered_color: Color::RED,
-            active_color: Color::BLUE,
-            border_color: Color::BLACK,
-            on_click: Box::new(|_| {}),
+            active_color:  Color::BLUE,
+            border_color:  Color::BLACK,
+            focus_color:   Color::BLUE,
+            on_click:      Box::new(|| {}),
         });
 
         cx.add_child(this, child);
@@ -76,10 +78,15 @@ impl Button {
         cx.request_draw(id);
     }
 
+    pub fn set_focus_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
+        cx.get_mut(id).focus_color = color;
+        cx.request_draw(id);
+    }
+
     pub fn set_on_click(
         cx: &mut impl BuildCx,
         id: WidgetId<Self>,
-        on_click: impl FnMut(&PointerButtonEvent) + 'static,
+        on_click: impl FnMut() + 'static,
     ) {
         cx.get_mut(id).on_click = Box::new(on_click);
     }
@@ -111,11 +118,22 @@ impl Widget for Button {
             self.corner_radius,
             &Paint::from(self.border_color),
         );
+
+        if cx.is_focused() {
+            canvas.draw_border(
+                cx.rect().expand(4.0),
+                BorderWidth::all(2.0),
+                self.corner_radius + 4.0,
+                &Paint::from(self.focus_color),
+            );
+        }
     }
 
     fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
         match update {
-            Update::Hovered(..) | Update::Active(..) => cx.request_draw(),
+            Update::Hovered(..) | Update::Active(..) | Update::Focused(..) => {
+                cx.request_draw();
+            }
 
             _ => {}
         }
@@ -125,17 +143,34 @@ impl Widget for Button {
         match event {
             PointerEvent::Down(..) => {
                 cx.request_draw();
-
                 PointerPropagate::Capture
             }
 
-            PointerEvent::Up(event) if cx.is_hovered() && cx.is_active() => {
-                (self.on_click)(event);
-
+            PointerEvent::Up(..) if cx.is_hovered() && cx.is_active() => {
+                (self.on_click)();
                 PointerPropagate::Bubble
             }
 
             _ => PointerPropagate::Bubble,
         }
+    }
+
+    fn on_key_event(&mut self, _cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {
+        match event {
+            KeyEvent::Up(event)
+                if matches!(event.key, Key::Character(ref c) if c == " ")
+                    || event.key == Key::Named(NamedKey::Enter) =>
+            {
+                (self.on_click)();
+
+                Propagate::Stop
+            }
+
+            _ => Propagate::Bubble,
+        }
+    }
+
+    fn accepts_focus() -> bool {
+        true
     }
 }

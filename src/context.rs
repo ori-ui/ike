@@ -1,27 +1,30 @@
 use crate::{
-    AnyWidgetId, App, Fonts, Offset, Point, Size, Space, Tree, Widget, WidgetId,
+    Affine, AnyWidgetId, App, Fonts, Offset, Point, Size, Space, Tree, Widget, WidgetId,
     math::Rect,
     widget::{AnyWidget, WidgetState},
 };
 
 pub struct EventCx<'a> {
-    pub(crate) app: &'a mut App,
+    #[allow(dead_code)]
+    pub(crate) app:   &'a mut App,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct UpdateCx<'a> {
-    pub(crate) tree: &'a mut Tree,
+    #[allow(dead_code)]
+    pub(crate) tree:  &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct LayoutCx<'a> {
     pub(crate) fonts: &'a mut dyn Fonts,
-    pub(crate) tree: &'a mut Tree,
+    pub(crate) tree:  &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct DrawCx<'a> {
-    pub(crate) tree: &'a mut Tree,
+    #[allow(dead_code)]
+    pub(crate) tree:  &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
 }
 
@@ -75,7 +78,7 @@ pub trait BuildCx {
         let state = self.app().tree.widget_state(parent.index);
         let child = state.children[index];
         self.app_mut().tree.remove(child);
-        self.app_mut().tree.request_layout(child);
+        self.app_mut().tree.request_layout(parent);
     }
 
     fn replace_child(&mut self, parent: impl AnyWidgetId, index: usize, child: impl AnyWidgetId)
@@ -109,6 +112,13 @@ pub trait BuildCx {
         let child = child.upcast();
 
         self.app().tree.widget_state(child.index).parent == Some(parent)
+    }
+
+    fn request_animate(&mut self, id: impl AnyWidgetId)
+    where
+        Self: Sized,
+    {
+        self.app_mut().tree.request_animate(id);
     }
 
     fn request_layout(&mut self, id: impl AnyWidgetId)
@@ -180,6 +190,10 @@ macro_rules! impl_contexts {
 impl_contexts! {
     EventCx<'_>,
     UpdateCx<'_> {
+        pub fn request_animate(&mut self) {
+            self.state.needs_animate = true;
+        }
+
         pub fn request_layout(&mut self) {
             self.state.needs_layout = true;
         }
@@ -198,6 +212,10 @@ impl_contexts! {
         pub fn children(&self) -> &[WidgetId] {
             &self.state.children
         }
+
+        pub fn transform(&self) -> Affine {
+            self.state.transform
+        }
     }
 }
 
@@ -205,6 +223,10 @@ impl_contexts! {
     EventCx<'_>,
     UpdateCx<'_>,
     DrawCx<'_> {
+        pub fn global_transform(&self) -> Affine {
+            self.state.global_transform
+        }
+
         pub fn size(&self) -> Size {
             self.state.size
         }

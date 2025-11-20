@@ -1,8 +1,4 @@
-use crate::{
-    BorderWidth, Color, CornerRadius, Offset, Size,
-    math::{Affine, Rect},
-    text::Paragraph,
-};
+use crate::{Affine, BorderWidth, Color, CornerRadius, Fonts, Offset, Paragraph, Rect};
 
 #[derive(Clone, PartialEq, PartialOrd)]
 pub enum Shader {
@@ -20,10 +16,6 @@ impl From<Color> for Paint {
             shader: Shader::Solid(color),
         }
     }
-}
-
-pub trait Fonts {
-    fn measure(&mut self, paragraph: &Paragraph, max_width: f32) -> Size;
 }
 
 pub trait Canvas {

@@ -16,4 +16,11 @@ impl Rect {
             },
         }
     }
+
+    pub fn expand(self, margin: f32) -> Self {
+        Self {
+            min: self.min - margin,
+            max: self.max + margin,
+        }
+    }
 }

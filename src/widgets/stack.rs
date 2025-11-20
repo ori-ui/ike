@@ -1,8 +1,7 @@
 use core::f32;
 
 use crate::{
-    AnyWidgetId, BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId, context::UpdateCx,
-    widget::Update,
+    BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId, context::UpdateCx, widget::Update,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,34 +52,39 @@ pub enum Align {
 }
 
 pub struct Stack {
-    axis: Axis,
+    axis:    Axis,
     justify: Justify,
-    align: Align,
-    gap: f32,
+    align:   Align,
+    gap:     f32,
 
-    flex: Vec<f32>,
+    flex: Vec<(f32, bool)>,
 }
 
 impl Stack {
     pub fn new(cx: &mut impl BuildCx) -> WidgetId<Self> {
         cx.insert(Self {
-            axis: Axis::Vertical,
+            axis:    Axis::Vertical,
             justify: Justify::Start,
-            align: Align::Center,
-            gap: 0.0,
+            align:   Align::Center,
+            gap:     0.0,
 
             flex: Vec::new(),
         })
     }
 
-    pub fn add_flex_child(
+    pub fn set_flex(
         cx: &mut impl BuildCx,
         id: WidgetId<Self>,
-        child: impl AnyWidgetId,
+        index: usize,
         flex: f32,
+        tight: bool,
     ) {
-        cx.get_mut(id).flex.push(flex);
-        cx.add_child(id, child);
+        cx.get_mut(id).flex[index] = (flex, tight);
+        cx.request_layout(id);
+    }
+
+    pub fn get_flex(cx: &impl BuildCx, id: WidgetId<Self>, index: usize) -> (f32, bool) {
+        cx.get(id).flex[index]
     }
 
     pub fn set_axis(cx: &mut impl BuildCx, id: WidgetId<Self>, axis: Axis) {
@@ -119,7 +123,9 @@ impl Widget for Stack {
         let mut major_sum = 0.0;
         let mut minor_sum = min_minor;
 
-        for (i, &flex) in self.flex.iter().enumerate() {
+        // measure inflexible children
+
+        for (i, &(flex, _)) in self.flex.iter().enumerate() {
             if flex > 0.0 {
                 flex_sum += flex;
                 continue;
@@ -137,11 +143,13 @@ impl Widget for Stack {
             minor_sum = minor_sum.max(minor);
         }
 
+        // measure expanding children
+
         let remaining = f32::max(max_major - total_gap - major_sum, 0.0);
         let per_flex = remaining / flex_sum;
 
-        for (i, &flex) in self.flex.iter().enumerate() {
-            if flex == 0.0 {
+        for (i, &(flex, tight)) in self.flex.iter().enumerate() {
+            if flex == 0.0 || tight {
                 continue;
             }
 
@@ -149,7 +157,31 @@ impl Widget for Stack {
 
             let space = Space::new(
                 self.axis.pack_size(0.0, min_minor),
-                self.axis.pack_size(max_major, max_major),
+                self.axis.pack_size(max_major, max_minor),
+            );
+
+            let size = cx.layout_child(i, space);
+            let (major, minor) = self.axis.unpack_size(size);
+
+            major_sum += major;
+            minor_sum = minor_sum.max(minor);
+        }
+
+        // measure tightly flexible children
+
+        let remaining = f32::max(max_major - total_gap - major_sum, 0.0);
+        let per_flex = remaining / flex_sum;
+
+        for (i, &(flex, tight)) in self.flex.iter().enumerate() {
+            if flex == 0.0 || !tight {
+                continue;
+            }
+
+            let major = per_flex * flex;
+
+            let space = Space::new(
+                self.axis.pack_size(major, min_minor),
+                self.axis.pack_size(major, max_minor),
             );
 
             let size = cx.layout_child(i, space);
@@ -201,12 +233,10 @@ impl Widget for Stack {
         self.axis.pack_size(major, minor)
     }
 
-    fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
+    fn update(&mut self, _cx: &mut UpdateCx<'_>, update: Update) {
         match update {
             Update::ChildAdded(_) => {
-                if self.flex.len() < cx.children().len() {
-                    self.flex.push(0.0);
-                }
+                self.flex.push((0.0, false));
             }
 
             Update::ChildRemoved(i) => {

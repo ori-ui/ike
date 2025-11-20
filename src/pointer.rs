@@ -4,7 +4,7 @@ use crate::Point;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pointer {
-    pub(crate) id: PointerId,
+    pub(crate) id:       PointerId,
     pub(crate) position: Point,
 }
 
@@ -20,14 +20,14 @@ pub enum PointerEvent {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointerMoveEvent {
     pub position: Point,
-    pub id: PointerId,
+    pub id:       PointerId,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointerButtonEvent {
-    pub button: PointerButton,
+    pub button:   PointerButton,
     pub position: Point,
-    pub id: PointerId,
+    pub id:       PointerId,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

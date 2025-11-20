@@ -5,14 +5,14 @@ use std::{
 };
 
 use crate::{
-    AnyWidgetId, Fonts, LayoutCx, Size, Space, Widget,
+    AnyWidgetId, Widget,
     context::UpdateCx,
     widget::{AnyWidget, Update, WidgetId, WidgetState},
 };
 
 pub struct Tree {
     entries: Vec<Entry>,
-    free: Vec<u32>,
+    free:    Vec<u32>,
 }
 
 impl Default for Tree {
@@ -25,7 +25,7 @@ impl Tree {
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
-            free: Vec::new(),
+            free:    Vec::new(),
         }
     }
 
@@ -50,8 +50,8 @@ impl Tree {
         let index = self.entries.len() as u32;
         self.entries.push(Entry {
             generation: 0,
-            widget: Some(Box::new(widget)),
-            state: Some(WidgetState::new::<T>()),
+            widget:     Some(Box::new(widget)),
+            state:      Some(WidgetState::new::<T>()),
         });
 
         WidgetId {
@@ -66,6 +66,10 @@ impl Tree {
         T: ?Sized + Widget,
     {
         let entry = &mut self.entries[id.index as usize];
+
+        if entry.generation != id.generation {
+            return;
+        }
 
         let _widget = entry.widget.take();
 
@@ -250,19 +254,76 @@ impl Tree {
         debug_assert_eq!(id.generation, entry.generation);
     }
 
-    pub(crate) fn propagate_state(&mut self, id: impl AnyWidgetId) {
-        let parent = self.with_entry(id.upcast(), |tree, _, state| {
-            if let Some(parent) = state.parent {
-                let parent_state = tree.widget_state_mut(parent.index);
-                parent_state.merge(state);
-            }
+    /// Update tree after widget state changes.
+    ///
+    /// Whenever the state of a widget has changed, the state it's ancestors become out of sync, and
+    /// they must be updated.
+    pub(crate) fn state_changed(&mut self, id: impl AnyWidgetId) {
+        let mut current = Some(id.upcast());
 
-            state.parent
+        while let Some(id) = current {
+            self.with_entry(id, |tree, _widget, state| {
+                state.reset();
+
+                let children = mem::take(&mut state.children);
+                for &child in &children {
+                    let child_state = tree.widget_state(child.index);
+                    state.merge(child_state);
+                }
+
+                state.children = children;
+                current = state.parent;
+            });
+        }
+    }
+
+    pub(crate) fn set_hovered(&mut self, id: impl AnyWidgetId, is_hovered: bool) {
+        self.with_entry(id.upcast(), |tree, widget, state| {
+            state.is_hovered = is_hovered;
+            state.has_hovered = is_hovered;
+
+            let mut cx = UpdateCx { tree, state };
+
+            widget.update(&mut cx, Update::Hovered(is_hovered));
         });
 
-        if let Some(parent) = parent {
-            self.propagate_state(parent);
-        }
+        self.state_changed(id);
+    }
+
+    pub(crate) fn set_active(&mut self, id: impl AnyWidgetId, is_active: bool) {
+        self.with_entry(id.upcast(), |tree, widget, state| {
+            state.is_active = is_active;
+            state.has_active = is_active;
+
+            let mut cx = UpdateCx { tree, state };
+
+            widget.update(&mut cx, Update::Active(is_active));
+        });
+
+        self.state_changed(id);
+    }
+
+    pub(crate) fn set_focused(&mut self, id: impl AnyWidgetId, is_focused: bool) {
+        self.with_entry(id.upcast(), |tree, widget, state| {
+            state.is_focused = is_focused;
+            state.has_focused = is_focused;
+
+            let mut cx = UpdateCx { tree, state };
+
+            widget.update(&mut cx, Update::Focused(is_focused));
+        });
+
+        self.state_changed(id);
+    }
+
+    pub(crate) fn request_animate(&mut self, id: impl AnyWidgetId) {
+        let id = id.upcast();
+        self.debug_validate_id(id);
+
+        let state = self.widget_state_mut(id.index);
+        state.needs_animate = true;
+
+        self.state_changed(id);
     }
 
     pub(crate) fn request_layout(&mut self, id: impl AnyWidgetId) {
@@ -273,7 +334,7 @@ impl Tree {
         state.needs_layout = true;
         state.needs_draw = true;
 
-        self.propagate_state(id);
+        self.state_changed(id);
     }
 
     pub(crate) fn request_draw(&mut self, id: impl AnyWidgetId) {
@@ -283,7 +344,15 @@ impl Tree {
         let state = self.widget_state_mut(id.index);
         state.needs_draw = true;
 
-        self.propagate_state(id);
+        self.state_changed(id);
+    }
+
+    pub fn needs_animate<T>(&self, id: WidgetId<T>) -> bool
+    where
+        T: ?Sized,
+    {
+        self.debug_validate_id(id);
+        self.widget_state(id.index).needs_animate
     }
 
     pub fn needs_layout<T>(&self, id: WidgetId<T>) -> bool
@@ -301,24 +370,12 @@ impl Tree {
         self.debug_validate_id(id);
         self.widget_state(id.index).needs_draw
     }
-
-    pub fn layout(&mut self, fonts: &mut dyn Fonts, root: WidgetId, size: Size) {
-        self.with_entry(root, |tree, widget, state| {
-            state.needs_layout = false;
-
-            let mut cx = LayoutCx { fonts, tree, state };
-            let space = Space::new(Size::new(0.0, 0.0), size);
-
-            let size = widget.layout(&mut cx, space);
-            state.size = size;
-        });
-    }
 }
 
 struct Entry {
     generation: u32,
-    widget: Option<Box<dyn Widget>>,
-    state: Option<WidgetState>,
+    widget:     Option<Box<dyn Widget>>,
+    state:      Option<WidgetState>,
 }
 
 impl<T> Index<WidgetId<T>> for Tree

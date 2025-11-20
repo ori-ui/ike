@@ -4,21 +4,21 @@ use crate::{
 };
 
 pub struct Container {
-    padding: Padding,
-    border_width: BorderWidth,
+    padding:       Padding,
+    border_width:  BorderWidth,
     corner_radius: CornerRadius,
-    background: Color,
-    border_color: Color,
+    background:    Color,
+    border_color:  Color,
 }
 
 impl Container {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetId<Self> {
         let this = cx.insert(Container {
-            padding: Padding::all(8.0),
-            border_width: BorderWidth::all(1.0),
+            padding:       Padding::all(8.0),
+            border_width:  BorderWidth::all(1.0),
             corner_radius: CornerRadius::all(8.0),
-            background: Color::rgb(0.9, 0.9, 0.9),
-            border_color: Color::BLACK,
+            background:    Color::rgb(0.9, 0.9, 0.9),
+            border_color:  Color::BLACK,
         });
 
         cx.add_child(this, child);

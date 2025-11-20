@@ -1,0 +1,34 @@
+use crate::{
+    BuildCx, Canvas, DrawCx, LayoutCx, Offset, Size, Space, Widget, WidgetId, text::Paragraph,
+};
+
+pub struct Text {
+    paragraph: Paragraph,
+}
+
+impl Text {
+    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetId<Self> {
+        cx.insert(Self { paragraph })
+    }
+
+    pub fn set_paragraph(cx: &mut impl BuildCx, id: WidgetId<Self>, paragraph: Paragraph) {
+        cx.get_mut(id).paragraph = paragraph;
+        cx.request_layout(id);
+    }
+}
+
+impl Widget for Text {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
+        cx.fonts()
+            .measure(&self.paragraph, space.max.width)
+            .min(space.max)
+    }
+
+    fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
+        canvas.draw_text(&self.paragraph, cx.width(), Offset::all(0.0));
+    }
+
+    fn accepts_pointer() -> bool {
+        false
+    }
+}

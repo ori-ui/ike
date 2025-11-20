@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Pointer, Size, WidgetId};
+use crate::{Color, Modifiers, Pointer, Size, WidgetId};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WindowId {
@@ -15,13 +15,15 @@ impl fmt::Debug for WindowId {
 
 #[derive(Debug)]
 pub struct Window {
-    pub(crate) id: WindowId,
-    pub(crate) anchor: Option<WindowId>,
-    pub(crate) scale: f32,
-    pub(crate) pointers: Vec<Pointer>,
+    pub(crate) id:        WindowId,
+    pub(crate) anchor:    Option<WindowId>,
+    pub(crate) scale:     f32,
+    pub(crate) pointers:  Vec<Pointer>,
+    pub(crate) modifiers: Modifiers,
 
     pub content: WidgetId,
-    pub size: Size,
+    pub size:    Size,
+    pub color:   Color,
 }
 
 impl Window {

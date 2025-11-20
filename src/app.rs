@@ -1,16 +1,19 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::{
+    mem,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
 use crate::{
-    Affine, Canvas, DrawCx, EventCx, Fonts, LayoutCx, Point, Pointer, PointerButton,
-    PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent, PointerPropagate, Size, Space,
-    Tree, Widget, WidgetId, Window, WindowId,
-    context::UpdateCx,
-    widget::{Update, WidgetState},
+    Affine, Canvas, Color, DrawCx, EventCx, Fonts, Key, KeyEvent, LayoutCx, Modifiers, NamedKey,
+    Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,
+    PointerPropagate, Propagate, Size, Space, Tree, Widget, WidgetId, Window, WindowId,
+    context::UpdateCx, key::KeyPressEvent, widget::WidgetState,
 };
 
 pub struct App {
     pub tree: Tree,
-    windows: Vec<Window>,
+    windows:  Vec<Window>,
 }
 
 impl Default for App {
@@ -22,7 +25,7 @@ impl Default for App {
 impl App {
     pub fn new() -> Self {
         Self {
-            tree: Tree::new(),
+            tree:    Tree::new(),
             windows: Vec::new(),
         }
     }
@@ -39,8 +42,10 @@ impl App {
             anchor: None,
             content,
             pointers: Vec::new(),
+            modifiers: Modifiers::empty(),
             scale: 1.0,
             size: Size::new(800.0, 600.0),
+            color: Color::WHITE,
         });
 
         self.windows.last_mut().unwrap()
@@ -69,6 +74,15 @@ impl App {
 
         layout_window(&mut self.tree, canvas.fonts(), window);
         draw_widget(&mut self.tree, window.content, canvas);
+        draw_over_widget(&mut self.tree, window.content, canvas);
+    }
+
+    pub fn animate(&mut self, window: WindowId, delta_time: Duration) {
+        let Some(window) = self.windows.iter().find(|w| w.id == window) else {
+            return;
+        };
+
+        animate_widget(&mut self.tree, window.content, delta_time);
     }
 
     pub fn pointer_entered(&mut self, window: WindowId, id: PointerId) -> bool {
@@ -90,7 +104,10 @@ impl App {
         };
 
         window.pointers.retain(|p| p.id == id);
-        remove_hovered(&mut self.tree, window.content);
+
+        if let Some(hovered) = find_hovered(&self.tree, window.content) {
+            self.tree.set_hovered(hovered, false);
+        }
 
         false
     }
@@ -172,7 +189,7 @@ impl App {
                 PointerPropagate::Stop => true,
 
                 PointerPropagate::Capture if pressed => {
-                    set_active(&mut self.tree, target, true);
+                    self.tree.set_active(target, true);
 
                     true
                 }
@@ -183,7 +200,7 @@ impl App {
             };
 
             if !pressed && self.tree.widget_state(target.index).is_active {
-                set_active(&mut self.tree, target, false);
+                self.tree.set_active(target, false);
                 update_hovered(&mut self.tree, content, position);
             }
 
@@ -191,6 +208,51 @@ impl App {
         } else {
             false
         }
+    }
+
+    pub fn modifiers_changed(&mut self, window: WindowId, modifiers: Modifiers) {
+        if let Some(window) = self.windows.iter_mut().find(|w| w.id == window) {
+            window.modifiers = modifiers;
+        }
+    }
+
+    pub fn key_press(
+        &mut self,
+        window: WindowId,
+        key: Key,
+        repeat: bool,
+        text: Option<&str>,
+        pressed: bool,
+    ) -> bool {
+        let Some(window) = self.windows.iter_mut().find(|w| w.id == window) else {
+            return false;
+        };
+
+        let event = KeyPressEvent {
+            key: key.clone(),
+            modifiers: window.modifiers,
+            text: text.map(Into::into),
+            repeat,
+        };
+
+        let event = match pressed {
+            true => KeyEvent::Down(event),
+            false => KeyEvent::Up(event),
+        };
+
+        let content = window.content;
+        let modifiers = window.modifiers;
+
+        let handled = match find_focused(&self.tree, window.content) {
+            Some(target) => send_key_event(self, target, &event) == Propagate::Stop,
+            None => false,
+        };
+
+        if key == Key::Named(NamedKey::Tab) && pressed && !handled {
+            focus_next(&mut self.tree, content, !modifiers.shift());
+        }
+
+        handled
     }
 
     pub fn window_resized(&mut self, window: WindowId, new_size: Size) {
@@ -212,6 +274,13 @@ impl App {
         window.size = new_size;
 
         self.tree.request_layout(window.content);
+    }
+
+    pub fn window_needs_animate(&self, window: WindowId) -> bool {
+        match self.windows.iter().find(|w| w.id == window) {
+            Some(window) => self.tree.needs_animate(window.content),
+            None => false,
+        }
     }
 
     pub fn window_needs_draw(&self, window: WindowId) -> bool {
@@ -246,11 +315,11 @@ fn find_pointer_target(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
     }
 }
 
-fn find_hovered(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
-    let state = tree.widget_state(root.index);
+fn find_hovered(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
+    let state = tree.widget_state(id.index);
 
     if state.is_hovered {
-        return Some(root);
+        return Some(id);
     }
 
     for &child in &state.children {
@@ -264,11 +333,11 @@ fn find_hovered(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
     None
 }
 
-fn find_active(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
-    let state = tree.widget_state(root.index);
+fn find_active(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
+    let state = tree.widget_state(id.index);
 
     if state.is_active {
-        return Some(root);
+        return Some(id);
     }
 
     for &child in &state.children {
@@ -282,11 +351,11 @@ fn find_active(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
     None
 }
 
-fn find_focused(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
-    let state = tree.widget_state(root.index);
+fn find_focused(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
+    let state = tree.widget_state(id.index);
 
     if state.is_focused {
-        return Some(root);
+        return Some(id);
     }
 
     for &child in &state.children {
@@ -300,30 +369,95 @@ fn find_focused(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
     None
 }
 
-fn set_active(tree: &mut Tree, id: WidgetId, is_active: bool) {
-    tree.with_entry(id, |tree, widget, state| {
-        state.is_active = is_active;
-        state.has_active = is_active;
+fn find_first_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<WidgetId> {
+    let state = tree.widget_state(id.index);
 
-        let mut cx = UpdateCx { tree, state };
+    if state.accepts_focus {
+        return Some(id);
+    }
 
-        widget.update(&mut cx, Update::Active(is_active));
-    });
+    if forward {
+        for &child in state.children.iter() {
+            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+                return Some(focusable);
+            }
+        }
+    } else {
+        for &child in state.children.iter().rev() {
+            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+                return Some(focusable);
+            }
+        }
+    }
 
-    tree.propagate_state(id);
+    None
 }
 
-fn set_focused(tree: &mut Tree, id: WidgetId, is_focused: bool) {
-    tree.with_entry(id, |tree, widget, state| {
-        state.is_focused = is_focused;
-        state.has_focused = is_focused;
+fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<WidgetId> {
+    let state = tree.widget_state(id.index);
 
-        let mut cx = UpdateCx { tree, state };
+    if !state.has_focused {
+        return find_first_focusable(tree, id, forward);
+    }
 
-        widget.update(&mut cx, Update::Focused(is_focused));
-    });
+    if forward {
+        let mut children = state.children.iter().copied();
 
-    tree.propagate_state(id);
+        for child in children.by_ref() {
+            let child_state = tree.widget_state(child.index);
+
+            if child_state.has_focused {
+                if let Some(focusable) = find_next_focusable(tree, child, forward) {
+                    return Some(focusable);
+                }
+
+                break;
+            }
+        }
+
+        for child in children {
+            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+                return Some(focusable);
+            }
+        }
+    } else {
+        let mut children = state.children.iter().copied().rev();
+
+        for child in children.by_ref() {
+            let child_state = tree.widget_state(child.index);
+
+            if child_state.has_focused {
+                if let Some(focusable) = find_next_focusable(tree, child, forward) {
+                    return Some(focusable);
+                }
+
+                break;
+            }
+        }
+
+        for child in children {
+            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+                return Some(focusable);
+            }
+        }
+    }
+
+    None
+}
+
+fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option<WidgetId> {
+    let current = find_focused(tree, id);
+    let focused = find_next_focusable(tree, id, forward);
+
+    if let Some(current) = current {
+        tree.set_focused(current, false);
+    }
+
+    if let Some(focused) = focused {
+        tree.set_focused(focused, true);
+    }
+
+    focused
 }
 
 fn send_pointer_event(app: &mut App, target: WidgetId, event: &PointerEvent) -> PointerPropagate {
@@ -337,21 +471,55 @@ fn send_pointer_event(app: &mut App, target: WidgetId, event: &PointerEvent) -> 
                 propagate = widget.on_pointer_event(&mut cx, event);
             }
 
-            if let Some(parent) = state.parent {
-                let parent_state = app.tree.widget_state_mut(parent.index);
-                parent_state.merge(state);
+            current = state.parent;
+        });
+    }
+
+    app.tree.state_changed(target);
+
+    propagate
+}
+
+fn send_key_event(app: &mut App, target: WidgetId, event: &KeyEvent) -> Propagate {
+    let mut current = Some(target);
+    let mut propagate = Propagate::Bubble;
+
+    while let Some(id) = current {
+        app.with_entry(id, |app, widget, state| {
+            if let Propagate::Bubble = propagate {
+                let mut cx = EventCx { app, state };
+                propagate = widget.on_key_event(&mut cx, event);
             }
 
             current = state.parent;
         });
     }
 
+    app.tree.state_changed(target);
+
     propagate
 }
 
-fn update_hovered(tree: &mut Tree, id: WidgetId, pointer: Point) -> Option<WidgetId> {
+fn update_hovered(tree: &mut Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
+    let current = find_hovered(tree, id);
+    let hovered = find_widget_at(tree, id, point);
+
+    if current != hovered {
+        if let Some(current) = current {
+            tree.set_hovered(current, false);
+        }
+
+        if let Some(hovered) = hovered {
+            tree.set_hovered(hovered, true);
+        }
+    }
+
+    hovered
+}
+
+fn find_widget_at(tree: &Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
     let state = tree.widget_state(id.index);
-    let local = state.global_transform.inverse() * pointer;
+    let local = state.global_transform.inverse() * point;
 
     let is_over = local.x >= 0.0
         && local.y >= 0.0
@@ -359,85 +527,45 @@ fn update_hovered(tree: &mut Tree, id: WidgetId, pointer: Point) -> Option<Widge
         && local.y <= state.size.height;
 
     if !is_over {
-        if state.has_hovered {
-            remove_hovered(tree, id);
-        }
-
         return None;
     }
 
-    tree.with_entry(id, |tree, widget, state| {
-        let mut hovered = None;
-
-        for child in state.children.clone() {
-            let child_hovered = update_hovered(tree, child, pointer);
-
-            let child_state = tree.widget_state(child.index);
-            state.merge(child_state);
-
-            if child_hovered.is_some() {
-                hovered = child_hovered;
-                break;
-            }
+    for &child in &state.children {
+        if let Some(id) = find_widget_at(tree, child, point) {
+            return Some(id);
         }
+    }
 
-        if hovered.is_some() && state.is_hovered {
-            state.is_hovered = false;
-            state.has_hovered = false;
-
-            let mut cx = UpdateCx { tree, state };
-            widget.update(&mut cx, Update::Hovered(false));
-        }
-
-        if hovered.is_none() && state.accepts_pointer {
-            hovered = Some(id);
-            if !state.is_hovered {
-                state.is_hovered = true;
-                state.has_hovered = true;
-
-                let mut cx = UpdateCx { tree, state };
-                widget.update(&mut cx, Update::Hovered(true));
-            }
-        }
-
-        hovered
-    })
-}
-
-fn remove_hovered(tree: &mut Tree, id: WidgetId) {
-    tree.with_entry(id, |tree, widget, state| {
-        if !state.has_hovered {
-            return;
-        }
-
-        for child in state.children.clone() {
-            remove_hovered(tree, child);
-
-            let child_state = tree.widget_state(child.index);
-            state.merge(child_state);
-        }
-
-        if state.is_hovered {
-            state.is_hovered = false;
-            state.has_hovered = false;
-
-            let mut cx = UpdateCx { tree, state };
-            widget.update(&mut cx, Update::Hovered(false));
-        }
-    });
+    if state.accepts_pointer {
+        Some(id)
+    } else {
+        None
+    }
 }
 
 fn draw_widget(tree: &mut Tree, widget: WidgetId, canvas: &mut dyn Canvas) {
     tree.with_entry(widget, |tree, widget, state| {
         canvas.transform(state.transform, &mut |canvas| {
-            state.needs_draw = false;
-
             let mut cx = DrawCx { tree, state };
-
             widget.draw(&mut cx, canvas);
 
             for &child in &state.children {
                 draw_widget(tree, child, canvas);
+            }
+        });
+    });
+}
+
+fn draw_over_widget(tree: &mut Tree, widget: WidgetId, canvas: &mut dyn Canvas) {
+    tree.with_entry(widget, |tree, widget, state| {
+        canvas.transform(state.transform, &mut |canvas| {
+            state.needs_draw = false;
+
+            let mut cx = DrawCx { tree, state };
+            widget.draw_over(&mut cx, canvas);
+
+            for &child in &state.children {
+                draw_over_widget(tree, child, canvas);
             }
         });
     });
@@ -462,12 +590,36 @@ fn layout_window(tree: &mut Tree, fonts: &mut dyn Fonts, window: &Window) {
 }
 
 fn compose_widget(tree: &mut Tree, id: WidgetId, transform: Affine) {
-    tree.with_entry(id, |tree, _, state| {
+    tree.with_entry(id, |tree, widget, state| {
         let transform = transform * state.transform;
         state.global_transform = transform;
+
+        let mut cx = UpdateCx { tree, state };
+        widget.compose(&mut cx);
 
         for &child in &state.children {
             compose_widget(tree, child, transform);
         }
+    });
+}
+
+fn animate_widget(tree: &mut Tree, id: WidgetId, dt: Duration) {
+    tree.with_entry(id, |tree, widget, state| {
+        state.needs_animate = false;
+
+        let mut cx = UpdateCx { tree, state };
+        widget.animate(&mut cx, dt);
+
+        state.reset();
+
+        let children = mem::take(&mut state.children);
+        for &child in &children {
+            animate_widget(tree, child, dt);
+
+            let child_state = tree.widget_state(child.index);
+            state.merge(child_state);
+        }
+
+        state.children = children;
     });
 }
