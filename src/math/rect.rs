@@ -23,4 +23,27 @@ impl Rect {
             max: self.max + margin,
         }
     }
+
+    pub const fn top(self) -> f32 {
+        self.min.y
+    }
+
+    pub const fn right(self) -> f32 {
+        self.max.x
+    }
+
+    pub const fn bottom(self) -> f32 {
+        self.max.y
+    }
+
+    pub const fn left(self) -> f32 {
+        self.min.x
+    }
+
+    pub const fn center(self) -> Point {
+        Point::new(
+            (self.min.x + self.max.x) / 2.0,
+            (self.min.y + self.max.y) / 2.0,
+        )
+    }
 }

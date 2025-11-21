@@ -8,6 +8,8 @@ pub struct EventCx<'a> {
     #[allow(dead_code)]
     pub(crate) app:   &'a mut App,
     pub(crate) state: &'a mut WidgetState,
+    pub(crate) id:    WidgetId,
+    pub(crate) focus: &'a mut Option<WidgetId>,
 }
 
 pub struct UpdateCx<'a> {
@@ -136,6 +138,16 @@ pub trait BuildCx {
     }
 }
 
+impl EventCx<'_> {
+    pub fn request_focus(&mut self) {
+        *self.focus = Some(self.id);
+    }
+
+    pub fn request_unfocus(&mut self) {
+        self.state.is_focused = false;
+    }
+}
+
 impl LayoutCx<'_> {
     pub fn fonts(&mut self) -> &mut dyn Fonts {
         self.fonts
@@ -196,6 +208,7 @@ impl_contexts! {
 
         pub fn request_layout(&mut self) {
             self.state.needs_layout = true;
+            self.state.needs_draw = true;
         }
 
         pub fn request_draw(&mut self) {

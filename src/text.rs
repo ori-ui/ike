@@ -18,8 +18,8 @@ pub struct Paragraph {
     pub line_height: f32,
     pub align:       TextAlign,
     pub wrap:        TextWrap,
-    text:            String,
-    styles:          Vec<(usize, TextStyle)>,
+    pub text:        String,
+    pub sections:    Vec<(usize, TextStyle)>,
 }
 
 impl Paragraph {
@@ -29,18 +29,18 @@ impl Paragraph {
             align,
             wrap,
             text: String::new(),
-            styles: Vec::new(),
+            sections: Vec::new(),
         }
     }
 
     pub fn push(&mut self, text: impl AsRef<str>, style: TextStyle) {
-        self.styles.push((self.text.len(), style));
+        self.sections.push((self.text.len(), style));
         self.text.push_str(text.as_ref());
     }
 
     pub fn clear(&mut self) {
         self.text.clear();
-        self.styles.clear();
+        self.sections.clear();
     }
 
     pub fn text(&self) -> &str {
@@ -49,11 +49,11 @@ impl Paragraph {
 
     pub fn sections(&self) -> impl Iterator<Item = (&str, &TextStyle)> {
         let last = self
-            .styles
+            .sections
             .last()
             .map(|(start, style)| (&self.text[*start..], style));
 
-        self.styles
+        self.sections
             .windows(2)
             .map(|sections| {
                 let (start, ref style) = sections[0];
@@ -161,6 +161,24 @@ pub struct TextLayoutLine {
     pub start_index: usize,
     pub end_index:   usize,
     pub glyphs:      Vec<GlyphCluster>,
+}
+
+impl TextLayoutLine {
+    pub fn left(&self) -> f32 {
+        self.left
+    }
+
+    pub fn right(&self) -> f32 {
+        self.left + self.width
+    }
+
+    pub fn top(&self) -> f32 {
+        self.baseline - self.ascent
+    }
+
+    pub fn bottom(&self) -> f32 {
+        self.baseline + self.descent
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -126,7 +126,8 @@ impl App {
             let event = PointerMoveEvent { id, position };
             let event = PointerEvent::Move(event);
 
-            return match send_pointer_event(self, target, &event) {
+            let content = window.content;
+            return match send_pointer_event(self, content, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -143,7 +144,8 @@ impl App {
             let event = PointerMoveEvent { id, position };
             let event = PointerEvent::Move(event);
 
-            match send_pointer_event(self, target, &event) {
+            let content = window.content;
+            match send_pointer_event(self, content, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -184,7 +186,7 @@ impl App {
 
             let content = window.content;
             let position = pointer.position;
-            let handled = match send_pointer_event(self, target, &event) {
+            let handled = match send_pointer_event(self, content, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -244,7 +246,7 @@ impl App {
         let modifiers = window.modifiers;
 
         let handled = match find_focused(&self.tree, window.content) {
-            Some(target) => send_key_event(self, target, &event) == Propagate::Stop,
+            Some(target) => send_key_event(self, content, target, &event) == Propagate::Stop,
             None => false,
         };
 
@@ -449,25 +451,51 @@ fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option<WidgetId> 
     let current = find_focused(tree, id);
     let focused = find_next_focusable(tree, id, forward);
 
-    if let Some(current) = current {
-        tree.set_focused(current, false);
-    }
+    if current != focused {
+        if let Some(current) = current {
+            tree.set_focused(current, false);
+        }
 
-    if let Some(focused) = focused {
-        tree.set_focused(focused, true);
+        if let Some(focused) = focused {
+            tree.set_focused(focused, true);
+        }
     }
 
     focused
 }
 
-fn send_pointer_event(app: &mut App, target: WidgetId, event: &PointerEvent) -> PointerPropagate {
+fn give_focus(tree: &mut Tree, root: WidgetId, target: WidgetId) {
+    let current = find_focused(tree, root);
+
+    if current != Some(target) {
+        if let Some(current) = current {
+            tree.set_focused(current, false);
+        }
+
+        tree.set_focused(target, true);
+    }
+}
+
+fn send_pointer_event(
+    app: &mut App,
+    root: WidgetId,
+    target: WidgetId,
+    event: &PointerEvent,
+) -> PointerPropagate {
+    let mut focus = None;
     let mut current = Some(target);
     let mut propagate = PointerPropagate::Bubble;
 
     while let Some(id) = current {
         app.with_entry(id, |app, widget, state| {
             if let PointerPropagate::Bubble = propagate {
-                let mut cx = EventCx { app, state };
+                let mut cx = EventCx {
+                    app,
+                    state,
+                    id,
+                    focus: &mut focus,
+                };
+
                 propagate = widget.on_pointer_event(&mut cx, event);
             }
 
@@ -477,17 +505,28 @@ fn send_pointer_event(app: &mut App, target: WidgetId, event: &PointerEvent) -> 
 
     app.tree.state_changed(target);
 
+    if let Some(focus) = focus {
+        give_focus(&mut app.tree, root, focus);
+    }
+
     propagate
 }
 
-fn send_key_event(app: &mut App, target: WidgetId, event: &KeyEvent) -> Propagate {
+fn send_key_event(app: &mut App, root: WidgetId, target: WidgetId, event: &KeyEvent) -> Propagate {
+    let mut focus = None;
     let mut current = Some(target);
     let mut propagate = Propagate::Bubble;
 
     while let Some(id) = current {
         app.with_entry(id, |app, widget, state| {
             if let Propagate::Bubble = propagate {
-                let mut cx = EventCx { app, state };
+                let mut cx = EventCx {
+                    app,
+                    state,
+                    id,
+                    focus: &mut focus,
+                };
+
                 propagate = widget.on_key_event(&mut cx, event);
             }
 
@@ -496,6 +535,10 @@ fn send_key_event(app: &mut App, target: WidgetId, event: &KeyEvent) -> Propagat
     }
 
     app.tree.state_changed(target);
+
+    if let Some(focus) = focus {
+        give_focus(&mut app.tree, root, focus);
+    }
 
     propagate
 }

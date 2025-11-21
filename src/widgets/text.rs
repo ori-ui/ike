@@ -1,6 +1,4 @@
-use crate::{
-    BuildCx, Canvas, DrawCx, LayoutCx, Offset, Size, Space, Widget, WidgetId, text::Paragraph,
-};
+use crate::{BuildCx, Canvas, DrawCx, LayoutCx, Offset, Paragraph, Size, Space, Widget, WidgetId};
 
 pub struct Text {
     paragraph: Paragraph,

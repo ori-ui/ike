@@ -141,10 +141,7 @@ impl Widget for Button {
 
     fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
         match event {
-            PointerEvent::Down(..) => {
-                cx.request_draw();
-                PointerPropagate::Capture
-            }
+            PointerEvent::Down(..) => PointerPropagate::Capture,
 
             PointerEvent::Up(..) if cx.is_hovered() && cx.is_active() => {
                 (self.on_click)();

@@ -653,6 +653,11 @@ impl Color {
         let (h, s, l, alpha) = self.to_okhsla();
         Self::okhsla(h, s, l - amount, alpha)
     }
+
+    pub fn fade(mut self, factor: f32) -> Self {
+        self.a *= factor;
+        self
+    }
 }
 
 impl Mul<f32> for Color {

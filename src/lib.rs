@@ -19,7 +19,7 @@ pub use app::App;
 pub use border::{BorderWidth, CornerRadius, Padding};
 pub use canvas::{Canvas, Paint, Shader};
 pub use color::Color;
-pub use context::{BuildCx, DrawCx, EventCx, LayoutCx};
+pub use context::{BuildCx, DrawCx, EventCx, LayoutCx, UpdateCx};
 pub use curve::Curve;
 pub use event::Propagate;
 pub use key::{Key, KeyEvent, Modifiers, NamedKey};
@@ -33,5 +33,5 @@ pub use text::{
     TextLayoutLine, TextStyle, TextWrap,
 };
 pub use tree::Tree;
-pub use widget::{AnyWidgetId, Widget, WidgetId};
+pub use widget::{AnyWidgetId, Update, Widget, WidgetId};
 pub use window::{Window, WindowId};
