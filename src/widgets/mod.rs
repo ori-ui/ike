@@ -1,13 +1,18 @@
 mod align;
 mod button;
+mod constrain;
 mod container;
+mod entry;
+mod label;
 mod stack;
 mod text;
 mod text_area;
 
 pub use align::Aligned;
 pub use button::Button;
+pub use constrain::Constrain;
 pub use container::Container;
+pub use entry::Entry;
+pub use label::Label;
 pub use stack::{Align, Axis, Justify, Stack};
-pub use text::Text;
-pub use text_area::TextArea;
+pub use text_area::{NewlineBehaviour, TextArea};

@@ -1,5 +1,6 @@
 mod app;
 mod border;
+mod build;
 mod canvas;
 mod color;
 mod context;
@@ -17,9 +18,10 @@ pub mod widgets;
 
 pub use app::App;
 pub use border::{BorderWidth, CornerRadius, Padding};
+pub use build::BuildCx;
 pub use canvas::{Canvas, Paint, Shader};
 pub use color::Color;
-pub use context::{BuildCx, DrawCx, EventCx, LayoutCx, UpdateCx};
+pub use context::{DrawCx, EventCx, LayoutCx, UpdateCx};
 pub use curve::Curve;
 pub use event::Propagate;
 pub use key::{Key, KeyEvent, Modifiers, NamedKey};
@@ -34,4 +36,4 @@ pub use text::{
 };
 pub use tree::Tree;
 pub use widget::{AnyWidgetId, Update, Widget, WidgetId};
-pub use window::{Window, WindowId};
+pub use window::{Window, WindowId, WindowSizing};

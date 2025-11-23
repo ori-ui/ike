@@ -1,15 +1,22 @@
 use crate::{
-    Affine, AnyWidgetId, App, Fonts, Offset, Point, Size, Space, Tree, Widget, WidgetId,
-    math::Rect,
-    widget::{AnyWidget, WidgetState},
+    Affine, App, Fonts, Offset, Point, Rect, Size, Space, Tree, WidgetId, Window, WindowId,
+    widget::WidgetState,
 };
 
+pub(crate) enum FocusUpdate {
+    None,
+    Unfocus,
+    Target(WidgetId),
+    Next,
+    Previous,
+}
+
 pub struct EventCx<'a> {
-    #[allow(dead_code)]
-    pub(crate) app:   &'a mut App,
-    pub(crate) state: &'a mut WidgetState,
-    pub(crate) id:    WidgetId,
-    pub(crate) focus: &'a mut Option<WidgetId>,
+    pub(crate) window: WindowId,
+    pub(crate) app:    &'a mut App,
+    pub(crate) state:  &'a mut WidgetState,
+    pub(crate) id:     WidgetId,
+    pub(crate) focus:  &'a mut FocusUpdate,
 }
 
 pub struct UpdateCx<'a> {
@@ -25,126 +32,39 @@ pub struct LayoutCx<'a> {
 }
 
 pub struct DrawCx<'a> {
+    pub(crate) window: &'a Window,
     #[allow(dead_code)]
-    pub(crate) tree:  &'a mut Tree,
-    pub(crate) state: &'a mut WidgetState,
-}
-
-pub trait BuildCx {
-    fn app(&self) -> &App;
-    fn app_mut(&mut self) -> &mut App;
-
-    fn get<T>(&self, id: WidgetId<T>) -> &T
-    where
-        T: ?Sized + AnyWidget,
-    {
-        &self.app().tree[id]
-    }
-
-    fn get_mut<T>(&mut self, id: WidgetId<T>) -> &mut T
-    where
-        T: ?Sized + AnyWidget,
-    {
-        &mut self.app_mut().tree[id]
-    }
-
-    fn insert<T>(&mut self, widget: T) -> WidgetId<T>
-    where
-        Self: Sized,
-        T: Widget,
-    {
-        self.app_mut().tree.insert(widget)
-    }
-
-    fn remove(&mut self, id: impl AnyWidgetId)
-    where
-        Self: Sized,
-    {
-        self.app_mut().tree.remove(id.upcast());
-    }
-
-    fn add_child(&mut self, parent: impl AnyWidgetId, child: impl AnyWidgetId)
-    where
-        Self: Sized,
-    {
-        let child = child.upcast();
-        self.app_mut().tree.add_child(parent, child);
-        self.app_mut().tree.request_layout(child);
-    }
-
-    fn remove_child(&mut self, parent: impl AnyWidgetId, index: usize)
-    where
-        Self: Sized,
-    {
-        let parent = parent.upcast();
-        let state = self.app().tree.widget_state(parent.index);
-        let child = state.children[index];
-        self.app_mut().tree.remove(child);
-        self.app_mut().tree.request_layout(parent);
-    }
-
-    fn replace_child(&mut self, parent: impl AnyWidgetId, index: usize, child: impl AnyWidgetId)
-    where
-        Self: Sized,
-    {
-        let child = child.upcast();
-        self.app_mut().tree.replace_child(parent, index, child);
-        self.app_mut().tree.request_layout(child);
-    }
-
-    fn swap_children(&mut self, parent: impl AnyWidgetId, index_a: usize, index_b: usize)
-    where
-        Self: Sized,
-    {
-        let parent = parent.upcast();
-
-        self.app_mut().tree.swap_children(parent, index_a, index_b);
-        self.app_mut().tree.request_layout(parent);
-    }
-
-    fn children(&self, widget: impl AnyWidgetId) -> &[WidgetId] {
-        &self.app().tree.widget_state(widget.upcast().index).children
-    }
-
-    fn is_parent(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
-    where
-        Self: Sized,
-    {
-        let parent = parent.upcast();
-        let child = child.upcast();
-
-        self.app().tree.widget_state(child.index).parent == Some(parent)
-    }
-
-    fn request_animate(&mut self, id: impl AnyWidgetId)
-    where
-        Self: Sized,
-    {
-        self.app_mut().tree.request_animate(id);
-    }
-
-    fn request_layout(&mut self, id: impl AnyWidgetId)
-    where
-        Self: Sized,
-    {
-        self.app_mut().tree.request_layout(id);
-    }
-
-    fn request_draw(&mut self, id: impl AnyWidgetId)
-    where
-        Self: Sized,
-    {
-        self.app_mut().tree.request_draw(id);
-    }
+    pub(crate) tree:   &'a mut Tree,
+    pub(crate) state:  &'a mut WidgetState,
 }
 
 impl EventCx<'_> {
+    pub fn window(&self) -> &Window {
+        self.app.get_window(self.window).unwrap()
+    }
+
+    pub fn window_mut(&mut self) -> &mut Window {
+        self.app.get_window_mut(self.window).unwrap()
+    }
+
+    pub fn is_window_focused(&self) -> bool {
+        self.window().is_focused()
+    }
+
     pub fn request_focus(&mut self) {
-        *self.focus = Some(self.id);
+        *self.focus = FocusUpdate::Target(self.id);
     }
 
     pub fn request_unfocus(&mut self) {
-        self.state.is_focused = false;
+        *self.focus = FocusUpdate::Unfocus;
+    }
+
+    pub fn request_focus_next(&mut self) {
+        *self.focus = FocusUpdate::Next;
+    }
+
+    pub fn request_focus_previous(&mut self) {
+        *self.focus = FocusUpdate::Previous;
     }
 }
 
@@ -175,15 +95,21 @@ impl LayoutCx<'_> {
     pub fn place_child(&mut self, i: usize, offset: Offset) {
         let child = &self.state.children[i];
 
-        let state = self.tree.widget_state_mut(child.index);
+        let state = self.tree.get_state_unchecked_mut(child.index);
         state.transform.offset = offset;
     }
 
     pub fn child_size(&self, i: usize) -> Size {
         let child = &self.state.children[i];
 
-        let state = self.tree.widget_state(child.index);
+        let state = self.tree.get_state_unchecked(child.index);
         state.size
+    }
+}
+
+impl DrawCx<'_> {
+    pub fn is_window_focused(&self) -> bool {
+        self.window.is_focused
     }
 }
 
@@ -266,6 +192,18 @@ impl_contexts! {
 
         pub fn is_focused(&self) -> bool {
             self.state.is_focused
+        }
+
+        pub fn has_hovered(&self) -> bool {
+            self.state.has_hovered
+        }
+
+        pub fn has_active(&self) -> bool {
+            self.state.has_active
+        }
+
+        pub fn has_focused(&self) -> bool {
+            self.state.has_focused
         }
     }
 }

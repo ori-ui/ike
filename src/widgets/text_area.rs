@@ -8,33 +8,116 @@ use crate::{
     Update, UpdateCx, Widget, WidgetId,
 };
 
-pub struct TextArea {
-    paragraph:       Paragraph,
-    selection_color: Color,
-    cursor_color:    Color,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NewlineBehaviour {
+    Enter,
+    ShiftEnter,
+    Never,
+}
 
-    lines:     Vec<TextLayoutLine>,
-    cursor:    usize,
-    selection: Option<usize>,
-    blink:     f32,
+impl NewlineBehaviour {
+    fn insert_newline(&self, shift: bool) -> bool {
+        match self {
+            NewlineBehaviour::Enter => true,
+            NewlineBehaviour::ShiftEnter => shift,
+            NewlineBehaviour::Never => false,
+        }
+    }
+}
+
+pub struct TextArea {
+    paragraph:         Paragraph,
+    selection_color:   Color,
+    cursor_color:      Color,
+    blink_rate:        f32,
+    is_editable:       bool,
+    newline_behaviour: NewlineBehaviour,
+
+    #[allow(clippy::type_complexity)]
+    on_change: Option<Box<dyn FnMut(&str)>>,
+    #[allow(clippy::type_complexity)]
+    on_submit: Option<Box<dyn FnMut(&str)>>,
+
+    lines:         Vec<TextLayoutLine>,
+    cursor:        usize,
+    selection:     Option<usize>,
+    blink:         f32,
+    cursor_anchor: Option<f32>,
 }
 
 impl TextArea {
-    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetId<Self> {
+    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph, is_editable: bool) -> WidgetId<Self> {
         let cursor = paragraph.text.len();
 
         cx.insert(Self {
             paragraph,
             selection_color: Color::BLUE,
-            cursor_color: Color::WHITE,
+            cursor_color: Color::BLACK,
+            blink_rate: 5.0,
+            is_editable,
+            newline_behaviour: NewlineBehaviour::Enter,
+
+            on_change: None,
+            on_submit: None,
 
             lines: Vec::new(),
             cursor,
             selection: None,
             blink: 0.0,
+            cursor_anchor: None,
         })
     }
 
+    pub fn set_paragraph(cx: &mut impl BuildCx, id: WidgetId<Self>, paragraph: Paragraph) {
+        cx.get_mut(id).paragraph = paragraph;
+        cx.request_layout(id);
+    }
+
+    pub fn set_selection_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
+        cx.get_mut(id).selection_color = color;
+        cx.request_draw(id);
+    }
+
+    pub fn set_cursor_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
+        cx.get_mut(id).cursor_color = color;
+        cx.request_draw(id);
+    }
+
+    pub fn set_blink_rate(cx: &mut impl BuildCx, id: WidgetId<Self>, rate: f32) {
+        cx.get_mut(id).blink_rate = rate;
+    }
+
+    pub fn set_newline_behaviour(
+        cx: &mut impl BuildCx,
+        id: WidgetId<Self>,
+        behaviour: NewlineBehaviour,
+    ) {
+        cx.get_mut(id).newline_behaviour = behaviour;
+        cx.request_draw(id);
+    }
+
+    pub fn set_on_change(
+        cx: &mut impl BuildCx,
+        id: WidgetId<Self>,
+        on_change: impl FnMut(&str) + 'static,
+    ) {
+        cx.get_mut(id).on_change = Some(Box::new(on_change));
+    }
+
+    pub fn set_on_submit(
+        cx: &mut impl BuildCx,
+        id: WidgetId<Self>,
+        on_submit: impl FnMut(&str) + 'static,
+    ) {
+        cx.get_mut(id).on_submit = Some(Box::new(on_submit));
+    }
+
+    pub fn get_text(cx: &impl BuildCx, id: WidgetId<Self>) -> &str {
+        &cx.get(id).paragraph.text
+    }
+}
+
+impl TextArea {
     fn set_cursor(&mut self, cursor: usize, select: bool) {
         if !select {
             self.selection = None
@@ -48,25 +131,27 @@ impl TextArea {
 
     fn find_point(&self, point: Point) -> usize {
         for line in &self.lines {
-            if point.y <= line.bottom() {
-                for glyph in &line.glyphs {
-                    if point.x < glyph.bounds.center().x {
-                        return glyph.start_index;
-                    }
-                }
-
-                return line.end_index;
+            if point.y >= line.top() && point.y <= line.bottom() {
+                return Self::find_point_in_line(line, point.x);
             }
         }
 
-        self.paragraph.text().len()
+        self.paragraph.text.len()
+    }
+
+    fn find_point_in_line(line: &TextLayoutLine, x: f32) -> usize {
+        for glyph in &line.glyphs {
+            if x < glyph.bounds.center().x {
+                return glyph.start_index;
+            }
+        }
+
+        line.end_index
     }
 
     fn move_forward(&mut self, select: bool) {
-        if let Some(selection) = self.selection
-            && !select
-        {
-            self.set_cursor(self.cursor.max(selection), false);
+        if !select && self.selection.is_some() {
+            self.move_end();
             return;
         }
 
@@ -80,10 +165,8 @@ impl TextArea {
     }
 
     fn move_backward(&mut self, select: bool) {
-        if let Some(selection) = self.selection
-            && !select
-        {
-            self.set_cursor(self.cursor.min(selection), false);
+        if !select && self.selection.is_some() {
+            self.move_start();
             return;
         }
 
@@ -94,6 +177,78 @@ impl TextArea {
         if let Some(prev_char) = self.paragraph.text[..self.cursor].chars().next_back() {
             self.set_cursor(self.cursor - prev_char.len_utf8(), select);
         };
+    }
+
+    fn move_start(&mut self) {
+        if let Some(selection) = self.selection {
+            self.set_cursor(self.cursor.min(selection), false);
+        }
+    }
+
+    fn move_end(&mut self) {
+        if let Some(selection) = self.selection {
+            self.set_cursor(self.cursor.max(selection), false);
+        }
+    }
+
+    fn move_upward(&mut self, select: bool) {
+        if !select && self.selection.is_some() {
+            self.move_start();
+            return;
+        }
+
+        let Some(index) = self.current_line_index() else {
+            return;
+        };
+
+        let next_index = index.saturating_sub(1);
+
+        let anchor = *self.cursor_anchor.get_or_insert_with(|| {
+            let line = &self.lines[index];
+            Self::cursor_offset_in_line(self.cursor, line)
+        });
+
+        let line = &self.lines[next_index];
+        let cursor = Self::find_point_in_line(line, anchor);
+        self.set_cursor(cursor, select);
+    }
+
+    fn move_downward(&mut self, select: bool) {
+        if !select && self.selection.is_some() {
+            self.move_start();
+            return;
+        }
+
+        let Some(index) = self.current_line_index() else {
+            return;
+        };
+
+        let next_index = usize::min(index + 1, self.lines.len() - 1);
+
+        let anchor = *self.cursor_anchor.get_or_insert_with(|| {
+            let line = &self.lines[index];
+            Self::cursor_offset_in_line(self.cursor, line)
+        });
+
+        let line = &self.lines[next_index];
+        let cursor = Self::find_point_in_line(line, anchor);
+        self.set_cursor(cursor, select);
+    }
+
+    fn current_line_index(&self) -> Option<usize> {
+        self.lines
+            .iter()
+            .position(|l| self.cursor >= l.start_index && self.cursor <= l.end_index)
+    }
+
+    fn cursor_offset_in_line(cursor: usize, line: &TextLayoutLine) -> f32 {
+        for glyph in &line.glyphs {
+            if cursor >= glyph.start_index && cursor < glyph.end_index {
+                return glyph.bounds.left();
+            }
+        }
+
+        line.right()
     }
 
     fn remove_selection(&mut self) -> bool {
@@ -138,7 +293,7 @@ impl TextArea {
                 canvas.draw_rect(
                     rect,
                     CornerRadius::all(0.0),
-                    &Paint::from(Color::BLUE.fade(0.5)),
+                    &Paint::from(self.selection_color.fade(0.5)),
                 );
 
                 continue;
@@ -174,38 +329,20 @@ impl TextArea {
         }
     }
 
-    fn draw_cursor(&self, canvas: &mut dyn Canvas) {
+    fn draw_cursor(&self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         if self.selection.is_some() {
             return;
         }
 
-        for line in &self.lines {
-            if self.cursor < line.start_index || self.cursor > line.end_index {
-                continue;
-            }
+        let blink = self.blink.cos().abs();
 
-            let blink = self.blink.cos().abs();
-
-            for glyph in &line.glyphs {
-                if self.cursor <= glyph.start_index {
-                    let rect = Rect {
-                        min: Point::new(glyph.bounds.left(), line.top()),
-                        max: Point::new(glyph.bounds.left() + 1.0, line.bottom()),
-                    };
-
-                    canvas.draw_rect(
-                        rect,
-                        CornerRadius::all(0.0),
-                        &Paint::from(self.cursor_color.fade(blink)),
-                    );
-
-                    return;
-                }
-            }
+        if let Some(index) = self.current_line_index() {
+            let line = &self.lines[index];
+            let offset = Self::cursor_offset_in_line(self.cursor, line);
 
             let rect = Rect {
-                min: Point::new(line.right(), line.top()),
-                max: Point::new(line.right() + 1.0, line.bottom()),
+                min: Point::new(offset, line.top()),
+                max: Point::new(offset + 1.0, line.bottom()),
             };
 
             canvas.draw_rect(
@@ -213,6 +350,26 @@ impl TextArea {
                 CornerRadius::all(0.0),
                 &Paint::from(self.cursor_color.fade(blink)),
             );
+
+            return;
+        }
+
+        // there are no layout lines yet we still want to draw the cursor at the start
+        let rect = Rect {
+            min: Point::new(cx.rect().left(), cx.rect().top()),
+            max: Point::new(cx.rect().left() + 1.0, cx.rect().bottom()),
+        };
+
+        canvas.draw_rect(
+            rect,
+            CornerRadius::all(0.0),
+            &Paint::from(self.cursor_color.fade(blink)),
+        );
+    }
+
+    fn changed(&mut self) {
+        if let Some(ref mut on_change) = self.on_change {
+            on_change(&self.paragraph.text);
         }
     }
 }
@@ -220,10 +377,9 @@ impl TextArea {
 impl Widget for TextArea {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         self.lines = cx.fonts().layout(&self.paragraph, space.max.width);
+        let size = cx.fonts().measure(&self.paragraph, space.max.width);
 
-        cx.fonts()
-            .measure(&self.paragraph, space.max.width)
-            .min(space.max)
+        size.fit(space)
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
@@ -234,26 +390,32 @@ impl Widget for TextArea {
         }
 
         self.draw_selection(canvas);
-        self.draw_cursor(canvas);
+
+        if cx.is_window_focused() && self.is_editable {
+            self.draw_cursor(cx, canvas);
+        }
     }
 
     fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
-        if let Update::Focused(focused) = update {
-            cx.request_draw();
+        match update {
+            Update::Focused(..) | Update::WindowFocused(..) => {
+                cx.request_draw();
 
-            match focused {
-                true => cx.request_animate(),
-                false => self.cursor = self.paragraph.text.len(),
+                if cx.is_focused() {
+                    cx.request_animate()
+                }
             }
+
+            _ => (),
         }
     }
 
     fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {
         if cx.is_focused() && self.selection.is_none() {
-            self.blink += dt.as_secs_f32() * 5.0;
+            self.blink += dt.as_secs_f32() * self.blink_rate;
 
-            cx.request_animate();
             cx.request_draw();
+            cx.request_animate();
         }
     }
 
@@ -266,6 +428,7 @@ impl Widget for TextArea {
 
                 cx.request_draw();
                 cx.request_focus();
+                cx.request_animate();
                 PointerPropagate::Capture
             }
 
@@ -284,51 +447,118 @@ impl Widget for TextArea {
 
     fn on_key_event(&mut self, cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {
         match event {
-            KeyEvent::Down(event) => {
+            KeyEvent::Down(event) if self.is_editable => {
                 if let Some(ref text) = event.text
                     && !text.chars().any(|c| c.is_ascii_control())
                 {
                     self.insert_text(text);
+
+                    self.changed();
                     cx.request_layout();
 
                     return Propagate::Stop;
                 }
 
-                if event.key == Key::Named(NamedKey::ArrowRight) {
-                    self.move_forward(event.modifiers.shift());
-                    cx.request_layout();
+                match event.key {
+                    Key::Named(NamedKey::ArrowRight) => {
+                        self.move_forward(event.modifiers.shift());
+                        cx.request_draw();
+                        cx.request_animate();
 
-                    return Propagate::Stop;
-                }
-
-                if event.key == Key::Named(NamedKey::ArrowLeft) {
-                    self.move_backward(event.modifiers.shift());
-                    cx.request_layout();
-
-                    return Propagate::Stop;
-                }
-
-                if event.key == Key::Named(NamedKey::Backspace) {
-                    if self.selection.is_some() {
-                        self.remove_selection();
-                        cx.request_layout();
-                    } else if self.cursor > 0 {
-                        self.move_backward(false);
-                        self.paragraph.text.remove(self.cursor);
-                        cx.request_layout();
+                        Propagate::Stop
                     }
 
-                    return Propagate::Stop;
+                    Key::Named(NamedKey::ArrowLeft) => {
+                        self.move_backward(event.modifiers.shift());
+                        cx.request_draw();
+                        cx.request_animate();
+
+                        Propagate::Stop
+                    }
+
+                    Key::Named(NamedKey::ArrowUp) => {
+                        self.move_upward(event.modifiers.shift());
+                        cx.request_draw();
+                        cx.request_animate();
+
+                        Propagate::Stop
+                    }
+
+                    Key::Named(NamedKey::ArrowDown) => {
+                        self.move_downward(event.modifiers.shift());
+                        cx.request_draw();
+                        cx.request_animate();
+
+                        Propagate::Stop
+                    }
+
+                    Key::Named(NamedKey::Delete) => {
+                        if self.selection.is_some() {
+                            self.remove_selection();
+
+                            self.changed();
+                            cx.request_layout();
+                            cx.request_animate();
+                        } else if self.cursor <= self.paragraph.text.len() {
+                            self.paragraph.text.remove(self.cursor);
+
+                            self.changed();
+                            cx.request_layout();
+                            cx.request_animate();
+                        }
+
+                        Propagate::Stop
+                    }
+
+                    Key::Named(NamedKey::Backspace) => {
+                        if self.selection.is_some() {
+                            self.remove_selection();
+
+                            self.changed();
+                            cx.request_layout();
+                            cx.request_animate();
+                        } else if self.cursor > 0 {
+                            self.move_backward(false);
+                            self.paragraph.text.remove(self.cursor);
+
+                            self.changed();
+                            cx.request_layout();
+                            cx.request_animate();
+                        }
+
+                        Propagate::Stop
+                    }
+
+                    Key::Named(NamedKey::Enter)
+                        if self
+                            .newline_behaviour
+                            .insert_newline(event.modifiers.shift()) =>
+                    {
+                        self.insert_text("\n");
+
+                        self.changed();
+                        cx.request_layout();
+                        cx.request_animate();
+
+                        Propagate::Stop
+                    }
+
+                    Key::Named(NamedKey::Enter)
+                        if !self
+                            .newline_behaviour
+                            .insert_newline(event.modifiers.shift()) =>
+                    {
+                        if let Some(ref mut on_submit) = self.on_submit {
+                            on_submit(&self.paragraph.text);
+                            cx.request_focus_next();
+                            cx.request_draw();
+                        }
+
+                        Propagate::Stop
+                    }
+
+                    _ => Propagate::Bubble,
                 }
-
-                if event.key == Key::Named(NamedKey::Enter) {
-                    self.insert_text("\n");
-                    cx.request_layout();
-
-                    return Propagate::Stop;
-                }
-
-                Propagate::Bubble
             }
 
             _ => Propagate::Bubble,

@@ -46,4 +46,11 @@ impl Rect {
             (self.min.y + self.max.y) / 2.0,
         )
     }
+
+    pub const fn contains(self, point: Point) -> bool {
+        point.x >= self.min.x
+            && point.y >= self.min.y
+            && point.x <= self.max.x
+            && point.y <= self.max.y
+    }
 }

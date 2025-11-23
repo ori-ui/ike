@@ -7,7 +7,7 @@ use std::{
 use crate::{
     AnyWidgetId, Widget,
     context::UpdateCx,
-    widget::{AnyWidget, Update, WidgetId, WidgetState},
+    widget::{AnyWidget, ChildUpdate, Update, WidgetId, WidgetState},
 };
 
 pub struct Tree {
@@ -29,7 +29,10 @@ impl Tree {
         }
     }
 
-    pub fn insert<T>(&mut self, widget: T) -> WidgetId<T>
+    /// Add a widget to the tree.
+    ///
+    /// Will use a previously freed entry.
+    pub(crate) fn insert<T>(&mut self, widget: T) -> WidgetId<T>
     where
         T: Widget,
     {
@@ -61,7 +64,8 @@ impl Tree {
         }
     }
 
-    pub fn remove<T>(&mut self, id: WidgetId<T>)
+    /// Remove a widget and all it's descendants.
+    pub(crate) fn remove<T>(&mut self, id: WidgetId<T>)
     where
         T: ?Sized + Widget,
     {
@@ -75,15 +79,16 @@ impl Tree {
 
         if let Some(state) = entry.state.take() {
             if let Some(parent) = state.parent {
-                let parent_state = self.widget_state_mut(parent.index);
+                let parent_state = self.get_state_unchecked_mut(parent.index);
 
-                if let Some(i) = parent_state.children.iter().position(|x| *x == id) {
-                    parent_state.children.remove(i);
+                if let Some(index) = parent_state.children.iter().position(|x| *x == id) {
+                    parent_state.children.remove(index);
 
                     self.with_entry(parent, |tree, widget, state| {
                         let mut cx = UpdateCx { tree, state };
 
-                        widget.update(&mut cx, Update::ChildRemoved(i));
+                        let update = Update::Children(ChildUpdate::Removed(index));
+                        widget.update(&mut cx, update);
                     });
 
                     self.request_layout(parent);
@@ -98,7 +103,8 @@ impl Tree {
         self.free.push(id.index);
     }
 
-    pub fn get<T>(&self, id: WidgetId<T>) -> Option<&T>
+    /// Get a reference to a widget.
+    pub(crate) fn get<T>(&self, id: WidgetId<T>) -> Option<&T>
     where
         T: ?Sized + AnyWidget,
     {
@@ -111,7 +117,8 @@ impl Tree {
         Some(T::downcast_ref(entry.widget.as_deref()?))
     }
 
-    pub fn get_mut<T>(&mut self, id: WidgetId<T>) -> Option<&mut T>
+    /// Get a mutable reference to a widget.
+    pub(crate) fn get_mut<T>(&mut self, id: WidgetId<T>) -> Option<&mut T>
     where
         T: ?Sized + AnyWidget,
     {
@@ -124,17 +131,18 @@ impl Tree {
         Some(T::downcast_mut(entry.widget.as_deref_mut()?))
     }
 
-    pub fn add_child(&mut self, parent: impl AnyWidgetId, child: impl AnyWidgetId) {
+    /// Add a child to widget.
+    pub(crate) fn add_child(&mut self, parent: impl AnyWidgetId, child: impl AnyWidgetId) {
         let parent = parent.upcast();
         let child = child.upcast();
 
         self.debug_validate_id(parent);
         self.debug_validate_id(child);
 
-        let child_state = self.widget_state_mut(child.index);
+        let child_state = self.get_state_unchecked_mut(child.index);
         child_state.parent = Some(parent.upcast());
 
-        let parent_state = self.widget_state_mut(parent.index);
+        let parent_state = self.get_state_unchecked_mut(parent.index);
 
         let index = parent_state.children.len();
         parent_state.children.push(child.upcast());
@@ -142,30 +150,39 @@ impl Tree {
         self.with_entry(parent, |tree, widget, state| {
             let mut cx = UpdateCx { tree, state };
 
-            widget.update(&mut cx, Update::ChildAdded(index));
+            let update = Update::Children(ChildUpdate::Added(index));
+            widget.update(&mut cx, update);
         });
 
         self.request_layout(parent);
     }
 
-    pub fn swap_children(&mut self, parent: impl AnyWidgetId, index_a: usize, index_b: usize) {
+    /// Swap two children of a widget.
+    pub(crate) fn swap_children(
+        &mut self,
+        parent: impl AnyWidgetId,
+        index_a: usize,
+        index_b: usize,
+    ) {
         let parent = parent.upcast();
 
         self.debug_validate_id(parent);
 
-        let parent_state = self.widget_state_mut(parent.index);
+        let parent_state = self.get_state_unchecked_mut(parent.index);
         parent_state.children.swap(index_a, index_b);
 
         self.with_entry(parent, |tree, widget, state| {
             let mut cx = UpdateCx { tree, state };
 
-            widget.update(&mut cx, Update::ChildrenSwapped(index_a, index_b));
+            let update = Update::Children(ChildUpdate::Swapped(index_a, index_b));
+            widget.update(&mut cx, update);
         });
 
         self.request_layout(parent);
     }
 
-    pub fn replace_child(
+    /// Replace the child of a widget with another.
+    pub(crate) fn replace_child(
         &mut self,
         parent: impl AnyWidgetId,
         index: usize,
@@ -177,10 +194,11 @@ impl Tree {
         self.debug_validate_id(parent);
         self.debug_validate_id(child);
 
-        let child_state = self.widget_state_mut(child.index);
+        let child_state = self.get_state_unchecked_mut(child.index);
+        assert!(child_state.parent.is_none());
         child_state.parent = Some(parent.upcast());
 
-        let parent_state = self.widget_state_mut(parent.index);
+        let parent_state = self.get_state_unchecked_mut(parent.index);
         let prev_child = mem::replace(&mut parent_state.children[index], child.upcast());
 
         self.remove(prev_child);
@@ -188,7 +206,8 @@ impl Tree {
         self.with_entry(parent, |tree, widget, state| {
             let mut cx = UpdateCx { tree, state };
 
-            widget.update(&mut cx, Update::ChildReplaced(index));
+            let update = Update::Children(ChildUpdate::Replaced(index));
+            widget.update(&mut cx, update);
         });
 
         self.request_layout(child);
@@ -236,12 +255,12 @@ impl Tree {
         output
     }
 
-    pub(crate) fn widget_state(&self, index: u32) -> &WidgetState {
+    pub(crate) fn get_state_unchecked(&self, index: u32) -> &WidgetState {
         let entry = &self.entries[index as usize];
         entry.state.as_ref().unwrap()
     }
 
-    pub(crate) fn widget_state_mut(&mut self, index: u32) -> &mut WidgetState {
+    pub(crate) fn get_state_unchecked_mut(&mut self, index: u32) -> &mut WidgetState {
         let entry = &mut self.entries[index as usize];
         entry.state.as_mut().unwrap()
     }
@@ -254,26 +273,28 @@ impl Tree {
         debug_assert_eq!(id.generation, entry.generation);
     }
 
-    /// Update tree after widget state changes.
-    ///
-    /// Whenever the state of a widget has changed, the state it's ancestors become out of sync, and
-    /// they must be updated.
+    pub(crate) fn update_state(&mut self, id: impl AnyWidgetId) {
+        self.with_entry(id.upcast(), |tree, _widget, state| {
+            state.reset();
+
+            let children = mem::take(&mut state.children);
+            for &child in &children {
+                let child_state = tree.get_state_unchecked(child.index);
+                state.merge(child_state);
+            }
+
+            state.children = children;
+        });
+    }
+
     pub(crate) fn state_changed(&mut self, id: impl AnyWidgetId) {
         let mut current = Some(id.upcast());
 
         while let Some(id) = current {
-            self.with_entry(id, |tree, _widget, state| {
-                state.reset();
+            self.update_state(id);
 
-                let children = mem::take(&mut state.children);
-                for &child in &children {
-                    let child_state = tree.widget_state(child.index);
-                    state.merge(child_state);
-                }
-
-                state.children = children;
-                current = state.parent;
-            });
+            let state = self.get_state_unchecked(id.index);
+            current = state.parent;
         }
     }
 
@@ -320,7 +341,7 @@ impl Tree {
         let id = id.upcast();
         self.debug_validate_id(id);
 
-        let state = self.widget_state_mut(id.index);
+        let state = self.get_state_unchecked_mut(id.index);
         state.needs_animate = true;
 
         self.state_changed(id);
@@ -330,7 +351,7 @@ impl Tree {
         let id = id.upcast();
         self.debug_validate_id(id);
 
-        let state = self.widget_state_mut(id.index);
+        let state = self.get_state_unchecked_mut(id.index);
         state.needs_layout = true;
         state.needs_draw = true;
 
@@ -341,34 +362,34 @@ impl Tree {
         let id = id.upcast();
         self.debug_validate_id(id);
 
-        let state = self.widget_state_mut(id.index);
+        let state = self.get_state_unchecked_mut(id.index);
         state.needs_draw = true;
 
         self.state_changed(id);
     }
 
-    pub fn needs_animate<T>(&self, id: WidgetId<T>) -> bool
+    pub(crate) fn needs_animate<T>(&self, id: WidgetId<T>) -> bool
     where
         T: ?Sized,
     {
         self.debug_validate_id(id);
-        self.widget_state(id.index).needs_animate
+        self.get_state_unchecked(id.index).needs_animate
     }
 
-    pub fn needs_layout<T>(&self, id: WidgetId<T>) -> bool
+    pub(crate) fn needs_layout<T>(&self, id: WidgetId<T>) -> bool
     where
         T: ?Sized,
     {
         self.debug_validate_id(id);
-        self.widget_state(id.index).needs_layout
+        self.get_state_unchecked(id.index).needs_layout
     }
 
-    pub fn needs_draw<T>(&self, id: WidgetId<T>) -> bool
+    pub(crate) fn needs_draw<T>(&self, id: WidgetId<T>) -> bool
     where
         T: ?Sized,
     {
         self.debug_validate_id(id);
-        self.widget_state(id.index).needs_draw
+        self.get_state_unchecked(id.index).needs_draw
     }
 }
 

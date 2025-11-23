@@ -1,7 +1,9 @@
 use core::f32;
 
 use crate::{
-    BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId, context::UpdateCx, widget::Update,
+    BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId,
+    context::UpdateCx,
+    widget::{ChildUpdate, Update},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -234,20 +236,24 @@ impl Widget for Stack {
     }
 
     fn update(&mut self, _cx: &mut UpdateCx<'_>, update: Update) {
-        match update {
-            Update::ChildAdded(_) => {
-                self.flex.push((0.0, false));
-            }
+        if let Update::Children(update) = update {
+            match update {
+                ChildUpdate::Added(..) => {
+                    self.flex.push((0.0, false));
+                }
 
-            Update::ChildRemoved(i) => {
-                self.flex.remove(i);
-            }
+                ChildUpdate::Removed(i) => {
+                    self.flex.remove(i);
+                }
 
-            Update::ChildrenSwapped(a, b) => {
-                self.flex.swap(a, b);
-            }
+                ChildUpdate::Swapped(a, b) => {
+                    self.flex.swap(a, b);
+                }
 
-            _ => {}
+                ChildUpdate::Replaced(i) => {
+                    self.flex[i] = (0.0, false);
+                }
+            }
         }
     }
 

@@ -43,10 +43,6 @@ impl Paragraph {
         self.sections.clear();
     }
 
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-
     pub fn sections(&self) -> impl Iterator<Item = (&str, &TextStyle)> {
         let last = self
             .sections

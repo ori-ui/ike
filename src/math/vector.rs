@@ -1,7 +1,9 @@
 use std::{
     fmt,
-    ops::{Add, Neg, Sub},
+    ops::{Add, AddAssign, Neg, Sub, SubAssign},
 };
+
+use crate::Space;
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Size {
@@ -21,18 +23,30 @@ impl Size {
         }
     }
 
-    pub fn min(self, other: Self) -> Self {
+    pub const fn min(self, other: Self) -> Self {
         Self {
             width:  self.width.min(other.width),
             height: self.height.min(other.height),
         }
     }
 
-    pub fn max(self, other: Self) -> Self {
+    pub const fn max(self, other: Self) -> Self {
         Self {
             width:  self.width.max(other.width),
             height: self.height.max(other.height),
         }
+    }
+
+    pub const fn fit(mut self, space: Space) -> Self {
+        if space.max.width.is_finite() {
+            self.width = self.width.min(space.max.width);
+        }
+
+        if space.max.height.is_finite() {
+            self.height = self.height.min(space.max.height);
+        }
+
+        self.max(space.min)
     }
 }
 
@@ -43,6 +57,8 @@ pub struct Point {
 }
 
 impl Point {
+    pub const ORIGIN: Self = Self::new(0.0, 0.0);
+
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
@@ -111,6 +127,18 @@ impl Add<f32> for Size {
     }
 }
 
+impl AddAssign for Size {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
+impl AddAssign<f32> for Size {
+    fn add_assign(&mut self, rhs: f32) {
+        *self = *self + rhs;
+    }
+}
+
 impl Sub for Size {
     type Output = Size;
 
@@ -122,14 +150,9 @@ impl Sub for Size {
     }
 }
 
-impl Sub for Point {
-    type Output = Offset;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Offset {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-        }
+impl SubAssign for Size {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }
 
@@ -151,6 +174,29 @@ impl Add<Offset> for Point {
         Point {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
+        }
+    }
+}
+
+impl AddAssign<f32> for Point {
+    fn add_assign(&mut self, rhs: f32) {
+        *self = *self + rhs;
+    }
+}
+
+impl AddAssign<Offset> for Point {
+    fn add_assign(&mut self, rhs: Offset) {
+        *self = *self + rhs;
+    }
+}
+
+impl Sub for Point {
+    type Output = Offset;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Offset {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
         }
     }
 }
@@ -199,6 +245,18 @@ impl Add for Offset {
     }
 }
 
+impl AddAssign<f32> for Offset {
+    fn add_assign(&mut self, rhs: f32) {
+        *self = *self + rhs;
+    }
+}
+
+impl AddAssign for Offset {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
 impl Sub<f32> for Offset {
     type Output = Offset;
 
@@ -210,6 +268,12 @@ impl Sub<f32> for Offset {
     }
 }
 
+impl SubAssign<f32> for Offset {
+    fn sub_assign(&mut self, rhs: f32) {
+        *self = *self - rhs;
+    }
+}
+
 impl Sub for Offset {
     type Output = Offset;
 
@@ -218,6 +282,12 @@ impl Sub for Offset {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
         }
+    }
+}
+
+impl SubAssign for Offset {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }
 

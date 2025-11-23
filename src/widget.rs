@@ -73,10 +73,16 @@ pub enum Update {
     Hovered(bool),
     Active(bool),
     Focused(bool),
-    ChildAdded(usize),
-    ChildRemoved(usize),
-    ChildReplaced(usize),
-    ChildrenSwapped(usize, usize),
+    WindowFocused(bool),
+    Children(ChildUpdate),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ChildUpdate {
+    Added(usize),
+    Removed(usize),
+    Replaced(usize),
+    Swapped(usize, usize),
 }
 
 pub trait AnyWidget: Widget {
