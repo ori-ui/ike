@@ -15,4 +15,4 @@ pub use container::Container;
 pub use entry::Entry;
 pub use label::Label;
 pub use stack::{Align, Axis, Justify, Stack};
-pub use text_area::{NewlineBehaviour, TextArea};
+pub use text_area::{NewlineBehaviour, SubmitBehaviour, TextArea};

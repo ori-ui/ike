@@ -8,10 +8,18 @@ use crate::{
     Update, UpdateCx, Widget, WidgetId,
 };
 
+/// When should newlines be inserted in a [`TextArea`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NewlineBehaviour {
+    /// Insert a newline when [`NamedKey::Enter`] is pressed.
+    ///
+    /// When enabled, `on_submit` is never called.
     Enter,
+
+    /// Insert a newline when [`NamedKey::Enter`] is pressed and [`Modifiers::shift`] is held.
     ShiftEnter,
+
+    /// Never insert newlines.
     Never,
 }
 
@@ -25,6 +33,16 @@ impl NewlineBehaviour {
     }
 }
 
+/// What should happen when a `submit` action happens in a [`TextArea`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SubmitBehaviour {
+    /// The [`TextArea`] will keep it's focus.
+    KeepFocus,
+
+    /// The focus will be given to the next widget.
+    FocusNext,
+}
+
 pub struct TextArea {
     paragraph:         Paragraph,
     selection_color:   Color,
@@ -32,6 +50,7 @@ pub struct TextArea {
     blink_rate:        f32,
     is_editable:       bool,
     newline_behaviour: NewlineBehaviour,
+    submit_behaviour:  SubmitBehaviour,
 
     #[allow(clippy::type_complexity)]
     on_change: Option<Box<dyn FnMut(&str)>>,
@@ -56,6 +75,7 @@ impl TextArea {
             blink_rate: 5.0,
             is_editable,
             newline_behaviour: NewlineBehaviour::Enter,
+            submit_behaviour: SubmitBehaviour::FocusNext,
 
             on_change: None,
             on_submit: None,
@@ -93,6 +113,15 @@ impl TextArea {
         behaviour: NewlineBehaviour,
     ) {
         cx.get_mut(id).newline_behaviour = behaviour;
+        cx.request_draw(id);
+    }
+
+    pub fn set_submit_behaviour(
+        cx: &mut impl BuildCx,
+        id: WidgetId<Self>,
+        behaviour: SubmitBehaviour,
+    ) {
+        cx.get_mut(id).submit_behaviour = behaviour;
         cx.request_draw(id);
     }
 
@@ -550,8 +579,11 @@ impl Widget for TextArea {
                     {
                         if let Some(ref mut on_submit) = self.on_submit {
                             on_submit(&self.paragraph.text);
-                            cx.request_focus_next();
                             cx.request_draw();
+                        }
+
+                        if let SubmitBehaviour::FocusNext = self.submit_behaviour {
+                            cx.request_focus_next();
                         }
 
                         Propagate::Stop

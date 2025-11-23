@@ -112,6 +112,15 @@ impl Entry {
         TextArea::set_newline_behaviour(cx, text_area, behaviour);
     }
 
+    pub fn set_submit_behaviour(
+        cx: &mut impl BuildCx,
+        id: WidgetId<Self>,
+        behaviour: SubmitBehaviour,
+    ) {
+        let text_area = cx.get(id).text_area;
+        TextArea::set_submit_behaviour(cx, text_area, behaviour);
+    }
+
     pub fn set_on_change(
         cx: &mut impl BuildCx,
         id: WidgetId<Self>,
