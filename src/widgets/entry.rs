@@ -1,7 +1,7 @@
 use crate::{
     BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Paragraph,
     Size, Space, Widget, WidgetId,
-    widgets::{NewlineBehaviour, TextArea},
+    widgets::{NewlineBehaviour, SubmitBehaviour, TextArea},
 };
 
 pub struct Entry {
