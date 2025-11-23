@@ -89,7 +89,24 @@ impl TextArea {
     }
 
     pub fn set_paragraph(cx: &mut impl BuildCx, id: WidgetId<Self>, paragraph: Paragraph) {
-        cx.get_mut(id).paragraph = paragraph;
+        let this = cx.get_mut(id);
+
+        // the new text might place the cursor in the middle of a unicode character,
+        // in which case we want to move the cursor to avoid crashes.
+
+        this.cursor = this.cursor.min(paragraph.text.len());
+        while !paragraph.text.is_char_boundary(this.cursor) {
+            this.cursor -= 1;
+        }
+
+        if let Some(ref mut selection) = this.selection {
+            *selection = (*selection).min(paragraph.text.len());
+            while !paragraph.text.is_char_boundary(*selection) {
+                *selection -= 1;
+            }
+        }
+
+        this.paragraph = paragraph;
         cx.request_layout(id);
     }
 
