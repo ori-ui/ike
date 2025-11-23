@@ -25,8 +25,10 @@ impl App {
 
         window.pointers.retain(|p| p.id == id);
 
-        if let Some(hovered) = find_hovered(&self.tree, window.content) {
-            self.tree.set_hovered(hovered, false);
+        if let Some(hovered) = find_hovered(&self.tree, window.content)
+            && let Some(mut widget) = self.tree.get_mut(hovered)
+        {
+            widget.set_hovered(false);
         }
 
         false
@@ -114,7 +116,9 @@ impl App {
                 PointerPropagate::Stop => true,
 
                 PointerPropagate::Capture if pressed => {
-                    self.tree.set_active(target, true);
+                    if let Some(mut widget) = self.tree.get_mut(target) {
+                        widget.set_active(true);
+                    }
 
                     true
                 }
@@ -125,19 +129,22 @@ impl App {
             };
 
             if !pressed && self.tree.get_state_unchecked(target.index).is_active {
-                self.tree.set_active(target, false);
+                if let Some(mut widget) = self.tree.get_mut(target) {
+                    widget.set_active(false);
+                }
+
                 update_hovered(&mut self.tree, content, position);
             }
 
             if let Some(focused) = focus::find_focused(&self.tree, content)
+                && let Some(mut widget) = self.tree.get_mut(focused)
                 && button == PointerButton::Primary
                 && pressed
             {
-                let state = self.tree.get_state_unchecked(focused.index);
-                let local = state.global_transform.inverse() * position;
+                let local = widget.state().global_transform.inverse() * position;
 
-                if !Rect::min_size(Point::ORIGIN, state.size).contains(local) {
-                    self.tree.set_focused(focused, false);
+                if !Rect::min_size(Point::ORIGIN, widget.state().size).contains(local) {
+                    widget.set_focused(false);
                 }
             }
 
@@ -197,12 +204,16 @@ fn update_hovered(tree: &mut Tree, id: WidgetId, point: Point) -> Option<WidgetI
     let hovered = find_widget_at(tree, id, point);
 
     if current != hovered {
-        if let Some(current) = current {
-            tree.set_hovered(current, false);
+        if let Some(current) = current
+            && let Some(mut widget) = tree.get_mut(current)
+        {
+            widget.set_hovered(false);
         }
 
-        if let Some(hovered) = hovered {
-            tree.set_hovered(hovered, true);
+        if let Some(hovered) = hovered
+            && let Some(mut widget) = tree.get_mut(hovered)
+        {
+            widget.set_hovered(true);
         }
     }
 
@@ -242,24 +253,32 @@ fn send_pointer_event(
     let mut propagate = PointerPropagate::Bubble;
 
     while let Some(id) = current {
-        app.with_entry(id, |app, widget, state| {
-            if let PointerPropagate::Bubble = propagate {
-                let mut cx = EventCx {
-                    window,
-                    app,
-                    state,
-                    id,
-                    focus: &mut focus,
-                };
+        let mut widget = app.tree.get_mut(id).unwrap();
 
-                propagate = widget.on_pointer_event(&mut cx, event);
-            }
+        if let PointerPropagate::Bubble = propagate {
+            let mut cx = EventCx {
+                window,
+                windows: &mut app.windows,
+                tree: widget.tree,
+                state: widget.state.as_mut().unwrap(),
+                id,
+                focus: &mut focus,
+            };
 
-            current = state.parent;
-        });
+            propagate = widget
+                .widget
+                .as_mut()
+                .unwrap()
+                .on_pointer_event(&mut cx, event);
+        }
+
+        current = widget.state().parent;
     }
 
-    app.tree.state_changed(target);
+    if let Some(mut target) = app.tree.get_mut(target) {
+        target.propagate_state();
+    }
+
     focus::update_focus(&mut app.tree, root, focus);
 
     propagate

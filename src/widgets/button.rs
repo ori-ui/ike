@@ -1,7 +1,7 @@
 use crate::{
     AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent,
     LayoutCx, NamedKey, Padding, Paint, PointerEvent, PointerPropagate, Propagate, Size, Space,
-    Widget, WidgetId, context::UpdateCx, widget::Update,
+    Widget, WidgetMut, context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
@@ -17,8 +17,8 @@ pub struct Button {
 }
 
 impl Button {
-    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetId<Self> {
-        let this = cx.insert(Button {
+    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
+        let mut this = cx.insert(Button {
             padding:       Padding::all(8.0),
             border_width:  BorderWidth::all(1.0),
             corner_radius: CornerRadius::all(8.0),
@@ -30,65 +30,57 @@ impl Button {
             on_click:      Box::new(|| {}),
         });
 
-        cx.add_child(this, child);
+        this.add_child(child);
 
         this
     }
 
-    pub fn set_child(cx: &mut impl BuildCx, id: WidgetId<Self>, child: impl AnyWidgetId) {
-        cx.replace_child(id, 0, child);
+    pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
+        this.replace_child(0, child);
     }
 
-    pub fn set_padding(cx: &mut impl BuildCx, id: WidgetId<Self>, padding: Padding) {
-        cx.get_mut(id).padding = padding;
-        cx.request_layout(id);
+    pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
+        this.padding = padding;
+        this.request_layout();
     }
 
-    pub fn set_border_width(cx: &mut impl BuildCx, id: WidgetId<Self>, border_width: BorderWidth) {
-        cx.get_mut(id).border_width = border_width;
-        cx.request_layout(id);
+    pub fn set_border_width(this: &mut WidgetMut<Self>, border_width: BorderWidth) {
+        this.border_width = border_width;
+        this.request_layout();
     }
 
-    pub fn set_corner_radius(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        corner_radius: CornerRadius,
-    ) {
-        cx.get_mut(id).corner_radius = corner_radius;
-        cx.request_draw(id);
+    pub fn set_corner_radius(this: &mut WidgetMut<Self>, corner_radius: CornerRadius) {
+        this.corner_radius = corner_radius;
+        this.request_draw();
     }
 
-    pub fn set_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).color = color;
-        cx.request_draw(id);
+    pub fn set_border_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.border_color = color;
+        this.request_draw();
     }
 
-    pub fn set_hovered_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).hovered_color = color;
-        cx.request_draw(id);
+    pub fn set_focus_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.focus_color = color;
+        this.request_draw();
     }
 
-    pub fn set_active_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).active_color = color;
-        cx.request_draw(id);
+    pub fn set_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.color = color;
+        this.request_draw();
     }
 
-    pub fn set_border_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).border_color = color;
-        cx.request_draw(id);
+    pub fn set_hovered_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.hovered_color = color;
+        this.request_draw();
     }
 
-    pub fn set_focus_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).focus_color = color;
-        cx.request_draw(id);
+    pub fn set_active_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.active_color = color;
+        this.request_draw();
     }
 
-    pub fn set_on_click(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        on_click: impl FnMut() + 'static,
-    ) {
-        cx.get_mut(id).on_click = Box::new(on_click);
+    pub fn set_on_click(this: &mut WidgetMut<Self>, on_click: impl FnMut() + 'static) {
+        this.on_click = Box::new(on_click);
     }
 }
 

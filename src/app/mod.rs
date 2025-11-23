@@ -5,17 +5,13 @@ use std::{
 };
 
 use crate::{
-    Canvas, Color, Modifiers, Size, Tree, Update, Widget, WidgetId, Window, WindowId,
-    widget::WidgetState, window::WindowSizing,
+    Canvas, Color, Modifiers, Size, Tree, Update, WidgetId, Window, WindowId, window::WindowSizing,
 };
 
-mod animate;
-mod draw;
 mod focus;
 mod key;
 mod layout;
 mod pointer;
-mod update;
 
 pub struct App {
     pub(crate) tree:    Tree,
@@ -87,9 +83,10 @@ impl App {
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
         let window = self.windows.iter_mut().find(|w| w.id == window)?;
 
-        let new_window_size = layout::layout_window(&mut self.tree, canvas.fonts(), window);
-        draw::draw_widget(&mut self.tree, window, window.content, canvas);
-        draw::draw_over_widget(&mut self.tree, window, window.content, canvas);
+        let mut widget = self.tree.get_mut(window.content).unwrap();
+        let new_window_size = layout::layout_window(&mut widget, canvas.fonts(), window);
+        widget.draw_recursive(window, canvas);
+        widget.draw_over_recursive(window, canvas);
 
         new_window_size
     }
@@ -99,7 +96,8 @@ impl App {
             return;
         };
 
-        animate::animate_widget(&mut self.tree, window.content, delta_time);
+        let mut widget = self.tree.get_mut(window.content).unwrap();
+        widget.animate_recursive(delta_time);
     }
 
     pub fn window_focused(&mut self, window: WindowId, is_focused: bool) {
@@ -109,8 +107,9 @@ impl App {
 
         window.is_focused = is_focused;
 
+        let mut widget = self.tree.get_mut(window.content).unwrap();
         let update = Update::WindowFocused(is_focused);
-        update::update_widget(&mut self.tree, window.content, &update);
+        widget.update_recursive(update);
     }
 
     pub fn window_resized(&mut self, window: WindowId, new_size: Size) {
@@ -120,7 +119,8 @@ impl App {
 
         window.current_size = new_size;
 
-        self.tree.request_layout(window.content);
+        let mut widget = self.tree.get_mut(window.content).unwrap();
+        widget.request_layout();
     }
 
     pub fn window_scaled(&mut self, window: WindowId, new_scale: f32, new_size: Size) {
@@ -131,7 +131,8 @@ impl App {
         window.scale = new_scale;
         window.current_size = new_size;
 
-        self.tree.request_layout(window.content);
+        let mut widget = self.tree.get_mut(window.content).unwrap();
+        widget.request_layout();
     }
 
     pub fn window_needs_animate(&self, window: WindowId) -> bool {
@@ -146,21 +147,5 @@ impl App {
             Some(window) => self.tree.needs_draw(window.content),
             None => false,
         }
-    }
-}
-
-impl App {
-    pub(crate) fn with_entry<T, U>(
-        &mut self,
-        id: WidgetId<T>,
-        f: impl FnOnce(&mut Self, &mut dyn Widget, &mut WidgetState) -> U,
-    ) -> U
-    where
-        T: ?Sized,
-    {
-        let (mut widget, mut state) = self.tree.take_entry(id).unwrap();
-        let output = { f(self, widget.as_mut(), &mut state) };
-        self.tree.insert_entry(id, widget, state);
-        output
     }
 }

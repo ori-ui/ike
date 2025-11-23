@@ -1,4 +1,4 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId};
+use crate::{AnyWidgetId, BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetMut};
 
 pub struct Aligned {
     x: f32,
@@ -6,24 +6,25 @@ pub struct Aligned {
 }
 
 impl Aligned {
-    pub fn new(cx: &mut impl BuildCx, x: f32, y: f32, content: impl AnyWidgetId) -> WidgetId<Self> {
-        let this = cx.insert(Aligned { x, y });
-
-        cx.add_child(this, content);
-
+    pub fn new(
+        cx: &mut impl BuildCx,
+        x: f32,
+        y: f32,
+        content: impl AnyWidgetId,
+    ) -> WidgetMut<'_, Self> {
+        let mut this = cx.insert(Aligned { x, y });
+        this.add_child(content);
         this
     }
 
-    pub fn set_child(cx: &mut impl BuildCx, id: WidgetId<Self>, child: impl AnyWidgetId) {
-        cx.replace_child(id, 0, child);
+    pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
+        this.replace_child(0, child);
     }
 
-    pub fn set_alignment(cx: &mut impl BuildCx, id: WidgetId<Self>, x: f32, y: f32) {
-        let this = cx.get_mut(id);
+    pub fn set_alignment(this: &mut WidgetMut<Self>, x: f32, y: f32) {
         this.x = x;
         this.y = y;
-
-        cx.request_layout(id);
+        this.request_layout();
     }
 }
 

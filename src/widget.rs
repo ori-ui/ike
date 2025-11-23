@@ -73,6 +73,7 @@ pub enum Update {
     Hovered(bool),
     Active(bool),
     Focused(bool),
+    Stashed(bool),
     WindowFocused(bool),
     Children(ChildUpdate),
 }
@@ -86,12 +87,24 @@ pub enum ChildUpdate {
 }
 
 pub trait AnyWidget: Widget {
+    fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget>;
+
+    fn downcast_boxed(boxed: Box<dyn Widget>) -> Option<Box<Self>>;
+
     fn downcast_ref(any: &dyn Widget) -> &Self;
 
     fn downcast_mut(any: &mut dyn Widget) -> &mut Self;
 }
 
 impl AnyWidget for dyn Widget {
+    fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget> {
+        boxed
+    }
+
+    fn downcast_boxed(boxed: Box<dyn Widget>) -> Option<Box<Self>> {
+        Some(boxed)
+    }
+
     fn downcast_ref(any: &dyn Widget) -> &Self {
         any
     }
@@ -105,6 +118,14 @@ impl<T> AnyWidget for T
 where
     T: Widget,
 {
+    fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget> {
+        boxed
+    }
+
+    fn downcast_boxed(boxed: Box<dyn Widget>) -> Option<Box<Self>> {
+        (boxed as Box<dyn Any>).downcast().ok()
+    }
+
     fn downcast_ref(any: &dyn Widget) -> &Self {
         (any as &dyn Any).downcast_ref().unwrap()
     }
@@ -130,6 +151,11 @@ pub struct WidgetState {
 
     pub(crate) is_active:  bool,
     pub(crate) has_active: bool,
+
+    /// Whether the widget is currently stashed, either explicitly, or by an ancestor.
+    pub(crate) is_stashed:  bool,
+    /// Whether the widget is currently stashing itself and descendants.
+    pub(crate) is_stashing: bool,
 
     pub(crate) needs_animate: bool,
     pub(crate) needs_layout:  bool,
@@ -157,6 +183,9 @@ impl WidgetState {
             is_active:  false,
             has_active: false,
 
+            is_stashed:  false,
+            is_stashing: false,
+
             needs_animate: false,
             needs_layout:  true,
             needs_draw:    true,
@@ -177,9 +206,17 @@ impl WidgetState {
         self.has_active |= child.has_active;
         self.has_focused |= child.has_focused;
 
-        self.needs_animate |= child.needs_animate;
-        self.needs_layout |= child.needs_layout;
-        self.needs_draw |= child.needs_draw;
+        self.needs_animate |= child.needs_animate && !child.is_stashed;
+        self.needs_layout |= child.needs_layout && !child.is_stashed;
+        self.needs_draw |= child.needs_draw && !child.is_stashed;
+    }
+
+    pub fn accepts_focus(&self) -> bool {
+        self.accepts_focus && !self.is_stashed
+    }
+
+    pub fn accepts_pointer(&self) -> bool {
+        self.accepts_pointer && !self.is_stashed
     }
 }
 

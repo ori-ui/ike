@@ -24,8 +24,10 @@ pub(super) fn update_focus(tree: &mut Tree, root: WidgetId, update: FocusUpdate)
         FocusUpdate::None => {}
 
         FocusUpdate::Unfocus => {
-            if let Some(focused) = find_focused(tree, root) {
-                tree.set_focused(focused, false);
+            if let Some(focused) = find_focused(tree, root)
+                && let Some(mut widget) = tree.get_mut(focused)
+            {
+                widget.set_focused(false);
             }
         }
 
@@ -48,12 +50,16 @@ pub(super) fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option
     let focused = find_next_focusable(tree, id, forward);
 
     if current != focused {
-        if let Some(current) = current {
-            tree.set_focused(current, false);
+        if let Some(current) = current
+            && let Some(mut widget) = tree.get_mut(current)
+        {
+            widget.set_focused(false);
         }
 
-        if let Some(focused) = focused {
-            tree.set_focused(focused, true);
+        if let Some(focused) = focused
+            && let Some(mut widget) = tree.get_mut(focused)
+        {
+            widget.set_focused(true);
         }
     }
 
@@ -140,10 +146,14 @@ fn give_focus(tree: &mut Tree, root: WidgetId, target: WidgetId) {
     let current = find_focused(tree, root);
 
     if current != Some(target) {
-        if let Some(current) = current {
-            tree.set_focused(current, false);
+        if let Some(current) = current
+            && let Some(mut widget) = tree.get_mut(current)
+        {
+            widget.set_focused(false);
         }
 
-        tree.set_focused(target, true);
+        if let Some(mut widget) = tree.get_mut(target) {
+            widget.set_focused(true);
+        }
     }
 }

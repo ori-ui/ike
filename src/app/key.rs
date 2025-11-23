@@ -67,24 +67,28 @@ fn send_key_event(
     let mut propagate = Propagate::Bubble;
 
     while let Some(id) = current {
-        app.with_entry(id, |app, widget, state| {
-            if let Propagate::Bubble = propagate {
-                let mut cx = EventCx {
-                    window,
-                    app,
-                    state,
-                    id,
-                    focus: &mut focus,
-                };
+        let mut widget = app.tree.get_mut(id).unwrap();
 
-                propagate = widget.on_key_event(&mut cx, event);
-            }
+        if let Propagate::Bubble = propagate {
+            let mut cx = EventCx {
+                window,
+                windows: &mut app.windows,
+                tree: widget.tree,
+                state: widget.state.as_mut().unwrap(),
+                id,
+                focus: &mut focus,
+            };
 
-            current = state.parent;
-        });
+            propagate = widget.widget.as_mut().unwrap().on_key_event(&mut cx, event);
+        }
+
+        current = widget.state().parent;
     }
 
-    app.tree.state_changed(target);
+    if let Some(mut target) = app.tree.get_mut(target) {
+        target.propagate_state();
+    }
+
     focus::update_focus(&mut app.tree, root, focus);
 
     propagate

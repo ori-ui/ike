@@ -1,4 +1,4 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Size, Space, Widget, WidgetId};
+use crate::{AnyWidgetId, BuildCx, LayoutCx, Size, Space, Widget, WidgetMut};
 
 pub struct Constrain {
     min_size: Size,
@@ -6,29 +6,27 @@ pub struct Constrain {
 }
 
 impl Constrain {
-    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetId<Self> {
-        let this = cx.insert(Self {
+    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
+        let mut this = cx.insert(Self {
             min_size: Size::all(0.0),
             max_size: Size::all(f32::INFINITY),
         });
-
-        cx.add_child(this, child);
-
+        this.add_child(child);
         this
     }
 
-    pub fn set_child(cx: &mut impl BuildCx, id: WidgetId<Self>, child: impl AnyWidgetId) {
-        cx.replace_child(id, 0, child);
+    pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
+        this.replace_child(0, child);
     }
 
-    pub fn set_min_size(cx: &mut impl BuildCx, id: WidgetId<Self>, min_size: Size) {
-        cx.get_mut(id).min_size = min_size;
-        cx.request_layout(id);
+    pub fn set_min_size(this: &mut WidgetMut<Self>, min_size: Size) {
+        this.min_size = min_size;
+        this.request_layout();
     }
 
-    pub fn set_max_size(cx: &mut impl BuildCx, id: WidgetId<Self>, max_size: Size) {
-        cx.get_mut(id).max_size = max_size;
-        cx.request_layout(id);
+    pub fn set_max_size(this: &mut WidgetMut<Self>, max_size: Size) {
+        this.max_size = max_size;
+        this.request_layout();
     }
 }
 

@@ -1,7 +1,7 @@
 use core::f32;
 
 use crate::{
-    BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetId,
+    BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetMut,
     context::UpdateCx,
     widget::{ChildUpdate, Update},
 };
@@ -63,7 +63,7 @@ pub struct Stack {
 }
 
 impl Stack {
-    pub fn new(cx: &mut impl BuildCx) -> WidgetId<Self> {
+    pub fn new(cx: &mut impl BuildCx) -> WidgetMut<'_, Self> {
         cx.insert(Self {
             axis:    Axis::Vertical,
             justify: Justify::Start,
@@ -74,39 +74,33 @@ impl Stack {
         })
     }
 
-    pub fn set_flex(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        index: usize,
-        flex: f32,
-        tight: bool,
-    ) {
-        cx.get_mut(id).flex[index] = (flex, tight);
-        cx.request_layout(id);
+    pub fn set_flex(this: &mut WidgetMut<Self>, index: usize, flex: f32, tight: bool) {
+        this.flex[index] = (flex, tight);
+        this.request_layout();
     }
 
-    pub fn get_flex(cx: &impl BuildCx, id: WidgetId<Self>, index: usize) -> (f32, bool) {
-        cx.get(id).flex[index]
+    pub fn get_flex(&self, index: usize) -> (f32, bool) {
+        self.flex[index]
     }
 
-    pub fn set_axis(cx: &mut impl BuildCx, id: WidgetId<Self>, axis: Axis) {
-        cx.get_mut(id).axis = axis;
-        cx.request_layout(id);
+    pub fn set_axis(this: &mut WidgetMut<Self>, axis: Axis) {
+        this.axis = axis;
+        this.request_layout();
     }
 
-    pub fn set_justify(cx: &mut impl BuildCx, id: WidgetId<Self>, justify: Justify) {
-        cx.get_mut(id).justify = justify;
-        cx.request_layout(id);
+    pub fn set_justify(this: &mut WidgetMut<Self>, justify: Justify) {
+        this.justify = justify;
+        this.request_layout();
     }
 
-    pub fn set_align(cx: &mut impl BuildCx, id: WidgetId<Self>, align: Align) {
-        cx.get_mut(id).align = align;
-        cx.request_layout(id);
+    pub fn set_align(this: &mut WidgetMut<Self>, align: Align) {
+        this.align = align;
+        this.request_layout();
     }
 
-    pub fn set_gap(cx: &mut impl BuildCx, id: WidgetId<Self>, gap: f32) {
-        cx.get_mut(id).gap = gap;
-        cx.request_layout(id);
+    pub fn set_gap(this: &mut WidgetMut<Self>, gap: f32) {
+        this.gap = gap;
+        this.request_layout();
     }
 }
 

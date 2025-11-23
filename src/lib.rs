@@ -34,6 +34,6 @@ pub use text::{
     FontStretch, FontStyle, FontWeight, Fonts, GlyphCluster, Paragraph, TextAlign, TextDirection,
     TextLayoutLine, TextStyle, TextWrap,
 };
-pub use tree::Tree;
-pub use widget::{AnyWidgetId, Update, Widget, WidgetId};
+pub use tree::{Tree, WidgetMut, WidgetRef};
+pub use widget::{AnyWidget, AnyWidgetId, ChildUpdate, Update, Widget, WidgetId, WidgetState};
 pub use window::{Window, WindowId, WindowSizing};

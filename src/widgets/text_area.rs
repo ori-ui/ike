@@ -5,7 +5,7 @@ use keyboard_types::NamedKey;
 use crate::{
     BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent, LayoutCx, Offset, Paint,
     Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine,
-    Update, UpdateCx, Widget, WidgetId,
+    Update, UpdateCx, Widget, tree::WidgetMut,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -65,7 +65,11 @@ pub struct TextArea {
 }
 
 impl TextArea {
-    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph, is_editable: bool) -> WidgetId<Self> {
+    pub fn new(
+        cx: &mut impl BuildCx,
+        paragraph: Paragraph,
+        is_editable: bool,
+    ) -> WidgetMut<'_, Self> {
         let cursor = paragraph.text.len();
 
         cx.insert(Self {
@@ -88,9 +92,7 @@ impl TextArea {
         })
     }
 
-    pub fn set_paragraph(cx: &mut impl BuildCx, id: WidgetId<Self>, paragraph: Paragraph) {
-        let this = cx.get_mut(id);
-
+    pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
         // the new text might place the cursor in the middle of a unicode character,
         // in which case we want to move the cursor to avoid crashes.
 
@@ -107,59 +109,43 @@ impl TextArea {
         }
 
         this.paragraph = paragraph;
-        cx.request_layout(id);
+        this.request_layout();
     }
 
-    pub fn set_selection_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).selection_color = color;
-        cx.request_draw(id);
+    pub fn set_selection_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.selection_color = color;
+        this.request_draw();
     }
 
-    pub fn set_cursor_color(cx: &mut impl BuildCx, id: WidgetId<Self>, color: Color) {
-        cx.get_mut(id).cursor_color = color;
-        cx.request_draw(id);
+    pub fn set_cursor_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.cursor_color = color;
+        this.request_draw();
     }
 
-    pub fn set_blink_rate(cx: &mut impl BuildCx, id: WidgetId<Self>, rate: f32) {
-        cx.get_mut(id).blink_rate = rate;
+    pub fn set_blink_rate(this: &mut WidgetMut<Self>, rate: f32) {
+        this.blink_rate = rate;
     }
 
-    pub fn set_newline_behaviour(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        behaviour: NewlineBehaviour,
-    ) {
-        cx.get_mut(id).newline_behaviour = behaviour;
-        cx.request_draw(id);
+    pub fn set_newline_behaviour(this: &mut WidgetMut<Self>, behaviour: NewlineBehaviour) {
+        this.newline_behaviour = behaviour;
+        this.request_draw();
     }
 
-    pub fn set_submit_behaviour(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        behaviour: SubmitBehaviour,
-    ) {
-        cx.get_mut(id).submit_behaviour = behaviour;
-        cx.request_draw(id);
+    pub fn set_submit_behaviour(this: &mut WidgetMut<Self>, behaviour: SubmitBehaviour) {
+        this.submit_behaviour = behaviour;
+        this.request_draw();
     }
 
-    pub fn set_on_change(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        on_change: impl FnMut(&str) + 'static,
-    ) {
-        cx.get_mut(id).on_change = Some(Box::new(on_change));
+    pub fn set_on_change(this: &mut WidgetMut<Self>, on_change: impl FnMut(&str) + 'static) {
+        this.on_change = Some(Box::new(on_change));
     }
 
-    pub fn set_on_submit(
-        cx: &mut impl BuildCx,
-        id: WidgetId<Self>,
-        on_submit: impl FnMut(&str) + 'static,
-    ) {
-        cx.get_mut(id).on_submit = Some(Box::new(on_submit));
+    pub fn set_on_submit(this: &mut WidgetMut<Self>, on_submit: impl FnMut(&str) + 'static) {
+        this.on_submit = Some(Box::new(on_submit));
     }
 
-    pub fn get_text(cx: &impl BuildCx, id: WidgetId<Self>) -> &str {
-        &cx.get(id).paragraph.text
+    pub fn text(&self) -> &str {
+        &self.paragraph.text
     }
 }
 

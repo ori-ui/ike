@@ -1,6 +1,6 @@
 use crate::{
-    Affine, App, Fonts, Offset, Point, Rect, Size, Space, Tree, WidgetId, Window, WindowId,
-    widget::WidgetState,
+    Affine, AnyWidget, Fonts, Offset, Point, Rect, Size, Space, Tree, WidgetId, WidgetRef, Window,
+    WindowId, widget::WidgetState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -12,11 +12,13 @@ pub(crate) enum FocusUpdate {
 }
 
 pub struct EventCx<'a> {
-    pub(crate) window: WindowId,
-    pub(crate) app:    &'a mut App,
-    pub(crate) state:  &'a mut WidgetState,
-    pub(crate) id:     WidgetId,
-    pub(crate) focus:  &'a mut FocusUpdate,
+    pub(crate) window:  WindowId,
+    pub(crate) windows: &'a mut Vec<Window>,
+    #[allow(dead_code)]
+    pub(crate) tree:    &'a mut Tree,
+    pub(crate) state:   &'a mut WidgetState,
+    pub(crate) id:      WidgetId,
+    pub(crate) focus:   &'a mut FocusUpdate,
 }
 
 pub struct UpdateCx<'a> {
@@ -40,11 +42,14 @@ pub struct DrawCx<'a> {
 
 impl EventCx<'_> {
     pub fn window(&self) -> &Window {
-        self.app.get_window(self.window).unwrap()
+        self.windows.iter().find(|w| w.id == self.window).unwrap()
     }
 
     pub fn window_mut(&mut self) -> &mut Window {
-        self.app.get_window_mut(self.window).unwrap()
+        self.windows
+            .iter_mut()
+            .find(|w| w.id == self.window)
+            .unwrap()
     }
 
     pub fn is_window_focused(&self) -> bool {
@@ -73,34 +78,46 @@ impl LayoutCx<'_> {
         self.fonts
     }
 
-    pub fn layout_child(&mut self, i: usize, space: Space) -> Size {
-        let child = self.state.children[i];
-
-        self.tree.with_entry(child, |tree, widget, state| {
-            state.needs_layout = false;
-
-            let mut cx = LayoutCx {
-                fonts: self.fonts,
-                tree,
-                state,
-            };
-
-            let size = widget.layout(&mut cx, space);
-            state.size = size;
-
-            size
-        })
+    pub fn get<T>(&self, id: WidgetId<T>) -> WidgetRef<'_, T>
+    where
+        T: ?Sized + AnyWidget,
+    {
+        self.tree.get(id).unwrap()
     }
 
-    pub fn place_child(&mut self, i: usize, offset: Offset) {
-        let child = &self.state.children[i];
+    pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
+        let child = self.state.children[index];
+        let mut child = self.tree.get_mut(child).unwrap();
+        child.set_stashed(is_stashed);
+    }
+
+    pub fn layout_child(&mut self, index: usize, space: Space) -> Size {
+        let child = self.state.children[index];
+        let mut child = self.tree.get_mut(child).unwrap();
+
+        if child.is_stashed() {
+            child.state_mut().size = space.min;
+            return space.min;
+        }
+
+        child.state_mut().needs_layout = false;
+
+        let (widget, mut cx) = child.split_layout_cx(self.fonts);
+        let size = widget.layout(&mut cx, space);
+        child.state_mut().size = size;
+
+        size
+    }
+
+    pub fn place_child(&mut self, index: usize, offset: Offset) {
+        let child = &self.state.children[index];
 
         let state = self.tree.get_state_unchecked_mut(child.index);
         state.transform.offset = offset;
     }
 
-    pub fn child_size(&self, i: usize) -> Size {
-        let child = &self.state.children[i];
+    pub fn child_size(&self, index: usize) -> Size {
+        let child = &self.state.children[index];
 
         let state = self.tree.get_state_unchecked(child.index);
         state.size
