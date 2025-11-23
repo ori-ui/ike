@@ -33,9 +33,12 @@ pub struct Window {
     pub(crate) is_focused:   bool,
     pub(crate) current_size: Size,
 
-    pub content: WidgetId,
-    pub sizing:  WindowSizing,
-    pub color:   Color,
+    pub title:     String,
+    pub content:   WidgetId,
+    pub sizing:    WindowSizing,
+    pub visible:   bool,
+    pub decorated: bool,
+    pub color:     Color,
 }
 
 impl Window {

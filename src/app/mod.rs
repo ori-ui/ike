@@ -52,12 +52,15 @@ impl App {
             is_focused: false,
             current_size: Size::new(800.0, 600.0),
 
+            title: String::new(),
             content,
             sizing: WindowSizing::Resizable {
                 default_size: Size::new(800.0, 600.0),
                 min_size:     Size::all(0.0),
                 max_size:     Size::all(f32::INFINITY),
             },
+            visible: true,
+            decorated: true,
             color: Color::WHITE,
         });
 
