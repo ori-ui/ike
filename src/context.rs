@@ -95,7 +95,8 @@ impl LayoutCx<'_> {
         let child = self.state.children[index];
         let mut child = self.tree.get_mut(child).unwrap();
 
-        if child.is_stashed() {
+        if child.state().is_stashing {
+            child.state_mut().transform = Affine::IDENTITY;
             child.state_mut().size = space.min;
             return space.min;
         }

@@ -34,13 +34,10 @@ impl NewlineBehaviour {
 }
 
 /// What should happen when a `submit` action happens in a [`TextArea`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SubmitBehaviour {
-    /// The [`TextArea`] will keep it's focus.
-    KeepFocus,
-
-    /// The focus will be given to the next widget.
-    FocusNext,
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SubmitBehaviour {
+    pub keep_focus: bool,
+    pub clear_text: bool,
 }
 
 pub struct TextArea {
@@ -79,7 +76,7 @@ impl TextArea {
             blink_rate: 5.0,
             is_editable,
             newline_behaviour: NewlineBehaviour::Enter,
-            submit_behaviour: SubmitBehaviour::FocusNext,
+            submit_behaviour: SubmitBehaviour::default(),
 
             on_change: None,
             on_submit: None,
@@ -582,11 +579,16 @@ impl Widget for TextArea {
                     {
                         if let Some(ref mut on_submit) = self.on_submit {
                             on_submit(&self.paragraph.text);
-                            cx.request_draw();
                         }
 
-                        if let SubmitBehaviour::FocusNext = self.submit_behaviour {
+                        if !self.submit_behaviour.keep_focus {
                             cx.request_focus_next();
+                        }
+
+                        if self.submit_behaviour.clear_text {
+                            self.paragraph.text.clear();
+                            self.set_cursor(0, false);
+                            cx.request_draw();
                         }
 
                         Propagate::Stop

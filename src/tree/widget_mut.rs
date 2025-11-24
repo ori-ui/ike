@@ -209,6 +209,10 @@ where
     }
 
     pub(crate) fn animate_recursive(&mut self, dt: Duration) {
+        if self.is_stashed() {
+            return;
+        }
+
         self.for_each_child(|child| child.animate_recursive(dt));
 
         self.state_mut().needs_animate = false;
@@ -219,6 +223,10 @@ where
     }
 
     pub(crate) fn compose_recursive(&mut self, transform: Affine) {
+        if self.is_stashed() {
+            return;
+        }
+
         let transform = transform * self.transform();
         self.state_mut().global_transform = transform;
 

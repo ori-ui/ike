@@ -113,7 +113,7 @@ impl Widget for Stack {
             min_minor = max_minor;
         }
 
-        let total_gap = self.gap * (cx.children().len() - 1) as f32;
+        let total_gap = self.gap * cx.children().len().saturating_sub(1) as f32;
 
         let mut flex_sum = 0.0;
         let mut major_sum = 0.0;
