@@ -1,7 +1,7 @@
 use core::f32;
 
 use crate::{
-    BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetMut,
+    BuildCx, LayoutCx, Offset, Painter, Size, Space, Widget, WidgetMut,
     context::UpdateCx,
     widget::{ChildUpdate, Update},
 };
@@ -105,7 +105,7 @@ impl Stack {
 }
 
 impl Widget for Stack {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         let (min_major, mut min_minor) = self.axis.unpack_size(space.min);
         let (max_major, max_minor) = self.axis.unpack_size(space.max);
 
@@ -132,7 +132,7 @@ impl Widget for Stack {
                 self.axis.pack_size(f32::INFINITY, max_minor),
             );
 
-            let size = cx.layout_child(i, space);
+            let size = cx.layout_child(i, painter, space);
             let (major, minor) = self.axis.unpack_size(size);
 
             major_sum += major;
@@ -156,7 +156,7 @@ impl Widget for Stack {
                 self.axis.pack_size(max_major, max_minor),
             );
 
-            let size = cx.layout_child(i, space);
+            let size = cx.layout_child(i, painter, space);
             let (major, minor) = self.axis.unpack_size(size);
 
             major_sum += major;
@@ -180,7 +180,7 @@ impl Widget for Stack {
                 self.axis.pack_size(major, max_minor),
             );
 
-            let size = cx.layout_child(i, space);
+            let size = cx.layout_child(i, painter, space);
             let (major, minor) = self.axis.unpack_size(size);
 
             major_sum += major;
@@ -249,9 +249,5 @@ impl Widget for Stack {
                 }
             }
         }
-    }
-
-    fn accepts_pointer() -> bool {
-        false
     }
 }

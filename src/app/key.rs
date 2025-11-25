@@ -36,19 +36,19 @@ impl App {
             false => KeyEvent::Up(event),
         };
 
-        let content = window.content;
+        let contents = window.contents;
         let modifiers = window.modifiers;
         let window = window.id;
 
-        let handled = match focus::find_focused(&self.tree, content) {
+        let handled = match focus::find_focused(&self.tree, contents) {
             Some(target) => {
-                send_key_event(self, window, content, target, &event) == Propagate::Stop
+                send_key_event(self, window, contents, target, &event) == Propagate::Stop
             }
             None => false,
         };
 
         if key == Key::Named(NamedKey::Tab) && pressed && !handled {
-            focus::focus_next(&mut self.tree, content, !modifiers.shift());
+            focus::focus_next(&mut self.tree, contents, !modifiers.shift());
         }
 
         handled

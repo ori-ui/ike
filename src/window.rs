@@ -34,7 +34,7 @@ pub struct Window {
     pub(crate) current_size: Size,
 
     pub title:     String,
-    pub content:   WidgetId,
+    pub contents:  WidgetId,
     pub sizing:    WindowSizing,
     pub visible:   bool,
     pub decorated: bool,

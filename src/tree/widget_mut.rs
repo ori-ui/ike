@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, DrawCx, Fonts, LayoutCx, Tree, Update,
-    UpdateCx, Widget, WidgetId, WidgetRef, WidgetState, Window,
+    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, DrawCx, LayoutCx, Tree, Update, UpdateCx,
+    Widget, WidgetId, WidgetRef, WidgetState, Window,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -175,12 +175,9 @@ where
         (widget, cx)
     }
 
-    pub(crate) fn split_layout_cx<'b>(
-        &'b mut self,
-        fonts: &'b mut dyn Fonts,
-    ) -> (&'b mut T, LayoutCx<'b>) {
+    pub(crate) fn split_layout_cx<'b>(&'b mut self) -> (&'b mut T, LayoutCx<'b>) {
         let (tree, widget, state) = self.split();
-        let cx = LayoutCx { fonts, tree, state };
+        let cx = LayoutCx { tree, state };
         (widget, cx)
     }
 
@@ -209,7 +206,7 @@ where
     }
 
     pub(crate) fn animate_recursive(&mut self, dt: Duration) {
-        if self.is_stashed() {
+        if self.is_stashed() || !self.state().needs_animate {
             return;
         }
 

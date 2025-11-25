@@ -1,6 +1,6 @@
 use crate::{
-    Affine, AnyWidget, Fonts, Offset, Point, Rect, Size, Space, Tree, WidgetId, WidgetRef, Window,
-    WindowId, widget::WidgetState,
+    Affine, AnyWidget, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId, WidgetRef,
+    Window, WindowId, widget::WidgetState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -28,7 +28,6 @@ pub struct UpdateCx<'a> {
 }
 
 pub struct LayoutCx<'a> {
-    pub(crate) fonts: &'a mut dyn Fonts,
     pub(crate) tree:  &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
 }
@@ -74,10 +73,6 @@ impl EventCx<'_> {
 }
 
 impl LayoutCx<'_> {
-    pub fn fonts(&mut self) -> &mut dyn Fonts {
-        self.fonts
-    }
-
     pub fn get<T>(&self, id: WidgetId<T>) -> WidgetRef<'_, T>
     where
         T: ?Sized + AnyWidget,
@@ -91,7 +86,7 @@ impl LayoutCx<'_> {
         child.set_stashed(is_stashed);
     }
 
-    pub fn layout_child(&mut self, index: usize, space: Space) -> Size {
+    pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
         let child = self.state.children[index];
         let mut child = self.tree.get_mut(child).unwrap();
 
@@ -103,8 +98,8 @@ impl LayoutCx<'_> {
 
         child.state_mut().needs_layout = false;
 
-        let (widget, mut cx) = child.split_layout_cx(self.fonts);
-        let size = widget.layout(&mut cx, space);
+        let (widget, mut cx) = child.split_layout_cx();
+        let size = widget.layout(&mut cx, painter, space);
         child.state_mut().size = size;
 
         size

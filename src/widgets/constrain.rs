@@ -1,15 +1,20 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Size, Space, Widget, WidgetMut};
+use std::time::Duration;
+
+use crate::{
+    AnyWidgetId, BuildCx, LayoutCx, Painter, Size, Space, Transition, Transitioned, UpdateCx,
+    Widget, WidgetMut,
+};
 
 pub struct Constrain {
-    min_size: Size,
-    max_size: Size,
+    min_size: Transitioned<Size>,
+    max_size: Transitioned<Size>,
 }
 
 impl Constrain {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
         let mut this = cx.insert(Self {
-            min_size: Size::all(0.0),
-            max_size: Size::all(f32::INFINITY),
+            min_size: Transitioned::new(Size::all(0.0), Transition::INSTANT),
+            max_size: Transitioned::new(Size::all(f32::INFINITY), Transition::INSTANT),
         });
         this.add_child(child);
         this
@@ -20,22 +25,48 @@ impl Constrain {
     }
 
     pub fn set_min_size(this: &mut WidgetMut<Self>, min_size: Size) {
-        this.min_size = min_size;
         this.request_layout();
+
+        if this.min_size.begin_transition(min_size) {
+            this.request_animate();
+        }
     }
 
     pub fn set_max_size(this: &mut WidgetMut<Self>, max_size: Size) {
-        this.max_size = max_size;
         this.request_layout();
+
+        if this.max_size.begin_transition(max_size) {
+            this.request_animate();
+        }
+    }
+
+    pub fn set_min_size_transition(this: &mut WidgetMut<Self>, transition: Transition) {
+        this.min_size.set_transition(transition);
+    }
+
+    pub fn set_max_size_transition(this: &mut WidgetMut<Self>, transition: Transition) {
+        this.max_size.set_transition(transition);
     }
 }
 
 impl Widget for Constrain {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, mut space: Space) -> Size {
-        space.min = space.min.max(self.min_size);
-        space.max = space.max.min(self.max_size);
+    fn layout(
+        &mut self,
+        cx: &mut LayoutCx<'_>,
+        painter: &mut dyn Painter,
+        mut space: Space,
+    ) -> Size {
+        space.min = space.min.max(*self.min_size);
+        space.max = space.max.min(*self.max_size);
         space.min = space.min.min(space.max);
 
-        cx.layout_child(0, space)
+        cx.layout_child(0, painter, space)
+    }
+
+    fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {
+        if self.min_size.animate(dt) || self.max_size.animate(dt) {
+            cx.request_animate();
+            cx.request_layout();
+        }
     }
 }

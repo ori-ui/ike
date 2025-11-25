@@ -47,6 +47,14 @@ impl Rect {
         )
     }
 
+    pub const fn width(self) -> f32 {
+        self.max.x - self.min.x
+    }
+
+    pub const fn height(self) -> f32 {
+        self.max.y - self.min.y
+    }
+
     pub const fn contains(self, point: Point) -> bool {
         point.x >= self.min.x
             && point.y >= self.min.y

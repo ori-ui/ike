@@ -1,6 +1,6 @@
 use crate::{
-    BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Paragraph,
-    Size, Space, TextAlign, TextWrap, Widget, WidgetId,
+    BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Painter,
+    Paragraph, Size, Space, TextAlign, TextWrap, Widget, WidgetId,
     tree::{WidgetMut, WidgetRef},
     widgets::{Label, NewlineBehaviour, SubmitBehaviour, TextArea},
 };
@@ -129,7 +129,7 @@ impl Entry {
 }
 
 impl Widget for Entry {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         let mut space = space.shrink(self.padding.size() + self.border_width.size());
         space.min.width = space.min.width.max(self.min_width);
         space.max.width = space.max.width.max(self.max_width);
@@ -137,9 +137,9 @@ impl Widget for Entry {
 
         cx.set_child_stashed(1, !cx.get(self.text_area).text().is_empty());
 
-        let placeholder_size = cx.layout_child(1, space);
+        let placeholder_size = cx.layout_child(1, painter, space);
         space.min.width = space.min.width.max(placeholder_size.width);
-        let text_size = cx.layout_child(0, space);
+        let text_size = cx.layout_child(0, painter, space);
 
         cx.place_child(0, self.padding.offset() + self.border_width.offset());
         cx.place_child(1, self.padding.offset() + self.border_width.offset());
@@ -170,9 +170,5 @@ impl Widget for Entry {
                 &Paint::from(self.focus_color),
             );
         }
-    }
-
-    fn accepts_focus() -> bool {
-        false
     }
 }

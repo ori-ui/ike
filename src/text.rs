@@ -1,4 +1,4 @@
-use crate::{Color, Rect, Size};
+use crate::{Color, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TextAlign {
@@ -139,11 +139,6 @@ pub enum FontStyle {
 
     /// Oblique font style.
     Oblique,
-}
-
-pub trait Fonts {
-    fn measure(&mut self, paragraph: &Paragraph, max_width: f32) -> Size;
-    fn layout(&mut self, paragraph: &Paragraph, max_width: f32) -> Vec<TextLayoutLine>;
 }
 
 #[derive(Clone, Debug, PartialEq)]

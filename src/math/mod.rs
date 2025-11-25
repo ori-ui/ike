@@ -1,9 +1,13 @@
 mod matrix;
+mod offset;
+mod point;
 mod rect;
+mod size;
 mod space;
-mod vector;
 
-pub use matrix::*;
-pub use rect::*;
-pub use space::*;
-pub use vector::*;
+pub use matrix::{Affine, Matrix};
+pub use offset::Offset;
+pub use point::Point;
+pub use rect::Rect;
+pub use size::Size;
+pub use space::Space;

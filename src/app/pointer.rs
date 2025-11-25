@@ -25,7 +25,7 @@ impl App {
 
         window.pointers.retain(|p| p.id == id);
 
-        if let Some(hovered) = find_hovered(&self.tree, window.content)
+        if let Some(hovered) = find_hovered(&self.tree, window.contents)
             && let Some(mut widget) = self.tree.get_mut(hovered)
         {
             widget.set_hovered(false);
@@ -44,13 +44,22 @@ impl App {
         }
 
         // if there is an active widget, target it with the event
-        if let Some(target) = find_active(&self.tree, window.content) {
+        if let Some(target) = find_active(&self.tree, window.contents) {
+            if let Some(mut widget) = self.tree.get_mut(target) {
+                let local = widget.state().global_transform.inverse() * position;
+                let is_hovered = Rect::min_size(Point::ORIGIN, widget.state().size).contains(local);
+
+                if is_hovered != widget.is_hovered() {
+                    widget.set_hovered(is_hovered);
+                }
+            }
+
             let event = PointerMoveEvent { id, position };
             let event = PointerEvent::Move(event);
 
-            let content = window.content;
+            let contents = window.contents;
             let window = window.id;
-            return match send_pointer_event(self, window, content, target, &event) {
+            return match send_pointer_event(self, window, contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -61,15 +70,15 @@ impl App {
         }
 
         // if not, update the hovered state and target the hovered widget
-        let hovered = update_hovered(&mut self.tree, window.content, position);
+        let hovered = update_hovered(&mut self.tree, window.contents, position);
 
         if let Some(target) = hovered {
             let event = PointerMoveEvent { id, position };
             let event = PointerEvent::Move(event);
 
-            let content = window.content;
+            let contents = window.contents;
             let window = window.id;
-            match send_pointer_event(self, window, content, target, &event) {
+            match send_pointer_event(self, window, contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -97,7 +106,10 @@ impl App {
             return false;
         };
 
-        if let Some(target) = find_pointer_target(&self.tree, window.content) {
+        let contents = window.contents;
+        let position = pointer.position;
+
+        let handled = if let Some(target) = find_pointer_target(&self.tree, window.contents) {
             let event = PointerButtonEvent {
                 button,
                 position: pointer.position,
@@ -108,10 +120,8 @@ impl App {
                 false => PointerEvent::Up(event),
             };
 
-            let content = window.content;
-            let position = pointer.position;
             let window = window.id;
-            let handled = match send_pointer_event(self, window, content, target, &event) {
+            let handled = match send_pointer_event(self, window, contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -133,25 +143,27 @@ impl App {
                     widget.set_active(false);
                 }
 
-                update_hovered(&mut self.tree, content, position);
-            }
-
-            if let Some(focused) = focus::find_focused(&self.tree, content)
-                && let Some(mut widget) = self.tree.get_mut(focused)
-                && button == PointerButton::Primary
-                && pressed
-            {
-                let local = widget.state().global_transform.inverse() * position;
-
-                if !Rect::min_size(Point::ORIGIN, widget.state().size).contains(local) {
-                    widget.set_focused(false);
-                }
+                update_hovered(&mut self.tree, contents, position);
             }
 
             handled
         } else {
             false
+        };
+
+        if let Some(focused) = focus::find_focused(&self.tree, contents)
+            && let Some(mut widget) = self.tree.get_mut(focused)
+            && button == PointerButton::Primary
+            && pressed
+        {
+            let local = widget.state().global_transform.inverse() * position;
+
+            if !Rect::min_size(Point::ORIGIN, widget.state().size).contains(local) {
+                widget.set_focused(false);
+            }
         }
+
+        handled
     }
 }
 

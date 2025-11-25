@@ -32,7 +32,7 @@ impl App {
         }
     }
 
-    pub fn create_window(&mut self, content: WidgetId) -> &mut Window {
+    pub fn create_window(&mut self, contents: WidgetId) -> &mut Window {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
         let id = WindowId {
@@ -49,7 +49,7 @@ impl App {
             current_size: Size::new(800.0, 600.0),
 
             title: String::new(),
-            content,
+            contents,
             sizing: WindowSizing::Resizable {
                 default_size: Size::new(800.0, 600.0),
                 min_size:     Size::all(0.0),
@@ -83,8 +83,8 @@ impl App {
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
         let window = self.windows.iter_mut().find(|w| w.id == window)?;
 
-        let mut widget = self.tree.get_mut(window.content).unwrap();
-        let new_window_size = layout::layout_window(&mut widget, canvas.fonts(), window);
+        let mut widget = self.tree.get_mut(window.contents).unwrap();
+        let new_window_size = layout::layout_window(&mut widget, canvas.painter(), window);
         widget.draw_recursive(window, canvas);
         widget.draw_over_recursive(window, canvas);
 
@@ -96,7 +96,7 @@ impl App {
             return;
         };
 
-        let mut widget = self.tree.get_mut(window.content).unwrap();
+        let mut widget = self.tree.get_mut(window.contents).unwrap();
         widget.animate_recursive(delta_time);
     }
 
@@ -107,7 +107,7 @@ impl App {
 
         window.is_focused = is_focused;
 
-        let mut widget = self.tree.get_mut(window.content).unwrap();
+        let mut widget = self.tree.get_mut(window.contents).unwrap();
         let update = Update::WindowFocused(is_focused);
         widget.update_recursive(update);
     }
@@ -119,7 +119,7 @@ impl App {
 
         window.current_size = new_size;
 
-        let mut widget = self.tree.get_mut(window.content).unwrap();
+        let mut widget = self.tree.get_mut(window.contents).unwrap();
         widget.request_layout();
     }
 
@@ -131,20 +131,20 @@ impl App {
         window.scale = new_scale;
         window.current_size = new_size;
 
-        let mut widget = self.tree.get_mut(window.content).unwrap();
+        let mut widget = self.tree.get_mut(window.contents).unwrap();
         widget.request_layout();
     }
 
     pub fn window_needs_animate(&self, window: WindowId) -> bool {
         match self.windows.iter().find(|w| w.id == window) {
-            Some(window) => self.tree.needs_animate(window.content),
+            Some(window) => self.tree.needs_animate(window.contents),
             None => false,
         }
     }
 
     pub fn window_needs_draw(&self, window: WindowId) -> bool {
         match self.windows.iter().find(|w| w.id == window) {
-            Some(window) => self.tree.needs_draw(window.content),
+            Some(window) => self.tree.needs_draw(window.contents),
             None => false,
         }
     }

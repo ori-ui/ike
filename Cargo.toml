@@ -3,12 +3,6 @@ name = "ike"
 version = "0.1.0"
 edition = "2024"
 
-[features]
-tracing = ["dep:tracing"]
-
 [dependencies]
 keyboard-types = "0.8"
-
-[dependencies.tracing]
-version = "0.1"
-optional = true
+tracing = "0.1"

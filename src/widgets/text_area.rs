@@ -4,8 +4,8 @@ use keyboard_types::NamedKey;
 
 use crate::{
     BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent, LayoutCx, Offset, Paint,
-    Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine,
-    Update, UpdateCx, Widget, tree::WidgetMut,
+    Painter, Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect, Size, Space,
+    TextLayoutLine, Update, UpdateCx, Widget, tree::WidgetMut,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -404,11 +404,11 @@ impl TextArea {
 }
 
 impl Widget for TextArea {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
-        self.lines = cx.fonts().layout(&self.paragraph, space.max.width);
-        let size = cx.fonts().measure(&self.paragraph, space.max.width);
+    fn layout(&mut self, _cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+        self.lines = painter.layout_text(&self.paragraph, space.max.width);
+        let size = painter.measure_text(&self.paragraph, space.max.width);
 
-        size.fit(space)
+        space.constrain(size)
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
@@ -600,6 +600,10 @@ impl Widget for TextArea {
 
             _ => Propagate::Bubble,
         }
+    }
+
+    fn accepts_pointer() -> bool {
+        true
     }
 
     fn accepts_focus() -> bool {

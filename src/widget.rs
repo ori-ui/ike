@@ -7,13 +7,14 @@ use std::{
 };
 
 use crate::{
-    Canvas, DrawCx, EventCx, KeyEvent, LayoutCx, PointerEvent, PointerPropagate, Propagate,
+    Canvas, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent, PointerPropagate,
+    Propagate,
     context::UpdateCx,
     math::{Affine, Size, Space},
 };
 
 pub trait Widget: Any {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size;
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size;
 
     fn compose(&mut self, cx: &mut UpdateCx<'_>) {
         let _ = cx;
@@ -57,7 +58,7 @@ pub trait Widget: Any {
     where
         Self: Sized,
     {
-        true
+        false
     }
 
     fn accepts_focus() -> bool

@@ -1,14 +1,17 @@
+use std::time::Duration;
+
 use crate::{
     AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent,
-    LayoutCx, NamedKey, Padding, Paint, PointerEvent, PointerPropagate, Propagate, Size, Space,
-    Widget, WidgetMut, context::UpdateCx, widget::Update,
+    LayoutCx, NamedKey, Padding, Paint, Painter, PointerEvent, PointerPropagate, Propagate, Size,
+    Space, Transition, Transitioned, Widget, WidgetMut, context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
     padding:       Padding,
     border_width:  BorderWidth,
     corner_radius: CornerRadius,
-    color:         Color,
+    color:         Transitioned<Color>,
+    idle_color:    Color,
     hovered_color: Color,
     active_color:  Color,
     border_color:  Color,
@@ -22,7 +25,8 @@ impl Button {
             padding:       Padding::all(8.0),
             border_width:  BorderWidth::all(1.0),
             corner_radius: CornerRadius::all(8.0),
-            color:         Color::GREEN,
+            color:         Transitioned::new(Color::GREEN, Transition::INSTANT),
+            idle_color:    Color::GREEN,
             hovered_color: Color::RED,
             active_color:  Color::BLUE,
             border_color:  Color::BLACK,
@@ -64,19 +68,39 @@ impl Button {
         this.request_draw();
     }
 
-    pub fn set_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.color = color;
-        this.request_draw();
+    pub fn set_idle_color(this: &mut WidgetMut<Self>, color: Color) {
+        this.idle_color = color;
+        Self::update_color(this);
     }
 
     pub fn set_hovered_color(this: &mut WidgetMut<Self>, color: Color) {
         this.hovered_color = color;
-        this.request_draw();
+        Self::update_color(this);
     }
 
     pub fn set_active_color(this: &mut WidgetMut<Self>, color: Color) {
         this.active_color = color;
+        Self::update_color(this);
+    }
+
+    pub fn set_transition(this: &mut WidgetMut<Self>, transition: Transition) {
+        this.color.set_transition(transition);
+    }
+
+    fn update_color(this: &mut WidgetMut<Self>) {
+        let color = if this.is_active() {
+            this.active_color
+        } else if this.is_hovered() {
+            this.hovered_color
+        } else {
+            this.idle_color
+        };
+
         this.request_draw();
+
+        if this.color.begin_transition(color) {
+            this.request_animate();
+        }
     }
 
     pub fn set_on_click(this: &mut WidgetMut<Self>, on_click: impl FnMut() + 'static) {
@@ -85,9 +109,9 @@ impl Button {
 }
 
 impl Widget for Button {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         let space = space.shrink(self.padding.size() + self.border_width.size());
-        let size = cx.layout_child(0, space);
+        let size = cx.layout_child(0, painter, space);
 
         cx.place_child(0, self.padding.offset() + self.border_width.offset());
 
@@ -95,15 +119,7 @@ impl Widget for Button {
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
-        let color = if cx.is_active() {
-            self.active_color
-        } else if cx.is_hovered() {
-            self.hovered_color
-        } else {
-            self.color
-        };
-
-        canvas.draw_rect(cx.rect(), self.corner_radius, &Paint::from(color));
+        canvas.draw_rect(cx.rect(), self.corner_radius, &Paint::from(*self.color));
         canvas.draw_border(
             cx.rect(),
             self.border_width,
@@ -126,10 +142,29 @@ impl Widget for Button {
     fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
         match update {
             Update::Hovered(..) | Update::Active(..) | Update::Focused(..) => {
+                let color = if cx.is_active() {
+                    self.active_color
+                } else if cx.is_hovered() {
+                    self.hovered_color
+                } else {
+                    self.idle_color
+                };
+
                 cx.request_draw();
+
+                if self.color.begin_transition(color) {
+                    cx.request_animate();
+                }
             }
 
             _ => {}
+        }
+    }
+
+    fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {
+        if self.color.animate(dt) {
+            cx.request_animate();
+            cx.request_draw();
         }
     }
 
@@ -159,6 +194,10 @@ impl Widget for Button {
 
             _ => Propagate::Bubble,
         }
+    }
+
+    fn accepts_pointer() -> bool {
+        true
     }
 
     fn accepts_focus() -> bool {

@@ -8,17 +8,23 @@ pub struct Matrix {
 }
 
 impl Matrix {
-    pub const IDENTITY: Self = Self {
-        matrix: [1.0, 0.0, 0.0, 1.0],
-    };
+    pub const IDENTITY: Self = Self::new([1.0, 0.0, 0.0, 1.0]);
 
-    pub fn determinant(self) -> f32 {
+    pub const fn new(matrix: [f32; 4]) -> Self {
+        Self { matrix }
+    }
+
+    pub const fn scale(x: f32, y: f32) -> Self {
+        Self::new([x, 0.0, 0.0, y])
+    }
+
+    pub const fn determinant(self) -> f32 {
         let [a, b, c, d] = self.matrix;
 
         a * d - b * c
     }
 
-    pub fn inverse(self) -> Self {
+    pub const fn inverse(self) -> Self {
         let inv_det = self.determinant();
         let [a, b, c, d] = self.matrix;
 
@@ -83,8 +89,29 @@ pub struct Affine {
 impl Affine {
     pub const IDENTITY: Self = Self {
         matrix: Matrix::IDENTITY,
-        offset: Offset::new(0.0, 0.0),
+        offset: Offset::all(0.0),
     };
+
+    pub const fn translate(offset: Offset) -> Self {
+        Self {
+            matrix: Matrix::IDENTITY,
+            offset,
+        }
+    }
+
+    pub const fn scale(x: f32, y: f32) -> Self {
+        Self {
+            matrix: Matrix::scale(x, y),
+            offset: Offset::all(0.0),
+        }
+    }
+
+    pub const fn scale_translate(sx: f32, sy: f32, offset: Offset) -> Self {
+        Self {
+            matrix: Matrix::scale(sx, sy),
+            offset,
+        }
+    }
 
     pub fn inverse(self) -> Self {
         Self {
