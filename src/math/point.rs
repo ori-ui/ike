@@ -25,7 +25,7 @@ impl Point {
 
 impl fmt::Debug for Point {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}, {}]", self.x, self.y)
+        write!(f, "({}, {})", self.x, self.y)
     }
 }
 
