@@ -116,7 +116,7 @@ impl Widget for Stack {
         let total_gap = self.gap * cx.children().len().saturating_sub(1) as f32;
 
         let mut flex_sum = 0.0;
-        let mut major_sum = 0.0;
+        let mut major_sum = total_gap;
         let mut minor_sum = min_minor;
 
         // measure inflexible children
@@ -141,7 +141,7 @@ impl Widget for Stack {
 
         // measure expanding children
 
-        let remaining = f32::max(max_major - total_gap - major_sum, 0.0);
+        let remaining = f32::max(max_major - major_sum, 0.0);
         let per_flex = remaining / flex_sum;
 
         for (i, &(flex, tight)) in self.flex.iter().enumerate() {
@@ -165,7 +165,7 @@ impl Widget for Stack {
 
         // measure tightly flexible children
 
-        let remaining = f32::max(max_major - total_gap - major_sum, 0.0);
+        let remaining = f32::max(max_major - major_sum, 0.0);
         let per_flex = remaining / flex_sum;
 
         for (i, &(flex, tight)) in self.flex.iter().enumerate() {
@@ -187,7 +187,7 @@ impl Widget for Stack {
             minor_sum = minor_sum.max(minor);
         }
 
-        let major = f32::clamp(major_sum + total_gap, min_major, max_major);
+        let major = f32::clamp(major_sum, min_major, max_major);
         let minor = f32::clamp(minor_sum, min_minor, max_minor);
 
         let excess_major = major - major_sum + total_gap;
@@ -195,7 +195,7 @@ impl Widget for Stack {
         let count = cx.children().len();
         let gap = match self.justify {
             Justify::Start | Justify::Center | Justify::End => self.gap,
-            Justify::SpaceBetween => excess_major / (count - 1) as f32,
+            Justify::SpaceBetween => excess_major / (count.saturating_sub(1)) as f32,
             Justify::SpaceAround => excess_major / count as f32,
             Justify::SpaceEvenly => excess_major / (count + 1) as f32,
         };
