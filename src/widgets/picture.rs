@@ -119,7 +119,7 @@ impl Widget for Picture {
 
                     canvas.fill(&Paint {
                         shader: Shader::Solid(color),
-                        blend:  BlendMode::SrcATop,
+                        blend:  BlendMode::SrcIn,
                     });
                 });
             } else {

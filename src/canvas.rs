@@ -12,6 +12,8 @@ pub enum BlendMode {
     Dst,
     SrcOver,
     DstOver,
+    SrcIn,
+    DstIn,
     SrcATop,
     DstATop,
 }
