@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{any::Any, fmt};
 
 use crate::{Color, Modifiers, Pointer, Size, WidgetId};
 
@@ -32,6 +32,7 @@ pub struct Window {
     pub(crate) modifiers:    Modifiers,
     pub(crate) is_focused:   bool,
     pub(crate) current_size: Size,
+    pub(crate) properties:   Vec<Box<dyn Any>>,
 
     pub title:     String,
     pub contents:  WidgetId,
@@ -64,5 +65,25 @@ impl Window {
 
     pub fn is_focused(&self) -> bool {
         self.is_focused
+    }
+
+    pub fn add_property<T: Any>(&mut self, property: T) {
+        match self.get_property_mut() {
+            Some(prop) => *prop = property,
+            None => self.properties.push(Box::new(property)),
+        }
+    }
+
+    pub fn remove_property<T: Any>(&mut self) -> Option<T> {
+        let index = self.properties.iter().position(|p| p.as_ref().is::<T>())?;
+        Some(*self.properties.swap_remove(index).downcast().ok()?)
+    }
+
+    pub fn get_property<T: Any>(&self) -> Option<&T> {
+        self.properties.iter().find_map(|p| p.downcast_ref())
+    }
+
+    pub fn get_property_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.properties.iter_mut().find_map(|p| p.downcast_mut())
     }
 }

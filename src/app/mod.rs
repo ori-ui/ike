@@ -47,6 +47,7 @@ impl App {
             modifiers: Modifiers::empty(),
             is_focused: false,
             current_size: Size::new(800.0, 600.0),
+            properties: Vec::new(),
 
             title: String::new(),
             contents,

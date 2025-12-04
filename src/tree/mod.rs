@@ -166,8 +166,6 @@ impl Tree {
         debug_assert_eq!(id.generation, entry.generation);
     }
 
-    //pub(crate) fn set_stashed(&mut self, id: impl AnyWidgetId, is_stashed: bool) {}
-
     pub(crate) fn needs_animate<T>(&self, id: WidgetId<T>) -> bool
     where
         T: ?Sized,
