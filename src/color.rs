@@ -26,43 +26,89 @@ impl Color {
         Self::rgba(r, g, b, 1.0)
     }
 
-    pub fn hex(hex: &str) -> Self {
+    pub const fn hex(hex: &str) -> Self {
         Self::try_hex(hex).unwrap()
     }
 
     /// Try to parse a color from a hex string.
-    pub fn try_hex(hex: &str) -> Option<Self> {
-        let hex = hex.trim_start_matches('#');
+    pub const fn try_hex(mut hex: &str) -> Option<Self> {
+        // the things i do for const
+
+        const fn slice(s: &str, start: usize, end: usize) -> &str {
+            s.split_at(start).1.split_at(end - start).0
+        }
+
+        if !hex.is_empty() && hex.as_bytes()[0] == b'#' {
+            hex = hex.split_at(1).1;
+        }
 
         let mut color = Self::BLACK;
 
         match hex.len() {
             2 => {
-                color.r = u8::from_str_radix(hex, 16).ok()? as f32 / 255.0;
+                let Ok(r) = u8::from_str_radix(hex, 16) else {
+                    return None;
+                };
+
+                color.r = r as f32 / 255.0;
                 color.g = color.r;
                 color.b = color.r;
             }
             3 => {
-                color.r = u8::from_str_radix(&hex[0..1], 16).ok()? as f32 / 15.0;
-                color.g = u8::from_str_radix(&hex[1..2], 16).ok()? as f32 / 15.0;
-                color.b = u8::from_str_radix(&hex[2..3], 16).ok()? as f32 / 15.0;
+                let (Ok(r), Ok(g), Ok(b)) = (
+                    u8::from_str_radix(slice(hex, 0, 1), 16),
+                    u8::from_str_radix(slice(hex, 1, 2), 16),
+                    u8::from_str_radix(slice(hex, 2, 3), 16),
+                ) else {
+                    return None;
+                };
+
+                color.r = r as f32 / 15.0;
+                color.g = g as f32 / 15.0;
+                color.b = b as f32 / 15.0;
             }
             4 => {
-                color.r = u8::from_str_radix(&hex[0..1], 16).ok()? as f32 / 15.0;
-                color.g = u8::from_str_radix(&hex[1..2], 16).ok()? as f32 / 15.0;
-                color.b = u8::from_str_radix(&hex[2..3], 16).ok()? as f32 / 15.0;
-                color.a = u8::from_str_radix(&hex[3..4], 16).ok()? as f32 / 15.0;
+                let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
+                    u8::from_str_radix(slice(hex, 0, 1), 16),
+                    u8::from_str_radix(slice(hex, 1, 2), 16),
+                    u8::from_str_radix(slice(hex, 2, 3), 16),
+                    u8::from_str_radix(slice(hex, 3, 4), 16),
+                ) else {
+                    return None;
+                };
+
+                color.r = r as f32 / 15.0;
+                color.g = g as f32 / 15.0;
+                color.b = b as f32 / 15.0;
+                color.a = a as f32 / 15.0;
             }
             6 => {
-                color.r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
-                color.g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
-                color.b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
+                let (Ok(r), Ok(g), Ok(b)) = (
+                    u8::from_str_radix(slice(hex, 0, 2), 16),
+                    u8::from_str_radix(slice(hex, 2, 4), 16),
+                    u8::from_str_radix(slice(hex, 4, 6), 16),
+                ) else {
+                    return None;
+                };
+
+                color.r = r as f32 / 255.0;
+                color.g = g as f32 / 255.0;
+                color.b = b as f32 / 255.0;
             }
             8 => {
-                color.r = u8::from_str_radix(&hex[0..2], 16).ok()? as f32 / 255.0;
-                color.g = u8::from_str_radix(&hex[2..4], 16).ok()? as f32 / 255.0;
-                color.b = u8::from_str_radix(&hex[4..6], 16).ok()? as f32 / 255.0;
-                color.a = u8::from_str_radix(&hex[6..8], 16).ok()? as f32 / 255.0;
+                let (Ok(r), Ok(g), Ok(b), Ok(a)) = (
+                    u8::from_str_radix(slice(hex, 0, 2), 16),
+                    u8::from_str_radix(slice(hex, 2, 4), 16),
+                    u8::from_str_radix(slice(hex, 4, 6), 16),
+                    u8::from_str_radix(slice(hex, 6, 8), 16),
+                ) else {
+                    return None;
+                };
+
+                color.r = r as f32 / 255.0;
+                color.g = g as f32 / 255.0;
+                color.b = b as f32 / 255.0;
+                color.a = a as f32 / 255.0;
             }
             _ => return None,
         }
