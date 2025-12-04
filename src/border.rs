@@ -4,8 +4,8 @@ use crate::{Offset, Size};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CornerRadius {
-    pub top_right:    f32,
     pub top_left:     f32,
+    pub top_right:    f32,
     pub bottom_left:  f32,
     pub bottom_right: f32,
 }
@@ -13,11 +13,28 @@ pub struct CornerRadius {
 impl CornerRadius {
     pub const fn all(radius: f32) -> Self {
         Self {
-            top_right:    radius,
             top_left:     radius,
+            top_right:    radius,
             bottom_left:  radius,
             bottom_right: radius,
         }
+    }
+}
+
+impl From<[f32; 4]> for CornerRadius {
+    fn from([top_right, top_left, bottom_left, bottom_right]: [f32; 4]) -> Self {
+        Self {
+            top_left,
+            top_right,
+            bottom_left,
+            bottom_right,
+        }
+    }
+}
+
+impl From<f32> for CornerRadius {
+    fn from(radius: f32) -> Self {
+        Self::all(radius)
     }
 }
 
@@ -26,8 +43,8 @@ impl Add<f32> for CornerRadius {
 
     fn add(self, rhs: f32) -> Self::Output {
         CornerRadius {
-            top_right:    self.top_right + rhs,
             top_left:     self.top_left + rhs,
+            top_right:    self.top_right + rhs,
             bottom_left:  self.bottom_left + rhs,
             bottom_right: self.bottom_right + rhs,
         }
@@ -36,9 +53,9 @@ impl Add<f32> for CornerRadius {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BorderWidth {
+    pub left:   f32,
     pub right:  f32,
     pub top:    f32,
-    pub left:   f32,
     pub bottom: f32,
 }
 
@@ -58,6 +75,34 @@ impl BorderWidth {
 
     pub const fn offset(self) -> Offset {
         Offset::new(self.left, self.top)
+    }
+}
+
+impl From<[f32; 4]> for BorderWidth {
+    fn from([right, top, left, bottom]: [f32; 4]) -> Self {
+        Self {
+            left,
+            right,
+            top,
+            bottom,
+        }
+    }
+}
+
+impl From<[f32; 2]> for BorderWidth {
+    fn from([horizontal, vertical]: [f32; 2]) -> Self {
+        Self {
+            left:   horizontal,
+            right:  horizontal,
+            top:    vertical,
+            bottom: vertical,
+        }
+    }
+}
+
+impl From<f32> for BorderWidth {
+    fn from(width: f32) -> Self {
+        Self::all(width)
     }
 }
 
@@ -85,5 +130,33 @@ impl Padding {
 
     pub const fn offset(self) -> Offset {
         Offset::new(self.left, self.top)
+    }
+}
+
+impl From<[f32; 4]> for Padding {
+    fn from([right, top, left, bottom]: [f32; 4]) -> Self {
+        Self {
+            left,
+            right,
+            top,
+            bottom,
+        }
+    }
+}
+
+impl From<[f32; 2]> for Padding {
+    fn from([horizontal, vertical]: [f32; 2]) -> Self {
+        Self {
+            left:   horizontal,
+            right:  horizontal,
+            top:    vertical,
+            bottom: vertical,
+        }
+    }
+}
+
+impl From<f32> for Padding {
+    fn from(width: f32) -> Self {
+        Self::all(width)
     }
 }
