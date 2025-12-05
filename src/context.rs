@@ -96,11 +96,16 @@ impl LayoutCx<'_> {
             return space.min;
         }
 
+        if child.state().previous_space == Some(space) && !child.state().needs_layout {
+            return child.state().size;
+        }
+
         child.state_mut().needs_layout = false;
 
         let (widget, mut cx) = child.split_layout_cx();
         let size = widget.layout(&mut cx, painter, space);
         child.state_mut().size = size;
+        child.state_mut().previous_space = Some(space);
 
         size
     }

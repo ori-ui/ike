@@ -588,7 +588,7 @@ impl Widget for TextArea {
                         if self.submit_behaviour.clear_text {
                             self.paragraph.text.clear();
                             self.set_cursor(0, false);
-                            cx.request_draw();
+                            cx.request_layout();
                         }
 
                         Propagate::Stop
