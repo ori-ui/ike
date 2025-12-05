@@ -38,7 +38,7 @@ pub use pointer::{
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{
     FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,
-    TextLayoutLine, TextStyle, TextWrap,
+    TextLayoutLine, TextStyle, TextWrap, WeakParagraph,
 };
 pub use transition::{Transition, TransitionCurve, Transitionable, Transitioned};
 pub use tree::{Tree, WidgetMut, WidgetRef};

@@ -73,6 +73,14 @@ macro_rules! impl_widget_ref {
                 self.state().transform
             }
 
+            pub fn global_transform(&self) -> Affine {
+                self.state().global_transform
+            }
+
+            pub fn is_pixel_perfect(&self) -> bool {
+                self.state().is_pixel_perfect
+            }
+
             pub fn is_hovered(&self) -> bool {
                 self.state().is_hovered
             }

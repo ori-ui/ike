@@ -153,6 +153,13 @@ impl_contexts! {
         pub fn request_draw(&mut self) {
             self.state.needs_draw = true;
         }
+
+        pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
+            if self.is_pixel_perfect() != pixel_perfect {
+                self.state.is_pixel_perfect = pixel_perfect;
+                self.request_layout();
+            }
+        }
     }
 }
 
@@ -165,34 +172,8 @@ impl_contexts! {
             &self.state.children
         }
 
-        pub fn transform(&self) -> Affine {
-            self.state.transform
-        }
-    }
-}
-
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_>,
-    DrawCx<'_> {
-        pub fn global_transform(&self) -> Affine {
-            self.state.global_transform
-        }
-
-        pub fn size(&self) -> Size {
-            self.state.size
-        }
-
-        pub fn width(&self) -> f32 {
-            self.size().width
-        }
-
-        pub fn height(&self) -> f32 {
-            self.size().height
-        }
-
-        pub fn rect(&self) -> Rect {
-            Rect::min_size(Point::all(0.0), self.size())
+        pub fn is_pixel_perfect(&self) -> bool {
+            self.state.is_pixel_perfect
         }
 
         pub fn is_hovered(&self) -> bool {
@@ -217,6 +198,36 @@ impl_contexts! {
 
         pub fn has_focused(&self) -> bool {
             self.state.has_focused
+        }
+    }
+}
+
+impl_contexts! {
+    EventCx<'_>,
+    UpdateCx<'_>,
+    DrawCx<'_> {
+        pub fn transform(&self) -> Affine {
+            self.state.transform
+        }
+
+        pub fn global_transform(&self) -> Affine {
+            self.state.global_transform
+        }
+
+        pub fn size(&self) -> Size {
+            self.state.size
+        }
+
+        pub fn width(&self) -> f32 {
+            self.size().width
+        }
+
+        pub fn height(&self) -> f32 {
+            self.size().height
+        }
+
+        pub fn rect(&self) -> Rect {
+            Rect::min_size(Point::all(0.0), self.size())
         }
     }
 }

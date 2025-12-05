@@ -22,6 +22,13 @@ impl Offset {
             y: offset,
         }
     }
+
+    pub const fn round(self) -> Self {
+        Self {
+            x: self.x.round(),
+            y: self.y.round(),
+        }
+    }
 }
 
 impl fmt::Debug for Offset {

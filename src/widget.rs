@@ -143,6 +143,7 @@ pub struct WidgetState {
     pub(crate) size:             Size,
     pub(crate) parent:           Option<WidgetId>,
     pub(crate) children:         Vec<WidgetId>,
+    pub(crate) is_pixel_perfect: bool,
 
     pub(crate) is_hovered:  bool,
     pub(crate) has_hovered: bool,
@@ -174,6 +175,7 @@ impl WidgetState {
             size:             Size::new(0.0, 0.0),
             parent:           None,
             children:         Vec::new(),
+            is_pixel_perfect: true,
 
             is_hovered:  false,
             has_hovered: false,

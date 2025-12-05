@@ -71,6 +71,13 @@ where
         self.tree.get_mut(id)
     }
 
+    pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
+        if self.is_pixel_perfect() != pixel_perfect {
+            self.state_mut().is_pixel_perfect = pixel_perfect;
+            self.request_layout();
+        }
+    }
+
     pub fn set_stashed(&mut self, is_stashed: bool) {
         if self.is_stashed() == is_stashed {
             return;
@@ -224,6 +231,11 @@ where
             return;
         }
 
+        if self.is_pixel_perfect() {
+            let transform = &mut self.state_mut().transform;
+            transform.offset = transform.offset.round();
+        }
+
         let transform = transform * self.transform();
         self.state_mut().global_transform = transform;
 
@@ -240,13 +252,13 @@ where
             return;
         }
 
-        canvas.transform(self.transform(), &mut |canvas| {
+        canvas.transform(self.global_transform(), &mut |canvas| {
             let (widget, mut cx) = self.split_draw_cx(window);
             widget.draw(&mut cx, canvas);
+        });
 
-            self.for_each_child(|child| {
-                child.draw_recursive(window, canvas);
-            });
+        self.for_each_child(|child| {
+            child.draw_recursive(window, canvas);
         });
     }
 
@@ -257,13 +269,13 @@ where
             return;
         }
 
-        canvas.transform(self.transform(), &mut |canvas| {
+        canvas.transform(self.global_transform(), &mut |canvas| {
             let (widget, mut cx) = self.split_draw_cx(window);
             widget.draw_over(&mut cx, canvas);
+        });
 
-            self.for_each_child(|child| {
-                child.draw_over_recursive(window, canvas);
-            });
+        self.for_each_child(|child| {
+            child.draw_over_recursive(window, canvas);
         });
     }
 

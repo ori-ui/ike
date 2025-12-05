@@ -1,6 +1,6 @@
 use crate::{Affine, BorderWidth, Color, CornerRadius, Offset, Painter, Paragraph, Rect, Svg};
 
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub enum Shader {
     Solid(Color),
 }
@@ -18,7 +18,7 @@ pub enum BlendMode {
     DstATop,
 }
 
-#[derive(Clone, PartialEq, PartialOrd)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub struct Paint {
     pub shader: Shader,
     pub blend:  BlendMode,

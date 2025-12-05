@@ -20,18 +20,13 @@ impl From<SvgData> for Picturable {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Fit {
     Contain,
     Cover,
     Fill,
+    #[default]
     None,
-}
-
-impl Default for Fit {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 pub struct Picture {
