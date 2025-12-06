@@ -68,9 +68,9 @@ impl Widget for Constrain {
             cx.request_animate();
             cx.request_layout();
 
-            cx.set_pixel_perfect(true);
-        } else {
             cx.set_pixel_perfect(false);
+        } else {
+            cx.set_pixel_perfect(true);
         }
     }
 }
