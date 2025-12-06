@@ -528,7 +528,7 @@ impl Widget for TextArea {
                             self.changed();
                             cx.request_layout();
                             cx.request_animate();
-                        } else if self.cursor <= self.paragraph.text.len() {
+                        } else if self.cursor < self.paragraph.text.len() {
                             self.paragraph.text.remove(self.cursor);
 
                             self.changed();
