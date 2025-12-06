@@ -37,6 +37,20 @@ impl Size {
         }
     }
 
+    pub const fn ceil(self) -> Self {
+        Self {
+            width:  self.width.round(),
+            height: self.height.round(),
+        }
+    }
+
+    pub const fn ceil_to_scale(self, scale: f32) -> Self {
+        Self {
+            width:  (self.width * scale).ceil() / scale,
+            height: (self.height * scale).ceil() / scale,
+        }
+    }
+
     pub const fn area(self) -> f32 {
         self.width * self.height
     }

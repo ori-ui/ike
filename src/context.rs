@@ -28,8 +28,9 @@ pub struct UpdateCx<'a> {
 }
 
 pub struct LayoutCx<'a> {
-    pub(crate) tree:  &'a mut Tree,
-    pub(crate) state: &'a mut WidgetState,
+    pub(crate) window: &'a Window,
+    pub(crate) tree:   &'a mut Tree,
+    pub(crate) state:  &'a mut WidgetState,
 }
 
 pub struct DrawCx<'a> {
@@ -102,9 +103,9 @@ impl LayoutCx<'_> {
 
         child.state_mut().needs_layout = false;
 
-        let (widget, mut cx) = child.split_layout_cx();
+        let (widget, mut cx) = child.split_layout_cx(self.window);
         let size = widget.layout(&mut cx, painter, space);
-        child.state_mut().size = size;
+        child.state_mut().size = size.ceil_to_scale(self.window.scale());
         child.state_mut().previous_space = Some(space);
 
         size

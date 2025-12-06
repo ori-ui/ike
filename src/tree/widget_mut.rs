@@ -182,9 +182,16 @@ where
         (widget, cx)
     }
 
-    pub(crate) fn split_layout_cx<'b>(&'b mut self) -> (&'b mut T, LayoutCx<'b>) {
+    pub(crate) fn split_layout_cx<'b>(
+        &'b mut self,
+        window: &'b Window,
+    ) -> (&'b mut T, LayoutCx<'b>) {
         let (tree, widget, state) = self.split();
-        let cx = LayoutCx { tree, state };
+        let cx = LayoutCx {
+            window,
+            tree,
+            state,
+        };
         (widget, cx)
     }
 
@@ -226,20 +233,20 @@ where
         widget.animate(&mut cx, dt);
     }
 
-    pub(crate) fn compose_recursive(&mut self, transform: Affine) {
+    pub(crate) fn compose_recursive(&mut self, window: &Window, transform: Affine) {
         if self.is_stashed() {
             return;
         }
 
         if self.is_pixel_perfect() {
             let transform = &mut self.state_mut().transform;
-            transform.offset = transform.offset.round();
+            transform.offset = transform.offset.floor_to_scale(window.scale());
         }
 
         let transform = transform * self.transform();
         self.state_mut().global_transform = transform;
 
-        self.for_each_child(|child| child.compose_recursive(transform));
+        self.for_each_child(|child| child.compose_recursive(window, transform));
 
         self.update_state();
 

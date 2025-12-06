@@ -89,7 +89,7 @@ impl App {
         widget.draw_recursive(window, canvas);
         widget.draw_over_recursive(window, canvas);
 
-        new_window_size
+        matches!(window.sizing, WindowSizing::FitContent).then_some(new_window_size)
     }
 
     pub fn animate(&mut self, window: WindowId, delta_time: Duration) {

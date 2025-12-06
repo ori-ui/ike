@@ -23,10 +23,17 @@ impl Offset {
         }
     }
 
-    pub const fn round(self) -> Self {
+    pub const fn floor(self) -> Self {
         Self {
-            x: self.x.round(),
-            y: self.y.round(),
+            x: self.x.floor(),
+            y: self.y.floor(),
+        }
+    }
+
+    pub const fn floor_to_scale(self, scale: f32) -> Self {
+        Self {
+            x: (self.x * scale).floor() / scale,
+            y: (self.y * scale).floor() / scale,
         }
     }
 }

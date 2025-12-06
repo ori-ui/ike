@@ -132,7 +132,7 @@ impl Widget for Entry {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         let mut space = space.shrink(self.padding.size() + self.border_width.size());
         space.min.width = space.min.width.max(self.min_width);
-        space.max.width = space.max.width.max(self.max_width);
+        space.max.width = space.max.width.min(self.max_width);
         space.min.width = space.min.width.min(space.max.width);
 
         cx.set_child_stashed(1, !cx.get(self.text_area).text().is_empty());
