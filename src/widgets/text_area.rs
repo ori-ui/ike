@@ -5,7 +5,7 @@ use keyboard_types::NamedKey;
 use crate::{
     BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent, LayoutCx, Offset, Paint,
     Painter, Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect, Size, Space,
-    TextLayoutLine, Update, UpdateCx, Widget, tree::WidgetMut,
+    TextLayoutLine, Update, UpdateCx, Widget, WidgetMut,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -16,7 +16,8 @@ pub enum NewlineBehaviour {
     /// When enabled, `on_submit` is never called.
     Enter,
 
-    /// Insert a newline when [`NamedKey::Enter`] is pressed and [`Modifiers::shift`] is held.
+    /// Insert a newline when [`NamedKey::Enter`] is pressed and
+    /// [`Modifiers::shift`](crate::Modifiers) is held.
     ShiftEnter,
 
     /// Never insert newlines.
