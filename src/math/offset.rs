@@ -30,10 +30,10 @@ impl Offset {
         }
     }
 
-    pub const fn floor_to_scale(self, scale: f32) -> Self {
+    pub const fn round_to_scale(self, scale: f32) -> Self {
         Self {
-            x: (self.x * scale).floor() / scale,
-            y: (self.y * scale).floor() / scale,
+            x: (self.x * scale).round() / scale,
+            y: (self.y * scale).round() / scale,
         }
     }
 }

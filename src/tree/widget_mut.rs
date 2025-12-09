@@ -247,7 +247,7 @@ where
 
         if self.is_pixel_perfect() {
             let transform = &mut self.state_mut().transform;
-            transform.offset = transform.offset.floor_to_scale(window.scale());
+            transform.offset = transform.offset.round_to_scale(window.scale());
         }
 
         let transform = transform * self.transform();
