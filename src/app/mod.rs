@@ -84,8 +84,16 @@ impl App {
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
         let window = self.windows.iter_mut().find(|w| w.id == window)?;
 
+        let new_window_size = {
+            let mut widget = self.tree.get_mut(window.contents).unwrap();
+            layout::layout_window(&mut widget, canvas.painter(), window)
+        };
+
+        if let Some(pointer) = window.pointers.first() {
+            pointer::update_hovered(&mut self.tree, window.contents, pointer.position);
+        }
+
         let mut widget = self.tree.get_mut(window.contents).unwrap();
-        let new_window_size = layout::layout_window(&mut widget, canvas.painter(), window);
         widget.draw_recursive(window, canvas);
         widget.draw_over_recursive(window, canvas);
 

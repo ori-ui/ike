@@ -5,12 +5,13 @@ pub(super) fn layout_window(
     painter: &mut dyn Painter,
     window: &mut Window,
 ) -> Size {
-    widget.state_mut().needs_layout = false;
-
     let max_size = match window.sizing {
         WindowSizing::FitContent => Size::all(f32::INFINITY),
         WindowSizing::Resizable { .. } => window.current_size,
     };
+
+    let needs_layout = widget.state().needs_layout;
+    widget.state_mut().needs_layout = false;
 
     let (w, mut cx) = widget.split_layout_cx(window);
     let space = Space::new(Size::all(0.0), max_size);
@@ -21,7 +22,10 @@ pub(super) fn layout_window(
     }
 
     widget.state_mut().size = size;
-    widget.compose_recursive(window, Affine::IDENTITY);
+
+    if needs_layout {
+        widget.compose_recursive(window, Affine::IDENTITY);
+    }
 
     size
 }

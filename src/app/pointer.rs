@@ -211,7 +211,7 @@ fn find_hovered(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
     None
 }
 
-fn update_hovered(tree: &mut Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
+pub fn update_hovered(tree: &mut Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
     let current = find_hovered(tree, id);
     let hovered = find_widget_at(tree, id, point);
 
