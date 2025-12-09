@@ -19,7 +19,9 @@ pub struct Tree {
 struct Entry {
     generation: u32,
     widget:     Option<Box<dyn Widget>>,
-    state:      Option<WidgetState>,
+    // WidgetState is very large, around 150 bytes, and moving it is slow. since it is moved on
+    // every get_mut call, having it boxed is 2-3 times faster than not.
+    state:      Option<Box<WidgetState>>,
 }
 
 impl Default for Tree {
@@ -72,7 +74,7 @@ impl Tree {
             id,
             tree: self,
             widget: Some(Box::new(widget)),
-            state: Some(WidgetState::new::<T>()),
+            state: Some(Box::new(WidgetState::new::<T>())),
         }
     }
 
@@ -112,7 +114,7 @@ impl Tree {
     where
         T: ?Sized + AnyWidget,
     {
-        let entry = &self.entries[id.index as usize];
+        let entry = self.entries.get(id.index as usize)?;
 
         if id.generation != entry.generation {
             return None;
@@ -131,7 +133,7 @@ impl Tree {
     where
         T: ?Sized + AnyWidget,
     {
-        let entry = &mut self.entries[id.index as usize];
+        let entry = self.entries.get_mut(id.index as usize)?;
 
         if id.generation != entry.generation {
             return None;

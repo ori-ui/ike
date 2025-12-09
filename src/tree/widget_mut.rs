@@ -16,7 +16,7 @@ where
     pub(crate) id:     WidgetId<T>,
     pub(crate) tree:   &'a mut Tree,
     pub(crate) widget: Option<Box<T>>,
-    pub(crate) state:  Option<WidgetState>,
+    pub(crate) state:  Option<Box<WidgetState>>,
 }
 
 impl<'a, T> WidgetMut<'a, T>
