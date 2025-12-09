@@ -121,6 +121,8 @@ impl App {
         window.current_size = new_size;
 
         let mut widget = self.tree.get_mut(window.contents).unwrap();
+        let update = Update::WindowResized(new_size);
+        widget.update_recursive(update);
         widget.request_layout();
     }
 
@@ -133,7 +135,8 @@ impl App {
         window.current_size = new_size;
 
         let mut widget = self.tree.get_mut(window.contents).unwrap();
-        widget.request_layout();
+        let update = Update::WindowScaleChanged(new_scale);
+        widget.update_recursive(update);
     }
 
     pub fn window_needs_animate(&self, window: WindowId) -> bool {

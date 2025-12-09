@@ -104,8 +104,13 @@ impl LayoutCx<'_> {
         child.state_mut().needs_layout = false;
 
         let (widget, mut cx) = child.split_layout_cx(self.window);
-        let size = widget.layout(&mut cx, painter, space);
-        child.state_mut().size = size.ceil_to_scale(self.window.scale());
+        let mut size = widget.layout(&mut cx, painter, space);
+
+        if child.is_pixel_perfect() {
+            size = size.ceil_to_scale(self.window.scale())
+        }
+
+        child.state_mut().size = size;
         child.state_mut().previous_space = Some(space);
 
         size

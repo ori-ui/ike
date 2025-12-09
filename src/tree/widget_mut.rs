@@ -216,6 +216,13 @@ where
         });
 
         self.update_state();
+
+        if let Update::WindowScaleChanged(..) = update
+            && self.is_pixel_perfect()
+        {
+            self.state_mut().needs_layout = true;
+        }
+
         self.update(update);
     }
 

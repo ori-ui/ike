@@ -14,8 +14,13 @@ pub(super) fn layout_window(
 
     let (w, mut cx) = widget.split_layout_cx(window);
     let space = Space::new(Size::all(0.0), max_size);
-    let size = w.layout(&mut cx, painter, space);
-    widget.state_mut().size = size.ceil_to_scale(window.scale());
+    let mut size = w.layout(&mut cx, painter, space);
+
+    if widget.is_pixel_perfect() {
+        size = size.ceil_to_scale(window.scale());
+    }
+
+    widget.state_mut().size = size;
     widget.compose_recursive(window, Affine::IDENTITY);
 
     size

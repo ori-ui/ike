@@ -56,12 +56,12 @@ impl Container {
 
 impl Widget for Container {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
-        let space = space.shrink(self.padding.size());
+        let space = space.shrink(self.padding.size() + self.border_width.size());
         let size = cx.layout_child(0, painter, space);
 
-        cx.place_child(0, self.padding.offset());
+        cx.place_child(0, self.padding.offset() + self.border_width.offset());
 
-        size + self.padding.size()
+        size + self.padding.size() + self.border_width.size()
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
