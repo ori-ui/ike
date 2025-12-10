@@ -66,6 +66,8 @@ fn send_key_event(
     let mut current = Some(target);
     let mut propagate = Propagate::Bubble;
 
+    let _span = tracing::info_span!("key_event");
+
     while let Some(id) = current {
         let mut widget = app.tree.get_mut(id).unwrap();
 

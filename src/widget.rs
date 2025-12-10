@@ -130,8 +130,6 @@ where
 
 #[derive(Debug)]
 pub struct WidgetState {
-    #[allow(dead_code, reason = "used for debug purposes")]
-    pub(crate) type_name:        &'static str,
     pub(crate) transform:        Affine,
     pub(crate) global_transform: Affine,
     pub(crate) size:             Size,
@@ -160,12 +158,15 @@ pub struct WidgetState {
 
     pub(crate) accepts_pointer: bool,
     pub(crate) accepts_focus:   bool,
+
+    pub(crate) tracing_span: tracing::Span,
+    #[allow(dead_code, reason = "used for debug purposes")]
+    pub(crate) type_name:    &'static str,
 }
 
 impl WidgetState {
     pub(crate) fn new<T: Widget>() -> Self {
         Self {
-            type_name:        std::any::type_name::<T>(),
             transform:        Affine::IDENTITY,
             global_transform: Affine::IDENTITY,
             size:             Size::new(0.0, 0.0),
@@ -192,6 +193,9 @@ impl WidgetState {
 
             accepts_focus:   T::accepts_focus(),
             accepts_pointer: T::accepts_pointer(),
+
+            tracing_span: tracing::info_span!("Widget", r#type = std::any::type_name::<T>()),
+            type_name:    std::any::type_name::<T>(),
         }
     }
 

@@ -11,19 +11,15 @@ pub(super) fn layout_window(
     };
 
     let needs_layout = widget.state().needs_layout;
-    widget.state_mut().needs_layout = false;
 
-    let (w, mut cx) = widget.split_layout_cx(window);
-    let space = Space::new(Size::all(0.0), max_size);
-    let mut size = w.layout(&mut cx, painter, space);
-
-    if widget.is_pixel_perfect() {
-        size = size.ceil_to_scale(window.scale());
-    }
-
-    widget.state_mut().size = size;
+    let size = {
+        let _span = tracing::info_span!("layout").entered();
+        let space = Space::new(Size::all(0.0), max_size);
+        widget.layout_recursive(window, painter, space)
+    };
 
     if needs_layout {
+        let _span = tracing::info_span!("compose").entered();
         widget.compose_recursive(window, Affine::IDENTITY);
     }
 

@@ -94,8 +94,18 @@ impl App {
         }
 
         let mut widget = self.tree.get_mut(window.contents).unwrap();
-        widget.draw_recursive(window, canvas);
-        widget.draw_over_recursive(window, canvas);
+
+        {
+            let _span = tracing::info_span!("draw");
+
+            widget.draw_recursive(window, canvas);
+        }
+
+        {
+            let _span = tracing::info_span!("draw_over");
+
+            widget.draw_over_recursive(window, canvas);
+        }
 
         matches!(window.sizing, WindowSizing::FitContent).then_some(new_window_size)
     }
@@ -104,6 +114,8 @@ impl App {
         let Some(window) = self.windows.iter().find(|w| w.id == window) else {
             return;
         };
+
+        let _span = tracing::info_span!("animate");
 
         let mut widget = self.tree.get_mut(window.contents).unwrap();
         widget.animate_recursive(delta_time);

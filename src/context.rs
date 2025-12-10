@@ -90,30 +90,7 @@ impl LayoutCx<'_> {
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
         let child = self.state.children[index];
         let mut child = self.tree.get_mut(child).unwrap();
-
-        if child.state().is_stashing {
-            child.state_mut().transform = Affine::IDENTITY;
-            child.state_mut().size = space.min;
-            return space.min;
-        }
-
-        if child.state().previous_space == Some(space) && !child.state().needs_layout {
-            return child.state().size;
-        }
-
-        child.state_mut().needs_layout = false;
-
-        let (widget, mut cx) = child.split_layout_cx(self.window);
-        let mut size = widget.layout(&mut cx, painter, space);
-
-        if child.is_pixel_perfect() {
-            size = size.ceil_to_scale(self.window.scale())
-        }
-
-        child.state_mut().size = size;
-        child.state_mut().previous_space = Some(space);
-
-        size
+        child.layout_recursive(self.window, painter, space)
     }
 
     pub fn place_child(&mut self, index: usize, offset: Offset) {

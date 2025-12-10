@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, DrawCx, LayoutCx, Tree, Update, UpdateCx,
-    Widget, WidgetId, WidgetRef, WidgetState, Window,
+    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, DrawCx, LayoutCx, Painter, Size, Space,
+    Tree, Update, UpdateCx, Widget, WidgetId, WidgetRef, WidgetState, Window,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -160,12 +160,16 @@ impl<'a, T> WidgetMut<'a, T>
 where
     T: ?Sized + AnyWidget,
 {
-    pub(crate) fn state(&self) -> &WidgetState {
+    pub(crate) fn state(&self) -> &'a WidgetState {
         unsafe { &*self.state }
     }
 
     pub(crate) fn state_mut(&mut self) -> &mut WidgetState {
         unsafe { &mut *self.state }
+    }
+
+    pub(crate) fn enter_span(&self) -> tracing::span::Entered<'a> {
+        self.state().tracing_span.enter()
     }
 
     pub(crate) fn split(&mut self) -> (&mut Tree, &mut T, &mut WidgetState) {
@@ -209,6 +213,8 @@ where
     }
 
     pub(crate) fn update_recursive(&mut self, update: Update) {
+        let _span = self.enter_span();
+
         self.for_each_child(|child| {
             child.update_recursive(update.clone());
         });
@@ -229,6 +235,8 @@ where
             return;
         }
 
+        let _span = self.enter_span();
+
         self.for_each_child(|child| child.animate_recursive(dt));
 
         self.state_mut().needs_animate = false;
@@ -236,6 +244,44 @@ where
 
         let (widget, mut cx) = self.split_update_cx();
         widget.animate(&mut cx, dt);
+    }
+
+    pub(crate) fn layout_recursive(
+        &mut self,
+        window: &Window,
+        painter: &mut dyn Painter,
+        space: Space,
+    ) -> Size {
+        if self.state().is_stashing {
+            self.state_mut().transform = Affine::IDENTITY;
+            self.state_mut().size = space.min;
+            return space.min;
+        }
+
+        if self.state().previous_space == Some(space) && !self.state().needs_layout {
+            return self.state().size;
+        }
+
+        let _span = self.enter_span();
+        self.state_mut().needs_layout = false;
+
+        let mut size = {
+            let (widget, mut cx) = self.split_layout_cx(window);
+            widget.layout(&mut cx, painter, space)
+        };
+
+        if self.is_pixel_perfect() {
+            size = size.ceil_to_scale(window.scale())
+        }
+
+        if !size.is_finite() {
+            tracing::warn!(size = ?size, "size is not finite");
+        }
+
+        self.state_mut().size = size;
+        self.state_mut().previous_space = Some(space);
+
+        size
     }
 
     pub(crate) fn compose_recursive(&mut self, window: &Window, transform: Affine) {
@@ -247,6 +293,8 @@ where
             let transform = &mut self.state_mut().transform;
             transform.offset = transform.offset.round_to_scale(window.scale());
         }
+
+        let _span = self.enter_span();
 
         let transform = transform * self.transform();
         self.state_mut().global_transform = transform;
@@ -264,6 +312,8 @@ where
             return;
         }
 
+        let _span = self.enter_span();
+
         canvas.transform(self.global_transform(), &mut |canvas| {
             let (widget, mut cx) = self.split_draw_cx(window);
             widget.draw(&mut cx, canvas);
@@ -280,6 +330,8 @@ where
         if self.is_stashed() {
             return;
         }
+
+        let _span = self.enter_span();
 
         canvas.transform(self.global_transform(), &mut |canvas| {
             let (widget, mut cx) = self.split_draw_cx(window);

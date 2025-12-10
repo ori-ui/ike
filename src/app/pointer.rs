@@ -264,6 +264,8 @@ fn send_pointer_event(
     let mut current = Some(target);
     let mut propagate = PointerPropagate::Bubble;
 
+    let _span = tracing::info_span!("key_event");
+
     while let Some(id) = current {
         let mut widget = app.tree.get_mut(id).unwrap();
 

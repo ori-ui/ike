@@ -58,6 +58,16 @@ impl Size {
     pub const fn has_zero_area(self) -> bool {
         self.area() == 0.0
     }
+
+    /// Check if both `width` and `height` are finite.
+    pub const fn is_finite(self) -> bool {
+        self.width.is_finite() && self.height.is_finite()
+    }
+
+    /// Check if both `width` and `height` are infinite.
+    pub const fn is_infinite(self) -> bool {
+        self.width.is_infinite() && self.height.is_infinite()
+    }
 }
 
 impl fmt::Debug for Size {
