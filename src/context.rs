@@ -1,6 +1,6 @@
 use crate::{
-    Affine, AnyWidget, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId, WidgetRef,
-    Window, WindowId, widget::WidgetState,
+    Affine, AnyWidget, CursorIcon, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId,
+    WidgetRef, Window, WindowId, widget::WidgetState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -147,6 +147,10 @@ impl_contexts! {
                 self.state.is_pixel_perfect = pixel_perfect;
                 self.request_layout();
             }
+        }
+
+        pub fn set_cursor(&mut self, cursor: CursorIcon) {
+            self.state.cursor = cursor;
         }
     }
 }

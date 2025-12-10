@@ -1,5 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+pub use cursor_icon::CursorIcon;
+
 use crate::Point;
 
 #[derive(Clone, Debug, PartialEq)]

@@ -3,9 +3,9 @@ use std::time::Duration;
 use keyboard_types::NamedKey;
 
 use crate::{
-    BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent, LayoutCx, Offset, Paint,
-    Painter, Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect, Size, Space,
-    TextLayoutLine, Update, UpdateCx, Widget, WidgetMut,
+    BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Key, KeyEvent, LayoutCx,
+    Offset, Paint, Painter, Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect,
+    Size, Space, TextLayoutLine, Update, UpdateCx, Widget, WidgetMut,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -153,6 +153,10 @@ impl TextArea {
             self.selection = None
         } else if self.selection.is_none() {
             self.selection = Some(self.cursor);
+        }
+
+        if self.selection == Some(cursor) {
+            self.selection = None;
         }
 
         self.cursor = cursor;
@@ -436,6 +440,10 @@ impl Widget for TextArea {
                 }
             }
 
+            Update::Hovered(..) => {
+                cx.set_cursor(CursorIcon::Text);
+            }
+
             _ => (),
         }
     }
@@ -468,6 +476,7 @@ impl Widget for TextArea {
                 self.set_cursor(cursor, true);
 
                 cx.request_draw();
+                cx.request_animate();
                 PointerPropagate::Bubble
             }
 

@@ -1,6 +1,6 @@
 use std::{any::Any, fmt};
 
-use crate::{Color, Modifiers, Pointer, Size, WidgetId};
+use crate::{Color, CursorIcon, Modifiers, Pointer, Size, WidgetId};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WindowId {
@@ -33,6 +33,7 @@ pub struct Window {
     pub(crate) is_focused:   bool,
     pub(crate) current_size: Size,
     pub(crate) properties:   Vec<Box<dyn Any>>,
+    pub(crate) cursor:       CursorIcon,
 
     pub title:     String,
     pub contents:  WidgetId,
@@ -65,6 +66,10 @@ impl Window {
 
     pub fn is_focused(&self) -> bool {
         self.is_focused
+    }
+
+    pub fn cursor(&self) -> CursorIcon {
+        self.cursor
     }
 
     pub fn add_property<T: Any>(&mut self, property: T) {

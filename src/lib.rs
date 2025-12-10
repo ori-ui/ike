@@ -32,8 +32,8 @@ pub use key::{Key, KeyEvent, Modifiers, NamedKey};
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
 pub use pointer::{
-    Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,
-    PointerPropagate,
+    CursorIcon, Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId,
+    PointerMoveEvent, PointerPropagate,
 };
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{

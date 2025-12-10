@@ -7,10 +7,8 @@ use std::{
 };
 
 use crate::{
-    Canvas, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent, PointerPropagate,
-    Propagate,
-    context::UpdateCx,
-    math::{Affine, Size, Space},
+    Affine, Canvas, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
+    PointerPropagate, Propagate, Size, Space, UpdateCx,
 };
 
 pub trait Widget: Any {
@@ -137,6 +135,7 @@ pub struct WidgetState {
     pub(crate) children:         Vec<WidgetId>,
     pub(crate) is_pixel_perfect: bool,
     pub(crate) previous_space:   Option<Space>,
+    pub(crate) cursor:           CursorIcon,
 
     pub(crate) is_hovered:  bool,
     pub(crate) has_hovered: bool,
@@ -176,6 +175,7 @@ impl WidgetState {
             children:         Vec::new(),
             is_pixel_perfect: true,
             previous_space:   None,
+            cursor:           CursorIcon::Default,
 
             is_hovered:  false,
             has_hovered: false,

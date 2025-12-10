@@ -1,7 +1,7 @@
 use crate::{
-    App, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId,
-    PointerMoveEvent, PointerPropagate, Rect, Tree, WidgetId, WindowId, app::focus,
-    context::FocusUpdate,
+    App, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent,
+    PointerId, PointerMoveEvent, PointerPropagate, Rect, Tree, WidgetId, Window, WindowId,
+    app::focus, context::FocusUpdate,
 };
 
 impl App {
@@ -70,7 +70,7 @@ impl App {
         }
 
         // if not, update the hovered state and target the hovered widget
-        let hovered = update_hovered(&mut self.tree, window.contents, position);
+        let hovered = update_hovered(&mut self.tree, window, window.contents, position);
 
         if let Some(target) = hovered {
             let event = PointerMoveEvent { id, position };
@@ -120,8 +120,8 @@ impl App {
                 false => PointerEvent::Up(event),
             };
 
-            let window = window.id;
-            let handled = match send_pointer_event(self, window, contents, target, &event) {
+            let window_id = window.id;
+            let handled = match send_pointer_event(self, window_id, contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -143,7 +143,9 @@ impl App {
                     widget.set_active(false);
                 }
 
-                update_hovered(&mut self.tree, contents, position);
+                if let Some(window) = self.windows.iter_mut().find(|w| w.id == window_id) {
+                    update_hovered(&mut self.tree, window, contents, position);
+                }
             }
 
             handled
@@ -211,7 +213,13 @@ fn find_hovered(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
     None
 }
 
-pub fn update_hovered(tree: &mut Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
+pub fn update_hovered(
+    tree: &mut Tree,
+    window: &mut Window,
+    id: WidgetId,
+    point: Point,
+) -> Option<WidgetId> {
+    let active = find_active(tree, id);
     let current = find_hovered(tree, id);
     let hovered = find_widget_at(tree, id, point);
 
@@ -227,6 +235,18 @@ pub fn update_hovered(tree: &mut Tree, id: WidgetId, point: Point) -> Option<Wid
         {
             widget.set_hovered(true);
         }
+    }
+
+    if let Some(active) = active
+        && let Some(widget) = tree.get(active)
+    {
+        window.cursor = widget.state().cursor;
+    } else if let Some(hovered) = hovered
+        && let Some(widget) = tree.get(hovered)
+    {
+        window.cursor = widget.state().cursor;
+    } else {
+        window.cursor = CursorIcon::Default;
     }
 
     hovered

@@ -5,7 +5,8 @@ use std::{
 };
 
 use crate::{
-    Canvas, Color, Modifiers, Size, Tree, Update, WidgetId, Window, WindowId, window::WindowSizing,
+    Canvas, Color, CursorIcon, Modifiers, Size, Tree, Update, WidgetId, Window, WindowId,
+    WindowSizing,
 };
 
 mod focus;
@@ -48,6 +49,7 @@ impl App {
             is_focused: false,
             current_size: Size::new(800.0, 600.0),
             properties: Vec::new(),
+            cursor: CursorIcon::Default,
 
             title: String::new(),
             contents,
@@ -90,7 +92,7 @@ impl App {
         };
 
         if let Some(pointer) = window.pointers.first() {
-            pointer::update_hovered(&mut self.tree, window.contents, pointer.position);
+            pointer::update_hovered(&mut self.tree, window, window.contents, pointer.position);
         }
 
         let mut widget = self.tree.get_mut(window.contents).unwrap();

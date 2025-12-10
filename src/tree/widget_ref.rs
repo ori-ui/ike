@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::{
-    Affine, AnyWidgetId, Tree, Widget, WidgetId, WidgetMut,
+    Affine, AnyWidgetId, CursorIcon, Tree, Widget, WidgetId, WidgetMut,
     widget::{AnyWidget, WidgetState},
 };
 
@@ -95,6 +95,10 @@ macro_rules! impl_widget_ref {
 
             pub fn is_stashed(&self) -> bool {
                 self.state().is_stashed
+            }
+
+            pub fn cursor(&self) -> CursorIcon {
+                self.state().cursor
             }
         }
     };

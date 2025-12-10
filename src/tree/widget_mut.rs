@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, DrawCx, LayoutCx, Painter, Size, Space,
-    Tree, Update, UpdateCx, Widget, WidgetId, WidgetRef, WidgetState, Window,
+    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, CursorIcon, DrawCx, LayoutCx, Painter,
+    Size, Space, Tree, Update, UpdateCx, Widget, WidgetId, WidgetRef, WidgetState, Window,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -46,6 +46,10 @@ where
 
     pub fn child_mut(&mut self, index: usize) -> WidgetMut<'_, dyn Widget> {
         self.tree.get_mut(self.state().children[index]).unwrap()
+    }
+
+    pub fn set_cursor(&mut self, cursor: CursorIcon) {
+        self.state_mut().cursor = cursor;
     }
 
     pub fn for_each_child(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
