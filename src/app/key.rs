@@ -70,16 +70,17 @@ fn send_key_event(
         let mut widget = app.tree.get_mut(id).unwrap();
 
         if let Propagate::Bubble = propagate {
+            let (tree, widget, state) = widget.split();
             let mut cx = EventCx {
                 window,
                 windows: &mut app.windows,
-                tree: widget.tree,
-                state: widget.state.as_mut().unwrap(),
+                tree,
+                state,
                 id,
                 focus: &mut focus,
             };
 
-            propagate = widget.widget.as_mut().unwrap().on_key_event(&mut cx, event);
+            propagate = widget.on_key_event(&mut cx, event);
         }
 
         current = widget.state().parent;

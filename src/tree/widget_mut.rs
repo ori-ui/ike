@@ -15,8 +15,8 @@ where
 {
     pub(crate) id:     WidgetId<T>,
     pub(crate) tree:   &'a mut Tree,
-    pub(crate) widget: Option<Box<T>>,
-    pub(crate) state:  Option<Box<WidgetState>>,
+    pub(crate) widget: *mut T,
+    pub(crate) state:  *mut WidgetState,
 }
 
 impl<'a, T> WidgetMut<'a, T>
@@ -49,7 +49,7 @@ where
     }
 
     pub fn for_each_child(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
-        for &child in &self.state.as_ref().unwrap().children {
+        for &child in &unsafe { &*self.state }.children {
             let mut child = self.tree.get_mut(child).unwrap();
             f(&mut child);
         }
@@ -59,8 +59,8 @@ where
         WidgetRef {
             id:     self.id,
             tree:   self.tree,
-            widget: self.widget.as_ref().unwrap(),
-            state:  self.state.as_ref().unwrap(),
+            widget: unsafe { &*self.widget },
+            state:  unsafe { &*self.state },
         }
     }
 
@@ -161,19 +161,17 @@ where
     T: ?Sized + AnyWidget,
 {
     pub(crate) fn state(&self) -> &WidgetState {
-        self.state.as_ref().unwrap()
+        unsafe { &*self.state }
     }
 
     pub(crate) fn state_mut(&mut self) -> &mut WidgetState {
-        self.state.as_mut().unwrap()
+        unsafe { &mut *self.state }
     }
 
     pub(crate) fn split(&mut self) -> (&mut Tree, &mut T, &mut WidgetState) {
-        (
-            self.tree,
-            self.widget.as_mut().unwrap(),
-            self.state.as_mut().unwrap(),
-        )
+        let widget = unsafe { &mut *self.widget };
+        let state = unsafe { &mut *self.state };
+        (self.tree, widget, state)
     }
 
     pub(crate) fn split_update_cx(&mut self) -> (&mut T, UpdateCx<'_>) {
@@ -298,8 +296,9 @@ where
 
         let children = mem::take(&mut self.state_mut().children);
         for &child in &children {
-            let child_state = self.tree.get_state_unchecked(child.index);
-            self.state.as_mut().unwrap().merge(child_state);
+            let (tree, _, state) = self.split();
+            let child_state = tree.get_state_unchecked(child.index);
+            state.merge(child_state);
         }
 
         self.state_mut().children = children;
@@ -318,14 +317,12 @@ where
 
     pub(crate) fn with_tree<U>(&mut self, f: impl FnOnce(&mut Tree) -> U) -> U {
         let entry = &mut self.tree.entries[self.id.index as usize];
-        entry.widget = self.widget.take().map(AnyWidget::upcast_boxed);
-        entry.state = self.state.take();
+        entry.borrowed = false;
 
         let output = f(self.tree);
 
         let entry = &mut self.tree.entries[self.id.index as usize];
-        self.widget = entry.widget.take().and_then(AnyWidget::downcast_boxed);
-        self.state = entry.state.take();
+        entry.borrowed = true;
 
         output
     }
@@ -356,7 +353,7 @@ where
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        self.widget.as_ref().unwrap()
+        unsafe { &*self.widget }
     }
 }
 
@@ -365,7 +362,7 @@ where
     T: ?Sized + AnyWidget,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.widget.as_mut().unwrap()
+        unsafe { &mut *self.widget }
     }
 }
 
@@ -375,7 +372,6 @@ where
 {
     fn drop(&mut self) {
         let entry = &mut self.tree.entries[self.id.index as usize];
-        entry.widget = self.widget.take().map(AnyWidget::upcast_boxed);
-        entry.state = self.state.take();
+        entry.borrowed = false;
     }
 }

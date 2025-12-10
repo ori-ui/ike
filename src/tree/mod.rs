@@ -7,7 +7,7 @@ pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
 
 use crate::{
-    Update, Widget, WidgetId,
+    LayoutCx, Painter, Size, Space, Update, Widget, WidgetId,
     widget::{AnyWidget, ChildUpdate, WidgetState},
 };
 
@@ -18,10 +18,18 @@ pub struct Tree {
 
 struct Entry {
     generation: u32,
-    widget:     Option<Box<dyn Widget>>,
-    // WidgetState is very large, around 150 bytes, and moving it is slow. since it is moved on
-    // every get_mut call, having it boxed is 2-3 times faster than not.
-    state:      Option<Box<WidgetState>>,
+    borrowed:   bool,
+    widget:     *mut dyn Widget,
+    state:      *mut WidgetState,
+}
+
+impl Drop for Entry {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = Box::from_raw(self.widget);
+            let _ = Box::from_raw(self.state);
+        }
+    }
 }
 
 impl Default for Tree {
@@ -48,7 +56,12 @@ impl Tree {
         let id = if let Some(index) = self.free.pop() {
             let entry = &mut self.entries[index as usize];
 
+            let old_widget = entry.widget;
+
             entry.generation += 1;
+            entry.widget = Box::into_raw(Box::new(widget));
+            unsafe { *entry.state = WidgetState::new::<T>() };
+            let _ = unsafe { Box::from_raw(old_widget) };
 
             WidgetId {
                 index,
@@ -59,8 +72,9 @@ impl Tree {
             let index = self.entries.len() as u32;
             self.entries.push(Entry {
                 generation: 0,
-                widget:     None,
-                state:      None,
+                borrowed:   false,
+                widget:     Box::into_raw(Box::new(widget)),
+                state:      Box::into_raw(Box::new(WidgetState::new::<T>())),
             });
 
             WidgetId {
@@ -70,11 +84,14 @@ impl Tree {
             }
         };
 
+        let entry = &mut self.entries[id.index as usize];
+        entry.borrowed = true;
+
         WidgetMut {
             id,
+            widget: entry.widget.cast(),
+            state: entry.state,
             tree: self,
-            widget: Some(Box::new(widget)),
-            state: Some(Box::new(WidgetState::new::<T>())),
         }
     }
 
@@ -95,7 +112,7 @@ impl Tree {
             parent.request_layout();
         }
 
-        for &child in &widget.state.as_ref().unwrap().children {
+        for &child in &unsafe { &*widget.state }.children {
             widget.tree.remove(child);
         }
 
@@ -103,8 +120,12 @@ impl Tree {
 
         let entry = &mut self.entries[id.index as usize];
 
-        let _ = entry.widget.take();
-        let _ = entry.state.take();
+        let old_widget = entry.widget;
+
+        entry.borrowed = false;
+        entry.widget = Box::into_raw(Box::new(Tombstone));
+        unsafe { *entry.state = WidgetState::new::<Tombstone>() };
+        let _ = unsafe { Box::from_raw(old_widget) };
 
         self.free.push(id.index);
     }
@@ -116,15 +137,16 @@ impl Tree {
     {
         let entry = self.entries.get(id.index as usize)?;
 
-        if id.generation != entry.generation {
+        if id.generation != entry.generation || entry.borrowed || !T::is(unsafe { &*entry.widget })
+        {
             return None;
         }
 
         Some(WidgetRef {
             id,
             tree: self,
-            widget: T::downcast_ref(entry.widget.as_deref()?),
-            state: entry.state.as_ref()?,
+            widget: unsafe { &*T::downcast_ptr(entry.widget) },
+            state: unsafe { &*entry.state },
         })
     }
 
@@ -135,29 +157,31 @@ impl Tree {
     {
         let entry = self.entries.get_mut(id.index as usize)?;
 
-        if id.generation != entry.generation {
+        if id.generation != entry.generation || entry.borrowed || !T::is(unsafe { &*entry.widget })
+        {
             return None;
         }
 
-        let widget = entry.widget.take()?;
-        let state = entry.state.take()?;
-
         Some(WidgetMut {
             id,
+            widget: T::downcast_ptr(entry.widget),
+            state: entry.state,
             tree: self,
-            widget: Some(AnyWidget::downcast_boxed(widget).unwrap()),
-            state: Some(state),
         })
     }
 
     pub(crate) fn get_state_unchecked(&self, index: u32) -> &WidgetState {
         let entry = &self.entries[index as usize];
-        entry.state.as_ref().unwrap()
+        assert!(!entry.borrowed);
+
+        unsafe { &*entry.state }
     }
 
     pub(crate) fn get_state_unchecked_mut(&mut self, index: u32) -> &mut WidgetState {
         let entry = &mut self.entries[index as usize];
-        entry.state.as_mut().unwrap()
+        assert!(!entry.borrowed);
+
+        unsafe { &mut *entry.state }
     }
 
     pub(crate) fn debug_validate_id<T>(&self, id: WidgetId<T>)
@@ -182,5 +206,18 @@ impl Tree {
     {
         self.debug_validate_id(id);
         self.get_state_unchecked(id.index).needs_draw
+    }
+}
+
+struct Tombstone;
+
+impl Widget for Tombstone {
+    fn layout(
+        &mut self,
+        _cx: &mut LayoutCx<'_>,
+        _painter: &mut dyn Painter,
+        _space: Space,
+    ) -> Size {
+        unreachable!()
     }
 }

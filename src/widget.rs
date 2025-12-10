@@ -92,11 +92,9 @@ pub enum ChildUpdate {
 pub trait AnyWidget: Widget {
     fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget>;
 
-    fn downcast_boxed(boxed: Box<dyn Widget>) -> Option<Box<Self>>;
+    fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self;
 
-    fn downcast_ref(any: &dyn Widget) -> &Self;
-
-    fn downcast_mut(any: &mut dyn Widget) -> &mut Self;
+    fn is(widget: &dyn Widget) -> bool;
 }
 
 impl AnyWidget for dyn Widget {
@@ -104,16 +102,12 @@ impl AnyWidget for dyn Widget {
         boxed
     }
 
-    fn downcast_boxed(boxed: Box<dyn Widget>) -> Option<Box<Self>> {
-        Some(boxed)
+    fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
+        ptr
     }
 
-    fn downcast_ref(any: &dyn Widget) -> &Self {
-        any
-    }
-
-    fn downcast_mut(any: &mut dyn Widget) -> &mut Self {
-        any
+    fn is(_widget: &dyn Widget) -> bool {
+        true
     }
 }
 
@@ -125,16 +119,12 @@ where
         boxed
     }
 
-    fn downcast_boxed(boxed: Box<dyn Widget>) -> Option<Box<Self>> {
-        (boxed as Box<dyn Any>).downcast().ok()
+    fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
+        ptr as *mut Self
     }
 
-    fn downcast_ref(any: &dyn Widget) -> &Self {
-        (any as &dyn Any).downcast_ref().unwrap()
-    }
-
-    fn downcast_mut(any: &mut dyn Widget) -> &mut Self {
-        (any as &mut dyn Any).downcast_mut().unwrap()
+    fn is(widget: &dyn Widget) -> bool {
+        (widget as &dyn Any).is::<T>()
     }
 }
 
@@ -235,15 +225,6 @@ pub struct WidgetId<T: ?Sized = dyn Widget> {
     pub(crate) index:      u32,
     pub(crate) generation: u32,
     pub(crate) marker:     PhantomData<T>,
-}
-
-impl WidgetId<dyn Widget> {
-    pub fn downcast_ref_unchecked<T>(&self) -> &WidgetId<T>
-    where
-        T: ?Sized,
-    {
-        unsafe { &*(self as *const _ as *const WidgetId<T>) }
-    }
 }
 
 impl<T: ?Sized> Clone for WidgetId<T> {
