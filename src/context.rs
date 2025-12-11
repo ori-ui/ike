@@ -1,237 +1,125 @@
-use crate::{
-    Affine, AnyWidget, Clip, CursorIcon, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId,
-    WidgetRef, Window, WindowId, widget::WidgetState,
+use std::{
+    any::{Any, TypeId},
+    pin::Pin,
+    sync::{Arc, mpsc::Sender},
 };
 
-pub(crate) enum FocusUpdate {
-    None,
-    Unfocus,
-    Target(WidgetId),
-    Next,
-    Previous,
+use ike_core::{AppState, BuildCx, WidgetId};
+use winit::event_loop::EventLoopProxy;
+
+pub struct Context {
+    pub(crate) app:     AppState,
+    pub(crate) proxy:   EventLoopProxy<()>,
+    pub(crate) entries: Vec<Entry>,
+    pub(crate) sender:  Sender<Event>,
+
+    pub(crate) use_type_names_unsafe: bool,
 }
 
-pub struct EventCx<'a> {
-    pub(crate) window:  WindowId,
-    pub(crate) windows: &'a mut Vec<Window>,
-    #[allow(dead_code)]
-    pub(crate) tree:    &'a mut Tree,
-    pub(crate) state:   &'a mut WidgetState,
-    pub(crate) id:      WidgetId,
-    pub(crate) focus:   &'a mut FocusUpdate,
+pub(crate) struct Entry {
+    value:     Box<dyn Any>,
+    type_id:   TypeId,
+    type_name: &'static str,
 }
 
-pub struct UpdateCx<'a> {
-    #[allow(dead_code)]
-    pub(crate) tree:  &'a mut Tree,
-    pub(crate) state: &'a mut WidgetState,
+#[derive(Clone)]
+pub struct Proxy {
+    pub(crate) sender: Sender<Event>,
+    pub(crate) proxy:  EventLoopProxy<()>,
 }
 
-pub struct LayoutCx<'a> {
-    pub(crate) window: &'a Window,
-    pub(crate) tree:   &'a mut Tree,
-    pub(crate) state:  &'a mut WidgetState,
+pub enum Event {
+    Rebuild,
+    Event(ori::Event),
+    Spawn(Pin<Box<dyn Future<Output = ()> + Send>>),
 }
 
-pub struct DrawCx<'a> {
-    pub(crate) window: &'a Window,
-    #[allow(dead_code)]
-    pub(crate) tree:   &'a mut Tree,
-    pub(crate) state:  &'a mut WidgetState,
-}
-
-impl EventCx<'_> {
-    pub fn window(&self) -> &Window {
-        self.windows.iter().find(|w| w.id == self.window).unwrap()
+impl BuildCx for Context {
+    fn app(&self) -> &AppState {
+        &self.app
     }
 
-    pub fn window_mut(&mut self) -> &mut Window {
-        self.windows
-            .iter_mut()
-            .find(|w| w.id == self.window)
-            .unwrap()
-    }
-
-    pub fn is_window_focused(&self) -> bool {
-        self.window().is_focused()
-    }
-
-    pub fn request_focus(&mut self) {
-        *self.focus = FocusUpdate::Target(self.id);
-    }
-
-    pub fn request_unfocus(&mut self) {
-        *self.focus = FocusUpdate::Unfocus;
-    }
-
-    pub fn request_focus_next(&mut self) {
-        *self.focus = FocusUpdate::Next;
-    }
-
-    pub fn request_focus_previous(&mut self) {
-        *self.focus = FocusUpdate::Previous;
+    fn app_mut(&mut self) -> &mut AppState {
+        &mut self.app
     }
 }
 
-impl LayoutCx<'_> {
-    pub fn get<T>(&self, id: WidgetId<T>) -> WidgetRef<'_, T>
-    where
-        T: ?Sized + AnyWidget,
-    {
-        self.tree.get(id).unwrap()
-    }
-
-    pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
-        let child = self.state.children[index];
-        let mut child = self.tree.get_mut(child).unwrap();
-        child.set_stashed(is_stashed);
-    }
-
-    pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
-        let child = self.state.children[index];
-        let mut child = self.tree.get_mut(child).unwrap();
-        child.layout_recursive(self.window, painter, space)
-    }
-
-    pub fn place_child(&mut self, index: usize, offset: Offset) {
-        let child = &self.state.children[index];
-
-        let state = self.tree.get_state_unchecked_mut(child.index);
-        state.transform.offset = offset;
-    }
-
-    pub fn child_size(&self, index: usize) -> Size {
-        let child = &self.state.children[index];
-
-        let state = self.tree.get_state_unchecked(child.index);
-        state.size
-    }
-
-    pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
-        self.state.clip = rect.into();
-    }
+impl ori::BaseElement for Context {
+    type Element = WidgetId;
 }
 
-impl DrawCx<'_> {
-    pub fn is_window_focused(&self) -> bool {
-        self.window.is_focused
-    }
-}
+impl ori::AsyncContext for Context {
+    type Proxy = Proxy;
 
-macro_rules! impl_contexts {
-    ($cx:ty { $($tt:tt)* }) => {
-        impl $cx {
-            $($tt)*
-        }
-    };
-    ($cx:ty, $($cxs:ty),* $(,)* { $($tt:tt)* }) => {
-        impl_contexts!($cx { $($tt)* });
-        impl_contexts!($($cxs),* { $($tt)* });
-    }
-}
-
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_> {
-        pub fn request_animate(&mut self) {
-            self.state.needs_animate = true;
-        }
-
-        pub fn request_layout(&mut self) {
-            self.state.needs_layout = true;
-            self.state.needs_draw = true;
-        }
-
-        pub fn request_draw(&mut self) {
-            self.state.needs_draw = true;
-        }
-
-        pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
-            if self.is_pixel_perfect() != pixel_perfect {
-                self.state.is_pixel_perfect = pixel_perfect;
-                self.request_layout();
-            }
-        }
-
-        pub fn set_cursor(&mut self, cursor: CursorIcon) {
-            self.state.cursor = cursor;
+    fn proxy(&mut self) -> Self::Proxy {
+        Proxy {
+            sender: self.sender.clone(),
+            proxy:  self.proxy.clone(),
         }
     }
 }
 
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_>,
-    LayoutCx<'_>,
-    DrawCx<'_> {
-        pub fn children(&self) -> impl ExactSizeIterator<Item = WidgetRef<'_>> {
-            self.state.children.iter().map(|child| self.tree.get(*child).unwrap())
-        }
+impl ori::ProviderContext for Context {
+    fn push_context<T: Any>(&mut self, context: Box<T>) {
+        self.entries.push(Entry {
+            value:     context,
+            type_id:   TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        })
+    }
 
-        pub fn child(&self, index: usize) -> Option<WidgetRef<'_>> {
-            self.tree.get(self.state.children[index])
-        }
+    fn pop_context<T: Any>(&mut self) -> Option<Box<T>> {
+        self.entries.pop()?.value.downcast().ok()
+    }
 
-        pub fn is_pixel_perfect(&self) -> bool {
-            self.state.is_pixel_perfect
-        }
+    fn get_context<T: Any>(&self) -> Option<&T> {
+        let entry = match self.use_type_names_unsafe {
+            true => self
+                .entries
+                .iter()
+                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
+            false => self
+                .entries
+                .iter()
+                .rfind(|e| e.type_id == TypeId::of::<T>())?,
+        };
 
-        pub fn is_hovered(&self) -> bool {
-            self.state.is_hovered
-        }
+        Some(unsafe { &*(entry.value.as_ref() as *const _ as *const T) })
+    }
 
-        pub fn is_active(&self) -> bool {
-            self.state.is_active
-        }
+    fn get_context_mut<T: Any>(&mut self) -> Option<&mut T> {
+        let entry = match self.use_type_names_unsafe {
+            true => self
+                .entries
+                .iter_mut()
+                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
+            false => self
+                .entries
+                .iter_mut()
+                .rfind(|e| e.type_id == TypeId::of::<T>())?,
+        };
 
-        pub fn is_focused(&self) -> bool {
-            self.state.is_focused
-        }
-
-        pub fn has_hovered(&self) -> bool {
-            self.state.has_hovered
-        }
-
-        pub fn has_active(&self) -> bool {
-            self.state.has_active
-        }
-
-        pub fn has_focused(&self) -> bool {
-            self.state.has_focused
-        }
-
-        pub fn clip(&self) -> Option<&Clip> {
-            self.state.clip.as_ref()
-        }
+        Some(unsafe { &mut *(entry.value.as_mut() as *mut _ as *mut T) })
     }
 }
 
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_>,
-    DrawCx<'_> {
-        pub fn transform(&self) -> Affine {
-            self.state.transform
-        }
+impl ori::Proxy for Proxy {
+    fn clone(&self) -> Arc<dyn ori::Proxy> {
+        Arc::new(Clone::clone(self))
+    }
 
-        pub fn global_transform(&self) -> Affine {
-            self.state.global_transform
-        }
+    fn rebuild(&self) {
+        let _ = self.sender.send(Event::Rebuild);
+        let _ = self.proxy.send_event(());
+    }
 
-        pub fn size(&self) -> Size {
-            self.state.size
-        }
+    fn event(&self, event: ori::Event) {
+        let _ = self.sender.send(Event::Event(event));
+        let _ = self.proxy.send_event(());
+    }
 
-        pub fn width(&self) -> f32 {
-            self.size().width
-        }
-
-        pub fn height(&self) -> f32 {
-            self.size().height
-        }
-
-        pub fn rect(&self) -> Rect {
-            Rect::min_size(Point::all(0.0), self.size())
-        }
+    fn spawn_boxed(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
+        let _ = self.sender.send(Event::Spawn(future));
+        let _ = self.proxy.send_event(());
     }
 }

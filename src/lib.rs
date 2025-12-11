@@ -1,48 +1,44 @@
 mod app;
-mod axis;
-mod border;
-mod build;
-mod canvas;
-mod color;
 mod context;
-mod curve;
-mod event;
-mod image;
+mod error;
 mod key;
-mod math;
-mod painter;
-mod pointer;
-mod svg;
-mod text;
-mod transition;
-mod tree;
-mod widget;
-mod window;
+mod palette;
+mod view;
+mod winit;
 
-pub mod widgets;
+#[doc(hidden)]
+#[cfg(feature = "reload")]
+pub mod reload;
+
+pub mod views {
+    #[allow(clippy::module_inception)]
+    #[path = "../views/mod.rs"]
+    mod views;
+
+    pub use ori::views::*;
+    pub use views::*;
+}
+
+pub use ike_core::*;
+pub use ori::*;
 
 pub use app::App;
-pub use axis::Axis;
-pub use border::{BorderWidth, CornerRadius, Padding};
-pub use build::BuildCx;
-pub use canvas::{BlendMode, Canvas, Clip, Paint, Shader};
-pub use color::Color;
-pub use context::{DrawCx, EventCx, LayoutCx, UpdateCx};
-pub use curve::Curve;
-pub use event::Propagate;
-pub use key::{Key, KeyEvent, Modifiers, NamedKey};
-pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
-pub use painter::Painter;
-pub use pointer::{
-    CursorIcon, Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId,
-    PointerMoveEvent, PointerPropagate, PointerScrollEvent,
-};
-pub use svg::{Svg, SvgData, WeakSvg};
-pub use text::{
-    FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,
-    TextLayoutLine, TextStyle, TextWrap, WeakParagraph,
-};
-pub use transition::{Transition, TransitionCurve, Transitionable, Transitioned};
-pub use tree::{Tree, WidgetMut, WidgetRef};
-pub use widget::{AnyWidget, AnyWidgetId, ChildUpdate, Update, Widget, WidgetId, WidgetState};
-pub use window::{Window, WindowId, WindowSizing};
+pub use context::Context;
+pub use palette::Palette;
+pub use view::{Effect, View};
+
+pub mod prelude {
+    pub use ike_core::{
+        Axis, BorderWidth, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Padding, Svg,
+        TextAlign, TextWrap, Transition, include_svg,
+        widgets::{Align, Fit, Justify, NewlineBehaviour, SubmitBehaviour},
+    };
+
+    pub use ori::{Action, Event, Proxy, ViewId};
+    pub use tracing::{
+        debug, debug_span, error, error_span, info, info_span, span, trace, trace_span, warn,
+        warn_span,
+    };
+
+    pub use crate::{App, Effect, Palette, View, ViewSeq, WindowSizing, views::*};
+}

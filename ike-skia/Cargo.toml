@@ -1,0 +1,39 @@
+[package]
+name = "ike-skia"
+version = "0.1.0"
+edition.workspace = true
+
+[features]
+default = ["vulkan"]
+vulkan = ["dep:ash", "dep:ash-window", "dep:raw-window-handle"]
+
+[dependencies]
+ike-core.workspace = true
+
+seahash = "4"
+tracing = "0.1"
+
+[dependencies.skia-safe]
+version = "0.91"
+default-features = false
+features = [
+  "binary-cache",
+  "embed-icudtl",
+  "pdf",
+  "vulkan",
+  "textlayout",
+  "svg",
+  "webp",
+]
+
+[dependencies.ash]
+version = "0.38"
+optional = true
+
+[dependencies.ash-window]
+version = "0.13"
+optional = true
+
+[dependencies.raw-window-handle]
+version = "0.6"
+optional = true

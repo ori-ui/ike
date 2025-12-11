@@ -1,0 +1,9 @@
+[package]
+name = "ike-core"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+keyboard-types = "0.8"
+tracing = "0.1"
+cursor-icon = "1.2"
