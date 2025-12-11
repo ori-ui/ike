@@ -1,5 +1,6 @@
 use crate::{
-    BuildCx, Canvas, DrawCx, LayoutCx, Offset, Painter, Paragraph, Size, Space, Widget, WidgetMut,
+    BuildCx, Canvas, DrawCx, LayoutCx, Offset, Painter, Paragraph, Point, Rect, Size, Space,
+    Widget, WidgetMut,
 };
 
 pub struct Label {
@@ -18,9 +19,12 @@ impl Label {
 }
 
 impl Widget for Label {
-    fn layout(&mut self, _cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         let size = painter.measure_text(&self.paragraph, space.max.width);
-        space.constrain(size)
+        let size = space.constrain(size);
+        cx.set_clip(Rect::min_size(Point::ORIGIN, size));
+
+        size
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {

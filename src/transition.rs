@@ -78,10 +78,17 @@ where
         self.update_current();
     }
 
+    pub fn set(&mut self, value: T) {
+        self.to = value.clone();
+        self.from = value.clone();
+        self.current = value.clone();
+        self.time = self.transition.duration;
+    }
+
     /// Start transitioning to a value.
     ///
     /// Returns whether `request_animate` should be called.
-    pub fn begin_transition(&mut self, to: T) -> bool {
+    pub fn begin(&mut self, to: T) -> bool {
         if to == self.to {
             return false;
         }

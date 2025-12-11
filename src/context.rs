@@ -1,5 +1,5 @@
 use crate::{
-    Affine, AnyWidget, CursorIcon, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId,
+    Affine, AnyWidget, Clip, CursorIcon, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId,
     WidgetRef, Window, WindowId, widget::WidgetState,
 };
 
@@ -106,6 +106,10 @@ impl LayoutCx<'_> {
         let state = self.tree.get_state_unchecked(child.index);
         state.size
     }
+
+    pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
+        self.state.clip = rect.into();
+    }
 }
 
 impl DrawCx<'_> {
@@ -160,8 +164,12 @@ impl_contexts! {
     UpdateCx<'_>,
     LayoutCx<'_>,
     DrawCx<'_> {
-        pub fn children(&self) -> &[WidgetId] {
-            &self.state.children
+        pub fn children(&self) -> impl ExactSizeIterator<Item = WidgetRef<'_>> {
+            self.state.children.iter().map(|child| self.tree.get(*child).unwrap())
+        }
+
+        pub fn child(&self, index: usize) -> Option<WidgetRef<'_>> {
+            self.tree.get(self.state.children[index])
         }
 
         pub fn is_pixel_perfect(&self) -> bool {
@@ -190,6 +198,10 @@ impl_contexts! {
 
         pub fn has_focused(&self) -> bool {
             self.state.has_focused
+        }
+
+        pub fn clip(&self) -> Option<&Clip> {
+            self.state.clip.as_ref()
         }
     }
 }

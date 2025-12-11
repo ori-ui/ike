@@ -98,7 +98,7 @@ impl Button {
 
         this.request_draw();
 
-        if this.color.begin_transition(color) {
+        if this.color.begin(color) {
             this.request_animate();
         }
     }
@@ -152,7 +152,7 @@ impl Widget for Button {
 
                 cx.request_draw();
 
-                if self.color.begin_transition(color) {
+                if self.color.begin(color) {
                     cx.request_animate();
                 }
             }

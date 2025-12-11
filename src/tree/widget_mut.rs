@@ -107,12 +107,12 @@ where
             self.state_mut().is_hovered = false;
             self.state_mut().is_active = false;
 
-            self.update(Update::Focused(false));
-            self.update(Update::Hovered(false));
-            self.update(Update::Active(false));
+            self.update_without_propagate(Update::Focused(false));
+            self.update_without_propagate(Update::Hovered(false));
+            self.update_without_propagate(Update::Active(false));
         }
 
-        self.update(Update::Stashed(is_stashed));
+        self.update_without_propagate(Update::Stashed(is_stashed));
         self.update_state();
     }
 
@@ -126,7 +126,7 @@ where
 
         let index = self.state().children.len();
         self.state_mut().children.push(child.upcast());
-        self.update(Update::Children(ChildUpdate::Added(index)));
+        self.update_without_propagate(Update::Children(ChildUpdate::Added(index)));
         self.request_layout();
     }
 
@@ -139,7 +139,7 @@ where
     /// Swap two children of a widget.
     pub fn swap_children(&mut self, index_a: usize, index_b: usize) {
         self.state_mut().children.swap(index_a, index_b);
-        self.update(Update::Children(ChildUpdate::Swapped(index_a, index_b)));
+        self.update_without_propagate(Update::Children(ChildUpdate::Swapped(index_a, index_b)));
         self.request_layout();
     }
 
@@ -153,7 +153,7 @@ where
         child_state.parent = Some(self.id.upcast());
 
         let prev_child = mem::replace(&mut self.state_mut().children[index], child);
-        self.update(Update::Children(ChildUpdate::Replaced(index)));
+        self.update_without_propagate(Update::Children(ChildUpdate::Replaced(index)));
         self.request_layout();
 
         prev_child
@@ -164,7 +164,7 @@ impl<'a, T> WidgetMut<'a, T>
 where
     T: ?Sized + AnyWidget,
 {
-    pub(crate) fn state(&self) -> &'a WidgetState {
+    pub(crate) fn state(&self) -> &WidgetState {
         unsafe { &*self.state }
     }
 
@@ -172,8 +172,8 @@ where
         unsafe { &mut *self.state }
     }
 
-    pub(crate) fn enter_span(&self) -> tracing::span::Entered<'a> {
-        self.state().tracing_span.enter()
+    pub(crate) fn enter_span(&self) -> tracing::span::EnteredSpan {
+        self.state().tracing_span.clone().entered()
     }
 
     pub(crate) fn split(&mut self) -> (&mut Tree, &mut T, &mut WidgetState) {
@@ -211,7 +211,7 @@ where
         (widget, cx)
     }
 
-    pub(crate) fn update(&mut self, update: Update) {
+    pub(crate) fn update_without_propagate(&mut self, update: Update) {
         let (widget, mut cx) = self.split_update_cx();
         widget.update(&mut cx, update);
     }
@@ -231,7 +231,7 @@ where
             self.state_mut().needs_layout = true;
         }
 
-        self.update(update);
+        self.update_without_propagate(update);
     }
 
     pub(crate) fn animate_recursive(&mut self, dt: Duration) {
@@ -318,13 +318,24 @@ where
 
         let _span = self.enter_span();
 
-        canvas.transform(self.global_transform(), &mut |canvas| {
-            let (widget, mut cx) = self.split_draw_cx(window);
-            widget.draw(&mut cx, canvas);
-        });
+        canvas.transform(self.transform(), &mut |canvas| {
+            if let Some(ref clip) = self.state().clip {
+                canvas.clip(&clip.clone(), &mut |canvas| {
+                    let (widget, mut cx) = self.split_draw_cx(window);
+                    widget.draw(&mut cx, canvas);
 
-        self.for_each_child(|child| {
-            child.draw_recursive(window, canvas);
+                    self.for_each_child(|child| {
+                        child.draw_recursive(window, canvas);
+                    });
+                });
+            } else {
+                let (widget, mut cx) = self.split_draw_cx(window);
+                widget.draw(&mut cx, canvas);
+
+                self.for_each_child(|child| {
+                    child.draw_recursive(window, canvas);
+                });
+            }
         });
     }
 
@@ -337,13 +348,24 @@ where
 
         let _span = self.enter_span();
 
-        canvas.transform(self.global_transform(), &mut |canvas| {
-            let (widget, mut cx) = self.split_draw_cx(window);
-            widget.draw_over(&mut cx, canvas);
-        });
+        canvas.transform(self.transform(), &mut |canvas| {
+            if let Some(ref clip) = self.state().clip {
+                canvas.clip(&clip.clone(), &mut |canvas| {
+                    let (widget, mut cx) = self.split_draw_cx(window);
+                    widget.draw_over(&mut cx, canvas);
 
-        self.for_each_child(|child| {
-            child.draw_over_recursive(window, canvas);
+                    self.for_each_child(|child| {
+                        child.draw_over_recursive(window, canvas);
+                    });
+                });
+            } else {
+                let (widget, mut cx) = self.split_draw_cx(window);
+                widget.draw_over(&mut cx, canvas);
+
+                self.for_each_child(|child| {
+                    child.draw_over_recursive(window, canvas);
+                });
+            }
         });
     }
 
@@ -385,19 +407,19 @@ where
 
     pub(crate) fn set_hovered(&mut self, is_hovered: bool) {
         self.state_mut().is_hovered = is_hovered;
-        self.update(Update::Hovered(is_hovered));
+        self.update_without_propagate(Update::Hovered(is_hovered));
         self.propagate_state();
     }
 
     pub(crate) fn set_active(&mut self, is_active: bool) {
         self.state_mut().is_active = is_active;
-        self.update(Update::Active(is_active));
+        self.update_without_propagate(Update::Active(is_active));
         self.propagate_state();
     }
 
     pub(crate) fn set_focused(&mut self, is_focused: bool) {
         self.state_mut().is_focused = is_focused;
-        self.update(Update::Focused(is_focused));
+        self.update_without_propagate(Update::Focused(is_focused));
         self.propagate_state();
     }
 }

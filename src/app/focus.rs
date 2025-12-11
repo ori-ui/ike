@@ -1,4 +1,4 @@
-use crate::{Tree, WidgetId, context::FocusUpdate};
+use crate::{Point, Rect, Tree, WidgetId, app::scroll, context::FocusUpdate};
 
 /// Find the currently focused widget.
 pub(super) fn find_focused(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
@@ -55,11 +55,18 @@ pub(super) fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option
         {
             widget.set_focused(false);
         }
+        if let Some(focused) = focused {
+            let rect = if let Some(mut widget) = tree.get_mut(focused) {
+                widget.set_focused(true);
 
-        if let Some(focused) = focused
-            && let Some(mut widget) = tree.get_mut(focused)
-        {
-            widget.set_focused(true);
+                Some(Rect::min_size(Point::ORIGIN, widget.size()))
+            } else {
+                None
+            };
+
+            if let Some(rect) = rect {
+                scroll::scroll_to(tree, focused, rect);
+            }
         }
     }
 
@@ -152,8 +159,16 @@ fn give_focus(tree: &mut Tree, root: WidgetId, target: WidgetId) {
             widget.set_focused(false);
         }
 
-        if let Some(mut widget) = tree.get_mut(target) {
+        let rect = if let Some(mut widget) = tree.get_mut(target) {
             widget.set_focused(true);
+
+            Some(Rect::min_size(Point::ORIGIN, widget.size()))
+        } else {
+            None
+        };
+
+        if let Some(rect) = rect {
+            scroll::scroll_to(tree, target, rect);
         }
     }
 }

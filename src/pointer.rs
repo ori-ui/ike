@@ -2,7 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub use cursor_icon::CursorIcon;
 
-use crate::Point;
+use crate::{Offset, Point};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pointer {
@@ -15,21 +15,29 @@ pub enum PointerEvent {
     Down(PointerButtonEvent),
     Up(PointerButtonEvent),
     Move(PointerMoveEvent),
+    Scroll(PointerScrollEvent),
     Enter(PointerId),
     Leave(PointerId),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PointerMoveEvent {
-    pub position: Point,
-    pub id:       PointerId,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointerButtonEvent {
     pub button:   PointerButton,
     pub position: Point,
-    pub id:       PointerId,
+    pub pointer:  PointerId,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PointerMoveEvent {
+    pub position: Point,
+    pub pointer:  PointerId,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PointerScrollEvent {
+    pub position: Point,
+    pub delta:    Offset,
+    pub pointer:  PointerId,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

@@ -1,4 +1,5 @@
 mod app;
+mod axis;
 mod border;
 mod build;
 mod canvas;
@@ -21,9 +22,10 @@ mod window;
 pub mod widgets;
 
 pub use app::App;
+pub use axis::Axis;
 pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::BuildCx;
-pub use canvas::{BlendMode, Canvas, Paint, Shader};
+pub use canvas::{BlendMode, Canvas, Clip, Paint, Shader};
 pub use color::Color;
 pub use context::{DrawCx, EventCx, LayoutCx, UpdateCx};
 pub use curve::Curve;
@@ -33,7 +35,7 @@ pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
 pub use pointer::{
     CursorIcon, Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId,
-    PointerMoveEvent, PointerPropagate,
+    PointerMoveEvent, PointerPropagate, PointerScrollEvent,
 };
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{

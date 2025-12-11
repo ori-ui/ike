@@ -1,4 +1,3 @@
-use core::f32;
 use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -13,6 +12,7 @@ mod focus;
 mod key;
 mod layout;
 mod pointer;
+mod scroll;
 
 pub struct App {
     pub(crate) tree:    Tree,

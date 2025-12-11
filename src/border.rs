@@ -22,7 +22,7 @@ impl CornerRadius {
 }
 
 impl From<[f32; 4]> for CornerRadius {
-    fn from([top_right, top_left, bottom_left, bottom_right]: [f32; 4]) -> Self {
+    fn from([top_left, top_right, bottom_right, bottom_left]: [f32; 4]) -> Self {
         Self {
             top_left,
             top_right,
@@ -79,7 +79,7 @@ impl BorderWidth {
 }
 
 impl From<[f32; 4]> for BorderWidth {
-    fn from([right, top, left, bottom]: [f32; 4]) -> Self {
+    fn from([top, right, bottom, left]: [f32; 4]) -> Self {
         Self {
             left,
             right,
@@ -134,7 +134,7 @@ impl Padding {
 }
 
 impl From<[f32; 4]> for Padding {
-    fn from([right, top, left, bottom]: [f32; 4]) -> Self {
+    fn from([top, right, bottom, left]: [f32; 4]) -> Self {
         Self {
             left,
             right,

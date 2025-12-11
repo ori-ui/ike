@@ -1,11 +1,11 @@
 use crate::{Affine, BorderWidth, Color, CornerRadius, Offset, Painter, Paragraph, Rect, Svg};
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub enum Shader {
     Solid(Color),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BlendMode {
     Clear,
     Src,
@@ -18,7 +18,7 @@ pub enum BlendMode {
     DstATop,
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub struct Paint {
     pub shader: Shader,
     pub blend:  BlendMode,
@@ -33,12 +33,31 @@ impl From<Color> for Paint {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Clip {
+    Rect(Rect),
+}
+
+impl From<Rect> for Clip {
+    fn from(rect: Rect) -> Self {
+        Self::Rect(rect)
+    }
+}
+
+impl From<Rect> for Option<Clip> {
+    fn from(rect: Rect) -> Self {
+        Some(Clip::Rect(rect))
+    }
+}
+
 pub trait Canvas {
     fn painter(&mut self) -> &mut dyn Painter;
 
     fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas));
 
     fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas));
+
+    fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas));
 
     fn fill(&mut self, paint: &Paint);
 

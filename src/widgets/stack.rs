@@ -1,39 +1,8 @@
 use core::f32;
 
 use crate::{
-    BuildCx, LayoutCx, Offset, Painter, Size, Space, Widget, WidgetMut,
-    context::UpdateCx,
-    widget::{ChildUpdate, Update},
+    Axis, BuildCx, ChildUpdate, LayoutCx, Painter, Size, Space, Update, UpdateCx, Widget, WidgetMut,
 };
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Axis {
-    Horizontal,
-    Vertical,
-}
-
-impl Axis {
-    fn unpack_size(self, size: Size) -> (f32, f32) {
-        match self {
-            Axis::Horizontal => (size.width, size.height),
-            Axis::Vertical => (size.height, size.width),
-        }
-    }
-
-    fn pack_size(self, major: f32, minor: f32) -> Size {
-        match self {
-            Axis::Horizontal => Size::new(major, minor),
-            Axis::Vertical => Size::new(minor, major),
-        }
-    }
-
-    fn pack_offset(self, major: f32, minor: f32) -> Offset {
-        match self {
-            Axis::Horizontal => Offset::new(major, minor),
-            Axis::Vertical => Offset::new(minor, major),
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Justify {

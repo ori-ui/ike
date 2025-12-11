@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    Affine, Canvas, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
-    PointerPropagate, Propagate, Size, Space, UpdateCx,
+    Affine, Canvas, Clip, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
+    PointerPropagate, Propagate, Rect, Size, Space, UpdateCx,
 };
 
 pub trait Widget: Any {
@@ -73,6 +73,7 @@ pub enum Update {
     Active(bool),
     Focused(bool),
     Stashed(bool),
+    ScrollTo(Rect),
     WindowFocused(bool),
     WindowResized(Size),
     WindowScaleChanged(f32),
@@ -136,6 +137,7 @@ pub struct WidgetState {
     pub(crate) is_pixel_perfect: bool,
     pub(crate) previous_space:   Option<Space>,
     pub(crate) cursor:           CursorIcon,
+    pub(crate) clip:             Option<Clip>,
 
     pub(crate) is_hovered:  bool,
     pub(crate) has_hovered: bool,
@@ -176,6 +178,7 @@ impl WidgetState {
             is_pixel_perfect: true,
             previous_space:   None,
             cursor:           CursorIcon::Default,
+            clip:             None,
 
             is_hovered:  false,
             has_hovered: false,

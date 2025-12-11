@@ -108,7 +108,7 @@ impl Tree {
             && let Some(index) = parent.children().iter().position(|x| *x == id)
         {
             parent.state_mut().children.remove(index);
-            parent.update(Update::Children(ChildUpdate::Removed(index)));
+            parent.update_without_propagate(Update::Children(ChildUpdate::Removed(index)));
             parent.request_layout();
         }
 

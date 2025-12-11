@@ -27,7 +27,7 @@ impl Constrain {
     pub fn set_min_size(this: &mut WidgetMut<Self>, min_size: Size) {
         this.request_layout();
 
-        if this.min_size.begin_transition(min_size) {
+        if this.min_size.begin(min_size) {
             this.request_animate();
         }
     }
@@ -35,7 +35,7 @@ impl Constrain {
     pub fn set_max_size(this: &mut WidgetMut<Self>, max_size: Size) {
         this.request_layout();
 
-        if this.max_size.begin_transition(max_size) {
+        if this.max_size.begin(max_size) {
             this.request_animate();
         }
     }

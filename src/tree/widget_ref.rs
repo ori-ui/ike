@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::{
-    Affine, AnyWidgetId, CursorIcon, Tree, Widget, WidgetId, WidgetMut,
+    Affine, AnyWidgetId, CursorIcon, Size, Tree, Widget, WidgetId, WidgetMut,
     widget::{AnyWidget, WidgetState},
 };
 
@@ -67,6 +67,10 @@ macro_rules! impl_widget_ref {
 
             pub fn child(&self, index: usize) -> WidgetRef<'_, dyn Widget> {
                 self.tree.get(self.state().children[index]).unwrap()
+            }
+
+            pub fn size(&self) -> Size {
+                self.state().size
             }
 
             pub fn transform(&self) -> Affine {
