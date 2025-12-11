@@ -118,7 +118,10 @@ fn watcher(env: Environment, proxy: impl ori::Proxy) {
                 if current > modified {
                     modified = current;
 
-                    proxy.event(ori::Event::new(ReloadEvent::Reload(lib_path), None));
+                    proxy.event(ori::Event::new(
+                        ReloadEvent::Reload(lib_path),
+                        None,
+                    ));
                 }
             }
         }
@@ -201,7 +204,13 @@ where
 
         let mut new_view = (state.build)(data);
 
-        new_view.rebuild(element, &mut state.state, cx, data, &mut state.view);
+        new_view.rebuild(
+            element,
+            &mut state.state,
+            cx,
+            data,
+            &mut state.view,
+        );
         state.view = new_view;
 
         cx.use_type_names_unsafe = use_type_names;
@@ -268,7 +277,13 @@ where
             None => {}
         }
 
-        let action = state.view.event(element, &mut state.state, cx, data, event);
+        let action = state.view.event(
+            element,
+            &mut state.state,
+            cx,
+            data,
+            event,
+        );
 
         cx.use_type_names_unsafe = use_type_names;
 

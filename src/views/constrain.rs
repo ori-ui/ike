@@ -155,8 +155,13 @@ where
         data: &mut T,
         old: &mut Self,
     ) {
-        self.contents
-            .rebuild(contents, state, cx, data, &mut old.contents);
+        self.contents.rebuild(
+            contents,
+            state,
+            cx,
+            data,
+            &mut old.contents,
+        );
 
         let mut widget = cx.get_mut(*element);
 

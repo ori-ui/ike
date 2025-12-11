@@ -41,15 +41,17 @@ fn name_entry() -> impl View<Data> + use<> {
 }
 
 fn todo_done(i: usize, _todo: &Todo) -> impl View<Data> + use<> {
-    let checkmark = using_or_default(move |data: &mut Data, palette: &Palette| {
-        let color = if data.todos[i].done {
-            palette.success
-        } else {
-            Color::TRANSPARENT
-        };
+    let checkmark = using_or_default(
+        move |data: &mut Data, palette: &Palette| {
+            let color = if data.todos[i].done {
+                palette.success
+            } else {
+                Color::TRANSPARENT
+            };
 
-        picture(Fit::Contain, include_svg!("check.svg")).color(color)
-    });
+            picture(Fit::Contain, include_svg!("check.svg")).color(color)
+        },
+    );
 
     let button = button(checkmark, move |data: &mut Data| {
         data.todos[i].done = !data.todos[i].done;
@@ -78,7 +80,11 @@ fn todo(i: usize, todo: &Todo, is_last: bool) -> impl View<Data> + use<> {
         hstack((
             expand(
                 1.0,
-                hstack((todo_done(i, todo), expand(1.0, label(&todo.name)))).gap(12.0),
+                hstack((
+                    todo_done(i, todo),
+                    expand(1.0, label(&todo.name)),
+                ))
+                .gap(12.0),
             ),
             todo_remove(i, todo),
         ))
@@ -123,21 +129,25 @@ fn todos(data: &Data) -> Option<Flex<impl View<Data> + use<>>> {
 fn filter(kind: Filter, name: &'static str) -> Flex<impl View<Data> + use<>> {
     expand(
         1.0,
-        using_or_default(move |data: &mut Data, palette: &Palette| {
-            button(
-                center(label(name).color(if data.filter == kind {
-                    palette.success
-                } else {
-                    palette.contrast
-                })),
-                move |data: &mut Data| {
-                    data.filter = kind;
-                },
-            )
-            .color(palette.surface(0))
-            .border_width([0.0, 0.0, 0.0, 1.0])
-            .corner_radius(0.0)
-        }),
+        using_or_default(
+            move |data: &mut Data, palette: &Palette| {
+                button(
+                    center(
+                        label(name).color(if data.filter == kind {
+                            palette.success
+                        } else {
+                            palette.contrast
+                        }),
+                    ),
+                    move |data: &mut Data| {
+                        data.filter = kind;
+                    },
+                )
+                .color(palette.surface(0))
+                .border_width([0.0, 0.0, 0.0, 1.0])
+                .corner_radius(0.0)
+            },
+        ),
     )
 }
 
@@ -160,7 +170,11 @@ fn ui(data: &mut Data) -> impl Effect<Data> + use<> {
         |_| Palette::paper(),
         window(center(width(
             300.0,
-            vstack((name_entry(), todos(data), width(240.0, filters()))),
+            vstack((
+                name_entry(),
+                todos(data),
+                width(240.0, filters()),
+            )),
         ))),
     )
 }

@@ -1,7 +1,7 @@
 use crate::{
     AppState, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent,
     PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, ScrollDelta, Tree,
-    WidgetId, Window, WindowId, context::FocusUpdate, app::focus,
+    WidgetId, Window, WindowId, app::focus, context::FocusUpdate,
 };
 
 impl AppState {
@@ -43,7 +43,12 @@ impl AppState {
             pointer.position = position;
         }
 
-        let hovered = update_hovered(&mut self.tree, window, window.contents, position);
+        let hovered = update_hovered(
+            &mut self.tree,
+            window,
+            window.contents,
+            position,
+        );
 
         // if there is an active widget, target it with the event
         if let Some(target) = find_active(&self.tree, window.contents) {
@@ -123,7 +128,9 @@ impl AppState {
             };
 
             let window_id = window.id;
-            let handled = match send_pointer_event(self, window_id, contents, target, &event) {
+            let handled = match send_pointer_event(
+                self, window_id, contents, target, &event,
+            ) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -146,7 +153,12 @@ impl AppState {
                 }
 
                 if let Some(window) = self.windows.iter_mut().find(|w| w.id == window_id) {
-                    update_hovered(&mut self.tree, window, contents, position);
+                    update_hovered(
+                        &mut self.tree,
+                        window,
+                        contents,
+                        position,
+                    );
                 }
             }
 
@@ -196,7 +208,9 @@ impl AppState {
 
         let contents = window.contents;
         let window_id = window.id;
-        match send_pointer_event(self, window_id, contents, target, &event) {
+        match send_pointer_event(
+            self, window_id, contents, target, &event,
+        ) {
             PointerPropagate::Bubble => false,
             PointerPropagate::Stop => true,
 

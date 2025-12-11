@@ -37,7 +37,10 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
     let vulkan = VulkanContext::new(&event_loop);
 
     let mut painter = SkiaPainter::new();
-    painter.load_font(include_bytes!("InterVariable.ttf"), None);
+    painter.load_font(
+        include_bytes!("InterVariable.ttf"),
+        None,
+    );
 
     let (sender, receiver) = std::sync::mpsc::channel();
     let context = Context {
@@ -105,7 +108,11 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             return;
         }
 
-        let (_, state) = ori::View::build(&mut self.view, &mut self.context, self.data);
+        let (_, state) = ori::View::build(
+            &mut self.view,
+            &mut self.context,
+            self.data,
+        );
 
         self.state = Some(state);
         self.update_windows(event_loop);
@@ -341,8 +348,11 @@ impl<T> AppState<'_, T> {
                 Some(window) => window.update(desc),
 
                 None => {
-                    self.windows
-                        .push(WindowState::new(&mut self.vulkan, event_loop, desc));
+                    self.windows.push(WindowState::new(
+                        &mut self.vulkan,
+                        event_loop,
+                        desc,
+                    ));
                 }
             }
         }
@@ -377,9 +387,10 @@ impl WindowState {
         use winit::dpi::LogicalSize;
 
         let size = match desc.sizing {
-            WindowSizing::FitContent => {
-                LogicalSize::new(desc.current_size().width, desc.current_size().height)
-            }
+            WindowSizing::FitContent => LogicalSize::new(
+                desc.current_size().width,
+                desc.current_size().height,
+            ),
             WindowSizing::Resizable { default_size, .. } => {
                 LogicalSize::new(default_size.width, default_size.height)
             }
@@ -408,13 +419,21 @@ impl WindowState {
             .with_max_inner_size(max_size)
             .with_inner_size(size)
             .with_cursor(desc.cursor())
-            .with_resizable(matches!(desc.sizing, WindowSizing::Resizable { .. }));
+            .with_resizable(matches!(
+                desc.sizing,
+                WindowSizing::Resizable { .. }
+            ));
 
         let window = event_loop.create_window(attributes).unwrap();
 
         let vulkan = unsafe {
             let physical = window.inner_size();
-            VulkanWindow::new(vulkan, &window, physical.width, physical.height)
+            VulkanWindow::new(
+                vulkan,
+                &window,
+                physical.width,
+                physical.height,
+            )
         };
 
         let (min_size, max_size) = match desc.sizing {
@@ -444,14 +463,18 @@ impl WindowState {
         } = desc.sizing
         {
             if self.min_size != min_size {
-                self.window
-                    .set_min_inner_size(Some(LogicalSize::new(min_size.width, min_size.height)));
+                self.window.set_min_inner_size(Some(LogicalSize::new(
+                    min_size.width,
+                    min_size.height,
+                )));
                 self.min_size = min_size;
             }
 
             if self.max_size != max_size {
-                self.window
-                    .set_max_inner_size(Some(LogicalSize::new(max_size.width, max_size.height)));
+                self.window.set_max_inner_size(Some(LogicalSize::new(
+                    max_size.width,
+                    max_size.height,
+                )));
                 self.max_size = max_size;
             }
         }

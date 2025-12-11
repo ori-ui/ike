@@ -208,8 +208,13 @@ where
         data: &mut T,
         old: &mut Self,
     ) {
-        self.contents
-            .rebuild(contents, state, cx, data, &mut old.contents);
+        self.contents.rebuild(
+            contents,
+            state,
+            cx,
+            data,
+            &mut old.contents,
+        );
 
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
         let theme = cx.get_context::<ScrollTheme>().cloned().unwrap_or_default();

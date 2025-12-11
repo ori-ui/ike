@@ -194,7 +194,10 @@ impl TextArea {
         }
 
         if let Some(next_char) = self.paragraph.text[self.cursor..].chars().next() {
-            self.set_cursor(self.cursor + next_char.len_utf8(), select);
+            self.set_cursor(
+                self.cursor + next_char.len_utf8(),
+                select,
+            );
         };
     }
 
@@ -209,7 +212,10 @@ impl TextArea {
         }
 
         if let Some(prev_char) = self.paragraph.text[..self.cursor].chars().next_back() {
-            self.set_cursor(self.cursor - prev_char.len_utf8(), select);
+            self.set_cursor(
+                self.cursor - prev_char.len_utf8(),
+                select,
+            );
         };
     }
 
@@ -391,7 +397,10 @@ impl TextArea {
         // there are no layout lines yet we still want to draw the cursor at the start
         let rect = Rect {
             min: Point::new(cx.rect().left(), cx.rect().top()),
-            max: Point::new(cx.rect().left() + 1.0, cx.rect().bottom()),
+            max: Point::new(
+                cx.rect().left() + 1.0,
+                cx.rect().bottom(),
+            ),
         };
 
         canvas.draw_rect(
@@ -420,7 +429,11 @@ impl Widget for TextArea {
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
-        canvas.draw_text(&self.paragraph, cx.width(), Offset::all(0.0));
+        canvas.draw_text(
+            &self.paragraph,
+            cx.width(),
+            Offset::all(0.0),
+        );
 
         if !cx.is_focused() {
             return;

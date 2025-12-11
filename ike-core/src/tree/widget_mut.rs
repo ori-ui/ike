@@ -126,7 +126,9 @@ where
 
         let index = self.state().children.len();
         self.state_mut().children.push(child.upcast());
-        self.update_without_propagate(Update::Children(ChildUpdate::Added(index)));
+        self.update_without_propagate(Update::Children(ChildUpdate::Added(
+            index,
+        )));
         self.request_layout();
     }
 
@@ -139,7 +141,9 @@ where
     /// Swap two children of a widget.
     pub fn swap_children(&mut self, index_a: usize, index_b: usize) {
         self.state_mut().children.swap(index_a, index_b);
-        self.update_without_propagate(Update::Children(ChildUpdate::Swapped(index_a, index_b)));
+        self.update_without_propagate(Update::Children(ChildUpdate::Swapped(
+            index_a, index_b,
+        )));
         self.request_layout();
     }
 
@@ -152,8 +156,13 @@ where
         assert!(child_state.parent.is_none());
         child_state.parent = Some(self.id.upcast());
 
-        let prev_child = mem::replace(&mut self.state_mut().children[index], child);
-        self.update_without_propagate(Update::Children(ChildUpdate::Replaced(index)));
+        let prev_child = mem::replace(
+            &mut self.state_mut().children[index],
+            child,
+        );
+        self.update_without_propagate(Update::Children(ChildUpdate::Replaced(
+            index,
+        )));
         self.request_layout();
 
         prev_child

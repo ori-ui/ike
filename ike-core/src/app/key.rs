@@ -1,8 +1,8 @@
 use keyboard_types::{Key, Modifiers, NamedKey};
 
 use crate::{
-    AppState, EventCx, KeyEvent, Propagate, WidgetId, WindowId, context::FocusUpdate,
-    key::KeyPressEvent, app::focus,
+    AppState, EventCx, KeyEvent, Propagate, WidgetId, WindowId, app::focus, context::FocusUpdate,
+    key::KeyPressEvent,
 };
 
 impl AppState {
@@ -48,7 +48,11 @@ impl AppState {
         };
 
         if key == Key::Named(NamedKey::Tab) && pressed && !handled {
-            focus::focus_next(&mut self.tree, contents, !modifiers.shift());
+            focus::focus_next(
+                &mut self.tree,
+                contents,
+                !modifiers.shift(),
+            );
         }
 
         handled

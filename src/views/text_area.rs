@@ -305,11 +305,19 @@ impl<T> ori::View<Context, T> for TextArea<T> {
 
         widgets::TextArea::set_on_change(&mut widget, {
             let proxy = Clone::clone(&proxy);
-            move |text| proxy.event(ori::Event::new(TextAreaEvent::Change(text.into()), id))
+            move |text| {
+                proxy.event(ori::Event::new(
+                    TextAreaEvent::Change(text.into()),
+                    id,
+                ))
+            }
         });
 
         widgets::TextArea::set_on_submit(&mut widget, move |text| {
-            proxy.event(ori::Event::new(TextAreaEvent::Submit(text.into()), id))
+            proxy.event(ori::Event::new(
+                TextAreaEvent::Submit(text.into()),
+                id,
+            ))
         });
 
         (widget.id(), id)

@@ -191,7 +191,10 @@ impl VulkanWindow {
                     context.instance.handle().as_raw() as _,
                     context.physical.as_raw() as _,
                     context.device.handle().as_raw() as _,
-                    (context.queue.as_raw() as _, context.family_index as usize),
+                    (
+                        context.queue.as_raw() as _,
+                        context.family_index as usize,
+                    ),
                     &get_proc,
                 ),
                 None,
@@ -424,7 +427,10 @@ impl VulkanWindow {
             ) {
                 Ok(image) => image,
                 Err(error) => {
-                    tracing::warn!(?error, "error acquiring swapchain image",);
+                    tracing::warn!(
+                        ?error,
+                        "error acquiring swapchain image",
+                    );
                     return None;
                 }
             };

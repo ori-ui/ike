@@ -400,8 +400,12 @@ impl<T> ori::View<Context, T> for Entry<T> {
 
         let text = self.text.as_deref().unwrap_or("");
         let paragraph = self.build_paragraph(text, color, &text_theme, &theme);
-        let placeholder =
-            self.build_paragraph(&self.placeholder, placeholder_color, &text_theme, &theme);
+        let placeholder = self.build_paragraph(
+            &self.placeholder,
+            placeholder_color,
+            &text_theme,
+            &theme,
+        );
 
         let mut widget = widgets::Entry::new(cx, paragraph);
 
@@ -435,11 +439,19 @@ impl<T> ori::View<Context, T> for Entry<T> {
         widgets::Entry::set_on_change(&mut widget, {
             let proxy = Clone::clone(&proxy);
 
-            move |text| proxy.event(ori::Event::new(EntryEvent::Change(text.into()), id))
+            move |text| {
+                proxy.event(ori::Event::new(
+                    EntryEvent::Change(text.into()),
+                    id,
+                ))
+            }
         });
 
         widgets::Entry::set_on_submit(&mut widget, move |text| {
-            proxy.event(ori::Event::new(EntryEvent::Submit(text.into()), id))
+            proxy.event(ori::Event::new(
+                EntryEvent::Submit(text.into()),
+                id,
+            ))
         });
 
         (widget.id(), id)
@@ -484,8 +496,12 @@ impl<T> ori::View<Context, T> for Entry<T> {
 
         if self.placeholder != old.placeholder || self.placeholder_color != old.placeholder_color {
             let placeholder_color = self.get_placeholder_color(&palette, &theme);
-            let placeholder =
-                self.build_paragraph(&self.placeholder, placeholder_color, &text_theme, &theme);
+            let placeholder = self.build_paragraph(
+                &self.placeholder,
+                placeholder_color,
+                &text_theme,
+                &theme,
+            );
             widgets::Entry::set_placeholder(&mut widget, placeholder);
         }
 

@@ -47,7 +47,9 @@ impl Canvas for SkiaCanvas<'_> {
         match clip {
             Clip::Rect(rect, radius) => {
                 let rect = skia_safe::RRect::new_nine_patch(
-                    skia_safe::Rect::new(rect.min.x, rect.min.y, rect.max.x, rect.max.y),
+                    skia_safe::Rect::new(
+                        rect.min.x, rect.min.y, rect.max.x, rect.max.y,
+                    ),
                     radius.top_left,
                     radius.top_right,
                     radius.bottom_right,
@@ -74,7 +76,9 @@ impl Canvas for SkiaCanvas<'_> {
 
     fn draw_rect(&mut self, rect: Rect, radius: CornerRadius, paint: &Paint) {
         let rect = skia_safe::RRect::new_nine_patch(
-            skia_safe::Rect::new(rect.min.x, rect.min.y, rect.max.x, rect.max.y),
+            skia_safe::Rect::new(
+                rect.min.x, rect.min.y, rect.max.x, rect.max.y,
+            ),
             radius.top_left,
             radius.top_right,
             radius.bottom_right,
@@ -104,7 +108,9 @@ impl Canvas for SkiaCanvas<'_> {
         );
 
         let outer = skia_safe::RRect::new_nine_patch(
-            skia_safe::Rect::new(rect.min.x, rect.min.y, rect.max.x, rect.max.y),
+            skia_safe::Rect::new(
+                rect.min.x, rect.min.y, rect.max.x, rect.max.y,
+            ),
             radius.top_left,
             radius.top_right,
             radius.bottom_right,

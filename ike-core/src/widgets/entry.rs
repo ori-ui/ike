@@ -44,7 +44,10 @@ impl Entry {
     }
 
     pub fn set_placeholder(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        Label::set_text(&mut this.get_mut(this.placeholder).unwrap(), paragraph)
+        Label::set_text(
+            &mut this.get_mut(this.placeholder).unwrap(),
+            paragraph,
+        )
     }
 
     pub fn set_min_width(this: &mut WidgetMut<Self>, min_width: f32) {
@@ -88,35 +91,59 @@ impl Entry {
     }
 
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        TextArea::set_text(&mut this.get_mut(this.text_area).unwrap(), paragraph);
+        TextArea::set_text(
+            &mut this.get_mut(this.text_area).unwrap(),
+            paragraph,
+        );
     }
 
     pub fn set_selection_color(this: &mut WidgetMut<Self>, color: Color) {
-        TextArea::set_selection_color(&mut this.get_mut(this.text_area).unwrap(), color);
+        TextArea::set_selection_color(
+            &mut this.get_mut(this.text_area).unwrap(),
+            color,
+        );
     }
 
     pub fn set_cursor_color(this: &mut WidgetMut<Self>, color: Color) {
-        TextArea::set_cursor_color(&mut this.get_mut(this.text_area).unwrap(), color);
+        TextArea::set_cursor_color(
+            &mut this.get_mut(this.text_area).unwrap(),
+            color,
+        );
     }
 
     pub fn set_blink_rate(this: &mut WidgetMut<Self>, rate: f32) {
-        TextArea::set_blink_rate(&mut this.get_mut(this.text_area).unwrap(), rate);
+        TextArea::set_blink_rate(
+            &mut this.get_mut(this.text_area).unwrap(),
+            rate,
+        );
     }
 
     pub fn set_newline_behaviour(this: &mut WidgetMut<Self>, behaviour: NewlineBehaviour) {
-        TextArea::set_newline_behaviour(&mut this.get_mut(this.text_area).unwrap(), behaviour);
+        TextArea::set_newline_behaviour(
+            &mut this.get_mut(this.text_area).unwrap(),
+            behaviour,
+        );
     }
 
     pub fn set_submit_behaviour(this: &mut WidgetMut<Self>, behaviour: SubmitBehaviour) {
-        TextArea::set_submit_behaviour(&mut this.get_mut(this.text_area).unwrap(), behaviour);
+        TextArea::set_submit_behaviour(
+            &mut this.get_mut(this.text_area).unwrap(),
+            behaviour,
+        );
     }
 
     pub fn set_on_change(this: &mut WidgetMut<Self>, on_change: impl FnMut(&str) + 'static) {
-        TextArea::set_on_change(&mut this.get_mut(this.text_area).unwrap(), on_change);
+        TextArea::set_on_change(
+            &mut this.get_mut(this.text_area).unwrap(),
+            on_change,
+        );
     }
 
     pub fn set_on_submit(this: &mut WidgetMut<Self>, on_submit: impl FnMut(&str) + 'static) {
-        TextArea::set_on_submit(&mut this.get_mut(this.text_area).unwrap(), on_submit);
+        TextArea::set_on_submit(
+            &mut this.get_mut(this.text_area).unwrap(),
+            on_submit,
+        );
     }
 
     pub fn text_area<'a>(this: &'a WidgetRef<'_, Self>) -> WidgetRef<'a, TextArea> {
@@ -135,14 +162,23 @@ impl Widget for Entry {
         space.max.width = space.max.width.min(self.max_width);
         space.min.width = space.min.width.min(space.max.width);
 
-        cx.set_child_stashed(1, !cx.get(self.text_area).text().is_empty());
+        cx.set_child_stashed(
+            1,
+            !cx.get(self.text_area).text().is_empty(),
+        );
 
         let placeholder_size = cx.layout_child(1, painter, space);
         space.min.width = space.min.width.max(placeholder_size.width);
         let text_size = cx.layout_child(0, painter, space);
 
-        cx.place_child(0, self.padding.offset() + self.border_width.offset());
-        cx.place_child(1, self.padding.offset() + self.border_width.offset());
+        cx.place_child(
+            0,
+            self.padding.offset() + self.border_width.offset(),
+        );
+        cx.place_child(
+            1,
+            self.padding.offset() + self.border_width.offset(),
+        );
 
         text_size.max(placeholder_size) + self.padding.size() + self.border_width.size()
     }

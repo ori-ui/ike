@@ -199,7 +199,10 @@ impl WidgetState {
             accepts_focus:   T::accepts_focus(),
             accepts_pointer: T::accepts_pointer(),
 
-            tracing_span: tracing::error_span!("Widget", r#type = Self::short_type_name::<T>()),
+            tracing_span: tracing::error_span!(
+                "Widget",
+                r#type = Self::short_type_name::<T>()
+            ),
             short_name:   Self::short_type_name::<T>(),
             type_name:    std::any::type_name::<T>(),
         }

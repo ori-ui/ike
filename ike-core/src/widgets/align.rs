@@ -51,7 +51,10 @@ impl Widget for Aligned {
         let excess_width = size.width - child_size.width;
         let excess_height = size.height - child_size.height;
 
-        let position = Offset::new(excess_width * self.x, excess_height * self.y);
+        let position = Offset::new(
+            excess_width * self.x,
+            excess_height * self.y,
+        );
 
         cx.place_child(0, position);
 

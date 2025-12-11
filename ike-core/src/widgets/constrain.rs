@@ -14,7 +14,10 @@ impl Constrain {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
         let mut this = cx.insert(Self {
             min_size: Transitioned::new(Size::all(0.0), Transition::INSTANT),
-            max_size: Transitioned::new(Size::all(f32::INFINITY), Transition::INSTANT),
+            max_size: Transitioned::new(
+                Size::all(f32::INFINITY),
+                Transition::INSTANT,
+            ),
         });
         this.add_child(child);
         this

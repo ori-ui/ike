@@ -87,8 +87,13 @@ where
         data: &mut T,
         old: &mut Self,
     ) {
-        self.contents
-            .seq_rebuild(children, states, cx, data, &mut old.contents);
+        self.contents.seq_rebuild(
+            children,
+            states,
+            cx,
+            data,
+            &mut old.contents,
+        );
 
         let mut widget = cx.get_mut(*element);
         update_children(&mut widget, children);
@@ -215,8 +220,13 @@ where
         data: &mut T,
         old: &mut Self,
     ) {
-        self.contents
-            .rebuild(&mut element.contents, state, cx, data, &mut old.contents);
+        self.contents.rebuild(
+            &mut element.contents,
+            state,
+            cx,
+            data,
+            &mut old.contents,
+        );
     }
 
     fn teardown(
@@ -237,8 +247,13 @@ where
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {
-        self.contents
-            .event(&mut element.contents, state, cx, data, event)
+        self.contents.event(
+            &mut element.contents,
+            state,
+            cx,
+            data,
+            event,
+        )
     }
 }
 

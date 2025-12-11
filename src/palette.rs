@@ -63,7 +63,12 @@ impl Palette {
         let (h, s, l, a) = color.to_okhsla();
 
         if is_light {
-            Color::okhsla(h, s - level * 0.025, l + level * 0.015, a)
+            Color::okhsla(
+                h,
+                s - level * 0.025,
+                l + level * 0.015,
+                a,
+            )
         } else {
             Color::okhsla(h, s - level * 0.04, l + level * 0.02, a)
         }
@@ -74,9 +79,19 @@ impl Palette {
         let (h, s, l, a) = color.to_okhsla();
 
         if is_light {
-            Color::okhsla(h, s - level * 0.025 - 0.1, l + level * 0.015 + 0.2, a)
+            Color::okhsla(
+                h,
+                s - level * 0.025 - 0.1,
+                l + level * 0.015 + 0.2,
+                a,
+            )
         } else {
-            Color::okhsla(h, s - level * 0.04 - 0.1, l + level * 0.02 - 0.2, a)
+            Color::okhsla(
+                h,
+                s - level * 0.04 - 0.1,
+                l + level * 0.02 - 0.2,
+                a,
+            )
         }
     }
 

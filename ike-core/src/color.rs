@@ -582,7 +582,10 @@ impl Color {
         let l = l_new;
 
         let (r_max, g_max, b_max) = Self::oklab_to_linear_srgb(lvt, a * cvt, b * cvt);
-        let max = f32::max(f32::max(r_max, g_max), f32::max(b_max, 0.0));
+        let max = f32::max(
+            f32::max(r_max, g_max),
+            f32::max(b_max, 0.0),
+        );
         let scale_l = f32::cbrt(1.0 / max);
 
         let l = l * scale_l;

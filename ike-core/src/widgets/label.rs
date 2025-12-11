@@ -28,6 +28,10 @@ impl Widget for Label {
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
-        canvas.draw_text(&self.paragraph, cx.width(), Offset::all(0.0));
+        canvas.draw_text(
+            &self.paragraph,
+            cx.width(),
+            Offset::all(0.0),
+        );
     }
 }

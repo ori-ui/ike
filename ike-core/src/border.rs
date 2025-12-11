@@ -70,7 +70,10 @@ impl BorderWidth {
     }
 
     pub const fn size(self) -> Size {
-        Size::new(self.left + self.right, self.top + self.bottom)
+        Size::new(
+            self.left + self.right,
+            self.top + self.bottom,
+        )
     }
 
     pub const fn offset(self) -> Offset {
@@ -125,7 +128,10 @@ impl Padding {
     }
 
     pub const fn size(self) -> Size {
-        Size::new(self.left + self.right, self.top + self.bottom)
+        Size::new(
+            self.left + self.right,
+            self.top + self.bottom,
+        )
     }
 
     pub const fn offset(self) -> Offset {

@@ -215,7 +215,10 @@ where
         widgets::Button::set_transition(&mut widget, transition);
 
         widgets::Button::set_on_click(&mut widget, move || {
-            proxy.event(ori::Event::new(ButtonEvent::Clicked, id));
+            proxy.event(ori::Event::new(
+                ButtonEvent::Clicked,
+                id,
+            ));
         });
 
         (widget.id(), (id, contents, state))
@@ -229,8 +232,13 @@ where
         data: &mut T,
         old: &mut Self,
     ) {
-        self.contents
-            .rebuild(contents, state, cx, data, &mut old.contents);
+        self.contents.rebuild(
+            contents,
+            state,
+            cx,
+            data,
+            &mut old.contents,
+        );
 
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
         let theme = cx.get_context::<ButtonTheme>().cloned().unwrap_or_default();

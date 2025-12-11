@@ -217,9 +217,10 @@ impl Painter for SkiaPainter {
         let mut min_height = 0.0;
 
         if let Some((_, style)) = paragraph.sections().next() {
-            let typefaces = self
-                .fonts
-                .find_typefaces(&[&style.font_family], Self::create_font_style(style));
+            let typefaces = self.fonts.find_typefaces(
+                &[&style.font_family],
+                Self::create_font_style(style),
+            );
 
             if let Some(typeface) = typefaces.first() {
                 let font = skia_safe::Font::new(typeface, style.font_size);
@@ -261,12 +262,18 @@ impl Painter for SkiaPainter {
 
             let (start_index, end_index) = if has_newline {
                 if is_last {
-                    (metric.start_index + 1, metric.end_including_newline)
+                    (
+                        metric.start_index + 1,
+                        metric.end_including_newline,
+                    )
                 } else {
                     (metric.start_index, end_index)
                 }
             } else {
-                (metric.start_index, metric.end_including_newline)
+                (
+                    metric.start_index,
+                    metric.end_including_newline,
+                )
             };
 
             let mut line = TextLayoutLine {

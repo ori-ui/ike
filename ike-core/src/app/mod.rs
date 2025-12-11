@@ -92,7 +92,12 @@ impl AppState {
         };
 
         if let Some(pointer) = window.pointers.first() {
-            pointer::update_hovered(&mut self.tree, window, window.contents, pointer.position);
+            pointer::update_hovered(
+                &mut self.tree,
+                window,
+                window.contents,
+                pointer.position,
+            );
         }
 
         let mut widget = self.tree.get_mut(window.contents).unwrap();

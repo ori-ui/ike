@@ -105,7 +105,10 @@ impl Scroll {
     }
 
     fn overflow(&self) -> f32 {
-        f32::max(self.child_major - self.scroll_major, 0.0)
+        f32::max(
+            self.child_major - self.scroll_major,
+            0.0,
+        )
     }
 
     fn scroll_fraction(&self) -> f32 {
@@ -185,7 +188,10 @@ impl Widget for Scroll {
             self.scroll.set(clamped_scroll);
         }
 
-        cx.place_child(0, self.axis.pack_offset(-*self.scroll, 0.0));
+        cx.place_child(
+            0,
+            self.axis.pack_offset(-*self.scroll, 0.0),
+        );
         cx.set_clip(Rect::min_size(Point::ORIGIN, size));
 
         size
@@ -212,7 +218,11 @@ impl Widget for Scroll {
             self.axis.pack_size(self.knob_length, self.track_width()),
         );
 
-        canvas.draw_rect(knob, self.knob_corner_radius, &self.knob_paint);
+        canvas.draw_rect(
+            knob,
+            self.knob_corner_radius,
+            &self.knob_paint,
+        );
     }
 
     fn draw_over(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {

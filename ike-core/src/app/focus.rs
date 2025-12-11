@@ -59,7 +59,10 @@ pub(super) fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option
             let rect = if let Some(mut widget) = tree.get_mut(focused) {
                 widget.set_focused(true);
 
-                Some(Rect::min_size(Point::ORIGIN, widget.size()))
+                Some(Rect::min_size(
+                    Point::ORIGIN,
+                    widget.size(),
+                ))
             } else {
                 None
             };
@@ -162,7 +165,10 @@ fn give_focus(tree: &mut Tree, root: WidgetId, target: WidgetId) {
         let rect = if let Some(mut widget) = tree.get_mut(target) {
             widget.set_focused(true);
 
-            Some(Rect::min_size(Point::ORIGIN, widget.size()))
+            Some(Rect::min_size(
+                Point::ORIGIN,
+                widget.size(),
+            ))
         } else {
             None
         };
