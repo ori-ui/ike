@@ -141,24 +141,18 @@ impl<V> Scroll<V> {
     }
 
     fn get_bar_border_paint(&self, theme: &ScrollTheme, palette: &Palette) -> Color {
-        self.bar_border_color.clone().unwrap_or_else(|| {
-            theme
-                .bar_border_color
-                .clone()
-                .unwrap_or_else(|| palette.outline)
-        })
+        self.bar_border_color
+            .unwrap_or_else(|| theme.bar_border_color.unwrap_or(palette.outline))
     }
 
     fn get_bar_paint(&self, theme: &ScrollTheme, palette: &Palette) -> Color {
         self.bar_color
-            .clone()
-            .unwrap_or_else(|| theme.bar_color.clone().unwrap_or_else(|| palette.surface))
+            .unwrap_or_else(|| theme.bar_color.unwrap_or(palette.surface))
     }
 
     fn get_knob_paint(&self, theme: &ScrollTheme, palette: &Palette) -> Color {
         self.knob_color
-            .clone()
-            .unwrap_or_else(|| theme.knob_color.clone().unwrap_or_else(|| palette.contrast))
+            .unwrap_or_else(|| theme.knob_color.unwrap_or(palette.contrast))
     }
 
     fn get_knob_corner_radius(&self, theme: &ScrollTheme) -> CornerRadius {
