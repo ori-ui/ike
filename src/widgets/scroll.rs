@@ -167,10 +167,7 @@ impl Widget for Scroll {
         };
 
         let child_size = cx.layout_child(0, painter, child_space);
-        let size = space.constrain(child_size);
-
-        cx.place_child(0, self.axis.pack_offset(-*self.scroll, 0.0));
-        cx.set_clip(Rect::min_size(Point::ORIGIN, size));
+        let size = space.constrain(child_size + self.axis.pack_size(0.0, self.bar_width));
 
         let (child_major, _) = self.axis.unpack_size(child_size);
         let (major, _) = self.axis.unpack_size(size);
@@ -179,6 +176,10 @@ impl Widget for Scroll {
         self.scroll_major = major;
         self.knob_length = major / child_major * self.track_length();
         self.knob_length = self.knob_length.max(24.0);
+        self.scroll.set(self.scroll.clamp(0.0, self.overflow()));
+
+        cx.place_child(0, self.axis.pack_offset(-*self.scroll, 0.0));
+        cx.set_clip(Rect::min_size(Point::ORIGIN, size));
 
         size
     }
