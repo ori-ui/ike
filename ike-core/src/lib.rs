@@ -1,4 +1,3 @@
-mod app;
 mod axis;
 mod border;
 mod build;
@@ -12,6 +11,7 @@ mod key;
 mod math;
 mod painter;
 mod pointer;
+mod root;
 mod svg;
 mod text;
 mod transition;
@@ -21,7 +21,6 @@ mod window;
 
 pub mod widgets;
 
-pub use app::AppState;
 pub use axis::Axis;
 pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::BuildCx;
@@ -37,6 +36,7 @@ pub use pointer::{
     CursorIcon, Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId,
     PointerMoveEvent, PointerPropagate, PointerScrollEvent, ScrollDelta,
 };
+pub use root::{Root, RootSignal, WindowUpdate};
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{
     FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,

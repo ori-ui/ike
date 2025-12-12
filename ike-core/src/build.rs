@@ -1,25 +1,29 @@
 use crate::{
-    AnyWidgetId, AppState, Widget, WidgetId,
+    AnyWidgetId, Color, Root, Widget, WidgetId, WindowId, WindowSizing,
     tree::{WidgetMut, WidgetRef},
     widget::AnyWidget,
 };
 
 pub trait BuildCx {
-    fn app(&self) -> &AppState;
-    fn app_mut(&mut self) -> &mut AppState;
+    fn root(&self) -> &Root;
+    fn root_mut(&mut self) -> &mut Root;
 
-    fn get<T>(&self, id: WidgetId<T>) -> WidgetRef<'_, T>
+    fn get<T>(&self, id: WidgetId<T>) -> Option<WidgetRef<'_, T>>
     where
+        Self: Sized,
         T: ?Sized + AnyWidget,
     {
-        self.app().tree.get(id).unwrap()
+        let root = self.root();
+        root.tree.get(&root.state, id)
     }
 
-    fn get_mut<T>(&mut self, id: WidgetId<T>) -> WidgetMut<'_, T>
+    fn get_mut<T>(&mut self, id: WidgetId<T>) -> Option<WidgetMut<'_, T>>
     where
+        Self: Sized,
         T: ?Sized + AnyWidget,
     {
-        self.app_mut().tree.get_mut(id).unwrap()
+        let root = self.root_mut();
+        root.tree.get_mut(&mut root.state, id)
     }
 
     fn insert<T>(&mut self, widget: T) -> WidgetMut<'_, T>
@@ -27,14 +31,16 @@ pub trait BuildCx {
         Self: Sized,
         T: Widget,
     {
-        self.app_mut().tree.insert(widget)
+        let root = self.root_mut();
+        root.tree.insert(&mut root.state, widget)
     }
 
     fn remove(&mut self, id: impl AnyWidgetId)
     where
         Self: Sized,
     {
-        self.app_mut().tree.remove(id.upcast());
+        let root = self.root_mut();
+        root.tree.remove(&mut root.state, id.upcast());
     }
 
     fn is_parent(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
@@ -44,6 +50,39 @@ pub trait BuildCx {
         let parent = parent.upcast();
         let child = child.upcast();
 
-        self.app().tree.get_state_unchecked(child.index).parent == Some(parent)
+        self.root().tree.get_state_unchecked(child.index).parent == Some(parent)
+    }
+
+    #[must_use]
+    fn set_window_contents(
+        &mut self,
+        window: WindowId,
+        contents: impl AnyWidgetId,
+    ) -> Option<WidgetId>
+    where
+        Self: Sized,
+    {
+        self.root_mut()
+            .set_window_contents(window, contents.upcast())
+    }
+
+    fn set_window_title(&mut self, window: WindowId, title: String) {
+        self.root_mut().set_window_title(window, title);
+    }
+
+    fn set_window_sizing(&mut self, window: WindowId, sizing: WindowSizing) {
+        self.root_mut().set_window_sizing(window, sizing);
+    }
+
+    fn set_window_visible(&mut self, window: WindowId, visible: bool) {
+        self.root_mut().set_window_visible(window, visible);
+    }
+
+    fn set_window_decorated(&mut self, window: WindowId, decorated: bool) {
+        self.root_mut().set_window_decorated(window, decorated);
+    }
+
+    fn set_window_color(&mut self, window: WindowId, color: Color) {
+        self.root_mut().set_window_color(window, color);
     }
 }

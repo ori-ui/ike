@@ -175,10 +175,10 @@ where
     fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let mut view = (self.initial)(data);
 
-        let use_type_names = cx.use_type_names_unsafe;
-        cx.use_type_names_unsafe = true;
+        let use_type_names = cx.is_using_type_names();
+        unsafe { cx.use_type_names(true) };
         let (element, state) = view.build(cx, data);
-        cx.use_type_names_unsafe = use_type_names;
+        unsafe { cx.use_type_names(use_type_names) };
 
         watcher(self.env, cx.proxy());
 
@@ -199,8 +199,8 @@ where
         data: &mut T,
         _old: &mut Self,
     ) {
-        let use_type_names = cx.use_type_names_unsafe;
-        cx.use_type_names_unsafe = true;
+        let use_type_names = cx.is_using_type_names();
+        unsafe { cx.use_type_names(true) };
 
         let mut new_view = (state.build)(data);
 
@@ -213,7 +213,7 @@ where
         );
         state.view = new_view;
 
-        cx.use_type_names_unsafe = use_type_names;
+        unsafe { cx.use_type_names(use_type_names) };
     }
 
     fn teardown(
@@ -223,12 +223,12 @@ where
         cx: &mut Context,
         data: &mut T,
     ) {
-        let use_type_names = cx.use_type_names_unsafe;
-        cx.use_type_names_unsafe = true;
+        let use_type_names = cx.is_using_type_names();
+        unsafe { cx.use_type_names(true) };
 
         state.view.teardown(element, state.state, cx, data);
 
-        cx.use_type_names_unsafe = use_type_names;
+        unsafe { cx.use_type_names(use_type_names) };
     }
 
     fn event(
@@ -239,8 +239,8 @@ where
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {
-        let use_type_names = cx.use_type_names_unsafe;
-        cx.use_type_names_unsafe = true;
+        let use_type_names = cx.is_using_type_names();
+        unsafe { cx.use_type_names(true) };
 
         match event.get() {
             Some(ReloadEvent::Reload(output)) => {
@@ -285,7 +285,7 @@ where
             event,
         );
 
-        cx.use_type_names_unsafe = use_type_names;
+        unsafe { cx.use_type_names(use_type_names) };
 
         action
     }

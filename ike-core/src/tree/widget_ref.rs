@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use crate::{
-    Affine, AnyWidgetId, CursorIcon, Size, Tree, Widget, WidgetId, WidgetMut,
+    Affine, AnyWidgetId, CursorIcon, Size, Tree, Widget, WidgetId, WidgetMut, Window, WindowId,
+    root::RootState,
     widget::{AnyWidget, WidgetState},
 };
 
@@ -10,6 +11,7 @@ where
     T: ?Sized,
 {
     pub(super) id:     WidgetId<T>,
+    pub(crate) root:   &'a RootState,
     pub(super) tree:   &'a Tree,
     pub(super) widget: &'a T,
     pub(super) state:  &'a WidgetState,
@@ -49,7 +51,7 @@ macro_rules! impl_widget_ref {
             where
                 U: ?Sized + AnyWidget,
             {
-                self.tree.get(id)
+                self.tree.get(self.root, id)
             }
 
             pub fn children(&self) -> &[WidgetId] {
@@ -62,11 +64,13 @@ macro_rules! impl_widget_ref {
             }
 
             pub fn parent(&self) -> Option<WidgetRef<'_, dyn Widget>> {
-                self.tree.get(self.state().parent?)
+                self.tree.get(self.root, self.state().parent?)
             }
 
             pub fn child(&self, index: usize) -> WidgetRef<'_, dyn Widget> {
-                self.tree.get(self.state().children[index]).unwrap()
+                self.tree
+                    .get(self.root, self.state().children[index])
+                    .unwrap()
             }
 
             pub fn size(&self) -> Size {
@@ -103,6 +107,10 @@ macro_rules! impl_widget_ref {
 
             pub fn cursor(&self) -> CursorIcon {
                 self.state().cursor
+            }
+
+            pub fn get_window(&self, id: WindowId) -> Option<&Window> {
+                self.root.get_window(id)
             }
         }
     };

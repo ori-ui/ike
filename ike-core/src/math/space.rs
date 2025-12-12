@@ -27,8 +27,8 @@ impl Space {
 
     pub const fn constrain(self, size: Size) -> Size {
         Size {
-            width:  size.width.clamp(self.min.width, self.max.width),
-            height: size.height.clamp(self.min.height, self.max.height),
+            width:  size.width.max(self.min.width).min(self.max.width),
+            height: size.height.max(self.min.height).min(self.max.height),
         }
     }
 }

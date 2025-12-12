@@ -1,5 +1,4 @@
 mod app;
-mod context;
 mod error;
 mod key;
 mod palette;
@@ -23,9 +22,9 @@ pub use ike_core::*;
 pub use ori::*;
 
 pub use app::App;
-pub use context::Context;
 pub use palette::Palette;
 pub use view::{Effect, View};
+pub use winit::Context;
 
 pub mod prelude {
     pub use ike_core::{

@@ -218,7 +218,10 @@ where
 
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
         let theme = cx.get_context::<ScrollTheme>().cloned().unwrap_or_default();
-        let mut widget = cx.get_mut(*element);
+
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return;
+        };
 
         if !widget.is_child(*contents) {
             widgets::Scroll::set_child(&mut widget, *contents);
@@ -295,9 +298,9 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let mut widget = cx.get_mut(*element);
-
-        if !widget.is_child(*contents) {
+        if let Some(mut widget) = cx.get_mut(*element)
+            && !widget.is_child(*contents)
+        {
             widgets::Scroll::set_child(&mut widget, *contents);
         }
 

@@ -312,7 +312,10 @@ impl VulkanWindow {
             .image_array_layers(1)
             .image_format(self.surface_format.format)
             .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
-            .image_extent(vk::Extent2D { width, height })
+            .image_extent(vk::Extent2D {
+                width:  width.max(1),
+                height: height.max(1),
+            })
             .image_usage(vk::ImageUsageFlags::TRANSFER_DST)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(self.pre_transform)
@@ -363,7 +366,10 @@ impl VulkanWindow {
 
         while self.skia_surfaces.len() < self.swapchain_images.len() {
             let image_info = skia_safe::ImageInfo::new(
-                skia_safe::ISize::new(width as i32, height as i32),
+                skia_safe::ISize::new(
+                    width.max(1) as i32,
+                    height.max(1) as i32,
+                ),
                 skia_safe::ColorType::BGRA8888,
                 skia_safe::AlphaType::Premul,
                 None,

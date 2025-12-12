@@ -6,7 +6,8 @@ use std::{
 
 use crate::{
     Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, CursorIcon, DrawCx, LayoutCx, Painter,
-    Size, Space, Tree, Update, UpdateCx, Widget, WidgetId, WidgetRef, WidgetState, Window,
+    Size, Space, Tree, Update, UpdateCx, Widget, WidgetId, WidgetRef, WidgetState, WindowId,
+    root::RootState,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -14,6 +15,7 @@ where
     T: ?Sized + AnyWidget,
 {
     pub(crate) id:     WidgetId<T>,
+    pub(crate) root:   &'a mut RootState,
     pub(crate) tree:   &'a mut Tree,
     pub(crate) widget: *mut T,
     pub(crate) state:  *mut WidgetState,
@@ -28,24 +30,48 @@ where
         self.state_mut().needs_draw = true;
 
         self.propagate_state();
+
+        if let Some(window) = self.state().window {
+            self.root.request_redraw(window);
+        }
     }
 
     pub fn request_draw(&mut self) {
         self.state_mut().needs_draw = true;
 
         self.propagate_state();
+
+        if let Some(window) = self.state().window {
+            self.root.request_redraw(window);
+        }
     }
 
     pub fn request_animate(&mut self) {
         self.state_mut().needs_animate = true;
+
+        if let Some(window) = self.state().window {
+            self.root.request_animate(window);
+        }
     }
 
     pub fn parent_mut(&mut self) -> Option<WidgetMut<'_, dyn Widget>> {
-        self.tree.get_mut(self.state().parent?)
+        self.tree.get_mut(self.root, self.state().parent?)
+    }
+
+    pub fn upcast(&mut self) -> WidgetMut<'_, dyn Widget> {
+        WidgetMut {
+            id:     self.id.upcast(),
+            root:   self.root,
+            tree:   self.tree,
+            widget: T::upcast_ptr(self.widget),
+            state:  self.state,
+        }
     }
 
     pub fn child_mut(&mut self, index: usize) -> WidgetMut<'_, dyn Widget> {
-        self.tree.get_mut(self.state().children[index]).unwrap()
+        self.tree
+            .get_mut(self.root, self.state().children[index])
+            .unwrap()
     }
 
     pub fn set_cursor(&mut self, cursor: CursorIcon) {
@@ -53,15 +79,17 @@ where
     }
 
     pub fn for_each_child(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
-        for &child in &unsafe { &*self.state }.children {
-            let mut child = self.tree.get_mut(child).unwrap();
+        let state = unsafe { &*self.state };
+        for &child in &state.children {
+            let mut child = self.tree.get_mut(self.root, child).unwrap();
             f(&mut child);
         }
     }
 
-    pub fn as_ref(&self) -> WidgetRef<'_, T> {
+    pub fn to_ref(&self) -> WidgetRef<'_, T> {
         WidgetRef {
             id:     self.id,
+            root:   self.root,
             tree:   self.tree,
             widget: unsafe { &*self.widget },
             state:  unsafe { &*self.state },
@@ -72,7 +100,7 @@ where
     where
         U: ?Sized + AnyWidget,
     {
-        self.tree.get_mut(id)
+        self.tree.get_mut(self.root, id)
     }
 
     pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
@@ -121,6 +149,11 @@ where
         let child = child.upcast();
         self.tree.debug_validate_id(child);
 
+        let window = self.state().window;
+        if let Some(mut child) = self.get_mut(child) {
+            child.set_window_recursive(window);
+        }
+
         let child_state = self.tree.get_state_unchecked_mut(child.index);
         child_state.parent = Some(self.id.upcast());
 
@@ -134,7 +167,7 @@ where
 
     pub fn remove_child(&mut self, index: usize) {
         if let Some(&child) = self.children().get(index) {
-            self.with_tree(|tree| tree.remove(child));
+            self.in_tree(|root, tree| tree.remove(root, child));
         }
     }
 
@@ -152,6 +185,11 @@ where
         let child = child.upcast();
         self.tree.debug_validate_id(child);
 
+        let window = self.state().window;
+        if let Some(mut child) = self.get_mut(child) {
+            child.set_window_recursive(window);
+        }
+
         let child_state = self.tree.get_state_unchecked_mut(child.index);
         assert!(child_state.parent.is_none());
         child_state.parent = Some(self.id.upcast());
@@ -164,6 +202,11 @@ where
             index,
         )));
         self.request_layout();
+
+        let window = self.state().window;
+        if let Some(mut prev_child) = self.get_mut(prev_child) {
+            prev_child.set_window_recursive(window);
+        }
 
         prev_child
     }
@@ -185,35 +228,41 @@ where
         self.state().tracing_span.clone().entered()
     }
 
-    pub(crate) fn split(&mut self) -> (&mut Tree, &mut T, &mut WidgetState) {
+    pub(crate) fn split(
+        &mut self,
+    ) -> (
+        &mut Tree,
+        &mut RootState,
+        &mut T,
+        &mut WidgetState,
+    ) {
         let widget = unsafe { &mut *self.widget };
         let state = unsafe { &mut *self.state };
-        (self.tree, widget, state)
+        (self.tree, self.root, widget, state)
     }
 
     pub(crate) fn split_update_cx(&mut self) -> (&mut T, UpdateCx<'_>) {
-        let (tree, widget, state) = self.split();
-        let cx = UpdateCx { tree, state };
+        let (tree, root, widget, state) = self.split();
+        let cx = UpdateCx { root, tree, state };
         (widget, cx)
     }
 
-    pub(crate) fn split_layout_cx<'b>(
-        &'b mut self,
-        window: &'b Window,
-    ) -> (&'b mut T, LayoutCx<'b>) {
-        let (tree, widget, state) = self.split();
+    pub(crate) fn split_layout_cx<'b>(&'b mut self, window: WindowId) -> (&'b mut T, LayoutCx<'b>) {
+        let (tree, root, widget, state) = self.split();
         let cx = LayoutCx {
             window,
+            root,
             tree,
             state,
         };
         (widget, cx)
     }
 
-    pub(crate) fn split_draw_cx<'b>(&'b mut self, window: &'b Window) -> (&'b mut T, DrawCx<'b>) {
-        let (tree, widget, state) = self.split();
+    pub(crate) fn split_draw_cx<'b>(&'b mut self, window: WindowId) -> (&'b mut T, DrawCx<'b>) {
+        let (tree, root, widget, state) = self.split();
         let cx = DrawCx {
             window,
+            root,
             tree,
             state,
         };
@@ -261,7 +310,7 @@ where
 
     pub(crate) fn layout_recursive(
         &mut self,
-        window: &Window,
+        window: WindowId,
         painter: &mut dyn Painter,
         space: Space,
     ) -> Size {
@@ -283,8 +332,10 @@ where
             widget.layout(&mut cx, painter, space)
         };
 
-        if self.is_pixel_perfect() {
-            size = size.ceil_to_scale(window.scale())
+        if self.is_pixel_perfect()
+            && let Some(window) = self.root.get_window(window)
+        {
+            size = size.ceil_to_scale(window.scale());
         }
 
         if !size.is_finite() {
@@ -297,14 +348,18 @@ where
         size
     }
 
-    pub(crate) fn compose_recursive(&mut self, window: &Window, transform: Affine) {
+    pub(crate) fn compose_recursive(&mut self, window: WindowId, transform: Affine) {
         if self.is_stashed() {
             return;
         }
 
-        if self.is_pixel_perfect() {
+        if self.is_pixel_perfect()
+            && let Some(window) = self.root.get_window(window)
+        {
+            let scale = window.scale();
+
             let transform = &mut self.state_mut().transform;
-            transform.offset = transform.offset.round_to_scale(window.scale());
+            transform.offset = transform.offset.round_to_scale(scale);
         }
 
         let _span = self.enter_span();
@@ -320,7 +375,7 @@ where
         widget.compose(&mut cx);
     }
 
-    pub(crate) fn draw_recursive(&mut self, window: &Window, canvas: &mut dyn Canvas) {
+    pub(crate) fn draw_recursive(&mut self, window: WindowId, canvas: &mut dyn Canvas) {
         if self.is_stashed() {
             return;
         }
@@ -348,7 +403,7 @@ where
         });
     }
 
-    pub(crate) fn draw_over_recursive(&mut self, window: &Window, canvas: &mut dyn Canvas) {
+    pub(crate) fn draw_over_recursive(&mut self, window: WindowId, canvas: &mut dyn Canvas) {
         self.state_mut().needs_draw = false;
 
         if self.is_stashed() {
@@ -383,7 +438,7 @@ where
 
         let children = mem::take(&mut self.state_mut().children);
         for &child in &children {
-            let (tree, _, state) = self.split();
+            let (tree, _, _, state) = self.split();
             let child_state = tree.get_state_unchecked(child.index);
             state.merge(child_state);
         }
@@ -393,25 +448,30 @@ where
 
     pub(crate) fn propagate_state(&mut self) {
         let mut current = Some(self.id.upcast());
-        self.with_tree(|tree| {
+        self.in_tree(|root, tree| {
             while let Some(id) = current {
-                let mut widget = tree.get_mut(id).unwrap();
+                let mut widget = tree.get_mut(root, id).unwrap();
                 widget.update_state();
                 current = widget.parent_mut().map(|w| w.id);
             }
         });
     }
 
-    pub(crate) fn with_tree<U>(&mut self, f: impl FnOnce(&mut Tree) -> U) -> U {
+    pub(crate) fn in_tree<U>(&mut self, f: impl FnOnce(&mut RootState, &mut Tree) -> U) -> U {
         let entry = &mut self.tree.entries[self.id.index as usize];
         entry.borrowed = false;
 
-        let output = f(self.tree);
+        let output = f(self.root, self.tree);
 
         let entry = &mut self.tree.entries[self.id.index as usize];
         entry.borrowed = true;
 
         output
+    }
+
+    pub(crate) fn set_window_recursive(&mut self, window: Option<WindowId>) {
+        self.state_mut().window = window;
+        self.for_each_child(|child| child.set_window_recursive(window));
     }
 
     pub(crate) fn set_hovered(&mut self, is_hovered: bool) {

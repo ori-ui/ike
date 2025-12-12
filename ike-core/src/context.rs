@@ -1,6 +1,6 @@
 use crate::{
     Affine, AnyWidget, Clip, CursorIcon, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId,
-    WidgetRef, Window, WindowId, widget::WidgetState,
+    WidgetRef, Window, WindowId, root::RootState, widget::WidgetState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -12,48 +12,37 @@ pub(crate) enum FocusUpdate {
 }
 
 pub struct EventCx<'a> {
-    pub(crate) window:  WindowId,
-    pub(crate) windows: &'a mut Vec<Window>,
-    #[allow(dead_code)]
-    pub(crate) tree:    &'a mut Tree,
-    pub(crate) state:   &'a mut WidgetState,
-    pub(crate) id:      WidgetId,
-    pub(crate) focus:   &'a mut FocusUpdate,
+    pub(crate) window: WindowId,
+    pub(crate) root:   &'a mut RootState,
+    pub(crate) tree:   &'a mut Tree,
+    pub(crate) state:  &'a mut WidgetState,
+    pub(crate) id:     WidgetId,
+    pub(crate) focus:  &'a mut FocusUpdate,
 }
 
 pub struct UpdateCx<'a> {
-    #[allow(dead_code)]
+    pub(crate) root:  &'a mut RootState,
     pub(crate) tree:  &'a mut Tree,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct LayoutCx<'a> {
-    pub(crate) window: &'a Window,
+    pub(crate) window: WindowId,
+    pub(crate) root:   &'a mut RootState,
     pub(crate) tree:   &'a mut Tree,
     pub(crate) state:  &'a mut WidgetState,
 }
 
 pub struct DrawCx<'a> {
-    pub(crate) window: &'a Window,
-    #[allow(dead_code)]
+    pub(crate) window: WindowId,
+    pub(crate) root:   &'a mut RootState,
     pub(crate) tree:   &'a mut Tree,
     pub(crate) state:  &'a mut WidgetState,
 }
 
 impl EventCx<'_> {
     pub fn window(&self) -> &Window {
-        self.windows.iter().find(|w| w.id == self.window).unwrap()
-    }
-
-    pub fn window_mut(&mut self) -> &mut Window {
-        self.windows
-            .iter_mut()
-            .find(|w| w.id == self.window)
-            .unwrap()
-    }
-
-    pub fn is_window_focused(&self) -> bool {
-        self.window().is_focused()
+        self.root.get_window(self.window).unwrap()
     }
 
     pub fn request_focus(&mut self) {
@@ -73,23 +62,29 @@ impl EventCx<'_> {
     }
 }
 
+impl UpdateCx<'_> {
+    pub fn window(&self) -> &Window {
+        self.root.get_window(self.state.window.unwrap()).unwrap()
+    }
+}
+
 impl LayoutCx<'_> {
     pub fn get<T>(&self, id: WidgetId<T>) -> WidgetRef<'_, T>
     where
         T: ?Sized + AnyWidget,
     {
-        self.tree.get(id).unwrap()
+        self.tree.get(self.root, id).unwrap()
     }
 
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
         let child = self.state.children[index];
-        let mut child = self.tree.get_mut(child).unwrap();
+        let mut child = self.tree.get_mut(self.root, child).unwrap();
         child.set_stashed(is_stashed);
     }
 
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
         let child = self.state.children[index];
-        let mut child = self.tree.get_mut(child).unwrap();
+        let mut child = self.tree.get_mut(self.root, child).unwrap();
         child.layout_recursive(self.window, painter, space)
     }
 
@@ -110,11 +105,15 @@ impl LayoutCx<'_> {
     pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
         self.state.clip = rect.into();
     }
+
+    pub fn window(&self) -> &Window {
+        self.root.get_window(self.window).unwrap()
+    }
 }
 
 impl DrawCx<'_> {
-    pub fn is_window_focused(&self) -> bool {
-        self.window.is_focused
+    pub fn window(&self) -> &Window {
+        self.root.get_window(self.window).unwrap()
     }
 }
 
@@ -135,15 +134,27 @@ impl_contexts! {
     UpdateCx<'_> {
         pub fn request_animate(&mut self) {
             self.state.needs_animate = true;
+
+            if let Some(window) = self.state.window {
+                self.root.request_animate(window);
+            }
         }
 
         pub fn request_layout(&mut self) {
             self.state.needs_layout = true;
             self.state.needs_draw = true;
+
+            if let Some(window) = self.state.window {
+                self.root.request_redraw(window);
+            }
         }
 
         pub fn request_draw(&mut self) {
             self.state.needs_draw = true;
+
+            if let Some(window) = self.state.window {
+                self.root.request_redraw(window);
+            }
         }
 
         pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
@@ -165,11 +176,15 @@ impl_contexts! {
     LayoutCx<'_>,
     DrawCx<'_> {
         pub fn children(&self) -> impl ExactSizeIterator<Item = WidgetRef<'_>> {
-            self.state.children.iter().map(|child| self.tree.get(*child).unwrap())
+            self.state.children.iter().map(|child| self.tree.get(self.root, *child).unwrap())
         }
 
         pub fn child(&self, index: usize) -> Option<WidgetRef<'_>> {
-            self.tree.get(self.state.children[index])
+            self.tree.get(self.root, self.state.children[index])
+        }
+
+        pub fn is_window_focused(&self) -> bool {
+            self.window().is_focused()
         }
 
         pub fn is_pixel_perfect(&self) -> bool {
@@ -202,6 +217,10 @@ impl_contexts! {
 
         pub fn clip(&self) -> Option<&Clip> {
             self.state.clip.as_ref()
+        }
+
+        pub fn id(&self) -> WidgetId {
+            self.state.widget_id
         }
     }
 }

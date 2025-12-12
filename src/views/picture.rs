@@ -51,7 +51,9 @@ impl<T> ori::View<Context, T> for Picture {
         _data: &mut T,
         old: &mut Self,
     ) {
-        let mut widget = cx.get_mut(*element);
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return;
+        };
 
         if self.contents != old.contents {
             widgets::Picture::set_contents(&mut widget, self.contents.clone());

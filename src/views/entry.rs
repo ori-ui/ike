@@ -469,7 +469,9 @@ impl<T> ori::View<Context, T> for Entry<T> {
         let text_theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
         let theme = cx.get_context::<EntryTheme>().cloned().unwrap_or_default();
 
-        let mut widget = cx.get_mut(*element);
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return;
+        };
 
         if self.text != old.text
             || self.font_size != old.font_size
@@ -484,7 +486,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
         {
             let text = match self.text {
                 Some(ref text) => text.clone(),
-                None => widgets::Entry::text_area(&widget.as_ref())
+                None => widgets::Entry::text_area(&widget.to_ref())
                     .text()
                     .to_owned(),
             };

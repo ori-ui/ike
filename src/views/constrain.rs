@@ -163,7 +163,9 @@ where
             &mut old.contents,
         );
 
-        let mut widget = cx.get_mut(*element);
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return;
+        };
 
         if !widget.is_child(*contents) {
             widgets::Constrain::set_child(&mut widget, *contents);
@@ -207,7 +209,9 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let mut widget = cx.get_mut(*element);
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return action;
+        };
 
         if !widget.is_child(*contents) {
             widgets::Constrain::set_child(&mut widget, *contents);

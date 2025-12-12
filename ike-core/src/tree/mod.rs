@@ -7,7 +7,8 @@ pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
 
 use crate::{
-    LayoutCx, Painter, Size, Space, Update, Widget, WidgetId,
+    AnyWidgetId, LayoutCx, Painter, Size, Space, Update, Widget, WidgetId,
+    root::RootState,
     widget::{AnyWidget, ChildUpdate, WidgetState},
 };
 
@@ -49,39 +50,49 @@ impl Tree {
     /// Add a widget to the tree.
     ///
     /// Will use a previously freed entry.
-    pub(crate) fn insert<T>(&mut self, widget: T) -> WidgetMut<'_, T>
+    pub(crate) fn insert<'a, T>(
+        &'a mut self,
+        root: &'a mut RootState,
+        widget: T,
+    ) -> WidgetMut<'a, T>
     where
         T: Widget,
     {
         let id = if let Some(index) = self.free.pop() {
             let entry = &mut self.entries[index as usize];
-
-            let old_widget = entry.widget;
-
             entry.generation += 1;
-            entry.widget = Box::into_raw(Box::new(widget));
-            unsafe { *entry.state = WidgetState::new::<T>() };
-            let _ = unsafe { Box::from_raw(old_widget) };
 
-            WidgetId {
+            let id = WidgetId {
                 index,
                 generation: entry.generation,
                 marker: PhantomData,
-            }
+            };
+
+            let old_widget = entry.widget;
+
+            entry.widget = Box::into_raw(Box::new(widget));
+            unsafe { *entry.state = WidgetState::new::<T>(id.upcast()) };
+            let _ = unsafe { Box::from_raw(old_widget) };
+
+            id
         } else {
             let index = self.entries.len() as u32;
+
+            let id = WidgetId {
+                index,
+                generation: 0,
+                marker: PhantomData,
+            };
+
+            let state = WidgetState::new::<T>(id.upcast());
             self.entries.push(Entry {
                 generation: 0,
                 borrowed:   false,
                 widget:     Box::into_raw(Box::new(widget)),
-                state:      Box::into_raw(Box::new(WidgetState::new::<T>())),
+                state:      Box::into_raw(Box::new(state)),
             });
 
-            WidgetId {
-                index,
-                generation: 0,
-                marker: PhantomData,
-            }
+            id
         };
 
         let entry = &mut self.entries[id.index as usize];
@@ -89,6 +100,7 @@ impl Tree {
 
         WidgetMut {
             id,
+            root,
             widget: entry.widget.cast(),
             state: entry.state,
             tree: self,
@@ -96,11 +108,11 @@ impl Tree {
     }
 
     /// Remove a widget and all it's descendants.
-    pub(crate) fn remove<T>(&mut self, id: WidgetId<T>)
+    pub(crate) fn remove<T>(&mut self, root: &mut RootState, id: WidgetId<T>)
     where
         T: ?Sized + AnyWidget,
     {
-        let Some(mut widget) = self.get_mut(id) else {
+        let Some(mut widget) = self.get_mut(root, id) else {
             return;
         };
 
@@ -115,7 +127,7 @@ impl Tree {
         }
 
         for &child in &unsafe { &*widget.state }.children {
-            widget.tree.remove(child);
+            widget.tree.remove(widget.root, child);
         }
 
         drop(widget);
@@ -126,14 +138,17 @@ impl Tree {
 
         entry.borrowed = false;
         entry.widget = Box::into_raw(Box::new(Tombstone));
-        unsafe { *entry.state = WidgetState::new::<Tombstone>() };
         let _ = unsafe { Box::from_raw(old_widget) };
 
         self.free.push(id.index);
     }
 
     /// Get a reference to a widget.
-    pub(crate) fn get<T>(&self, id: WidgetId<T>) -> Option<WidgetRef<'_, T>>
+    pub(crate) fn get<'a, T>(
+        &'a self,
+        root: &'a RootState,
+        id: WidgetId<T>,
+    ) -> Option<WidgetRef<'a, T>>
     where
         T: ?Sized + AnyWidget,
     {
@@ -146,6 +161,7 @@ impl Tree {
 
         Some(WidgetRef {
             id,
+            root,
             tree: self,
             widget: unsafe { &*T::downcast_ptr(entry.widget) },
             state: unsafe { &*entry.state },
@@ -153,7 +169,11 @@ impl Tree {
     }
 
     /// Get a mutable reference to a widget.
-    pub(crate) fn get_mut<T>(&mut self, id: WidgetId<T>) -> Option<WidgetMut<'_, T>>
+    pub(crate) fn get_mut<'a, T>(
+        &'a mut self,
+        root: &'a mut RootState,
+        id: WidgetId<T>,
+    ) -> Option<WidgetMut<'a, T>>
     where
         T: ?Sized + AnyWidget,
     {
@@ -166,6 +186,7 @@ impl Tree {
 
         Some(WidgetMut {
             id,
+            root,
             widget: T::downcast_ptr(entry.widget),
             state: entry.state,
             tree: self,
@@ -192,22 +213,6 @@ impl Tree {
     {
         let entry = &self.entries[id.index as usize];
         debug_assert_eq!(id.generation, entry.generation);
-    }
-
-    pub(crate) fn needs_animate<T>(&self, id: WidgetId<T>) -> bool
-    where
-        T: ?Sized,
-    {
-        self.debug_validate_id(id);
-        self.get_state_unchecked(id.index).needs_animate
-    }
-
-    pub(crate) fn needs_draw<T>(&self, id: WidgetId<T>) -> bool
-    where
-        T: ?Sized,
-    {
-        self.debug_validate_id(id);
-        self.get_state_unchecked(id.index).needs_draw
     }
 }
 

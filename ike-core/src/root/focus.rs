@@ -1,4 +1,4 @@
-use crate::{Point, Rect, Tree, WidgetId, app::scroll, context::FocusUpdate};
+use crate::{BuildCx, Point, Rect, Root, Tree, WidgetId, context::FocusUpdate, root::scroll};
 
 /// Find the currently focused widget.
 pub(super) fn find_focused(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
@@ -19,44 +19,44 @@ pub(super) fn find_focused(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
     None
 }
 
-pub(super) fn update_focus(tree: &mut Tree, root: WidgetId, update: FocusUpdate) {
+pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: FocusUpdate) {
     match update {
         FocusUpdate::None => {}
 
         FocusUpdate::Unfocus => {
-            if let Some(focused) = find_focused(tree, root)
-                && let Some(mut widget) = tree.get_mut(focused)
+            if let Some(focused) = find_focused(&root.tree, root_widget)
+                && let Some(mut widget) = root.get_mut(focused)
             {
                 widget.set_focused(false);
             }
         }
 
         FocusUpdate::Target(target) => {
-            give_focus(tree, root, target);
+            give_focus(root, root_widget, target);
         }
 
         FocusUpdate::Next => {
-            focus_next(tree, root, true);
+            focus_next(root, root_widget, true);
         }
 
         FocusUpdate::Previous => {
-            focus_next(tree, root, false);
+            focus_next(root, root_widget, false);
         }
     }
 }
 
-pub(super) fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option<WidgetId> {
-    let current = find_focused(tree, id);
-    let focused = find_next_focusable(tree, id, forward);
+pub(super) fn focus_next(root: &mut Root, id: WidgetId, forward: bool) -> Option<WidgetId> {
+    let current = find_focused(&root.tree, id);
+    let focused = find_next_focusable(&root.tree, id, forward);
 
     if current != focused {
         if let Some(current) = current
-            && let Some(mut widget) = tree.get_mut(current)
+            && let Some(mut widget) = root.get_mut(current)
         {
             widget.set_focused(false);
         }
         if let Some(focused) = focused {
-            let rect = if let Some(mut widget) = tree.get_mut(focused) {
+            let rect = if let Some(mut widget) = root.get_mut(focused) {
                 widget.set_focused(true);
 
                 Some(Rect::min_size(
@@ -68,7 +68,7 @@ pub(super) fn focus_next(tree: &mut Tree, id: WidgetId, forward: bool) -> Option
             };
 
             if let Some(rect) = rect {
-                scroll::scroll_to(tree, focused, rect);
+                scroll::scroll_to(root, focused, rect);
             }
         }
     }
@@ -152,17 +152,17 @@ fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widge
     None
 }
 
-fn give_focus(tree: &mut Tree, root: WidgetId, target: WidgetId) {
-    let current = find_focused(tree, root);
+fn give_focus(root: &mut Root, root_widget: WidgetId, target: WidgetId) {
+    let current = find_focused(&root.tree, root_widget);
 
     if current != Some(target) {
         if let Some(current) = current
-            && let Some(mut widget) = tree.get_mut(current)
+            && let Some(mut widget) = root.get_mut(current)
         {
             widget.set_focused(false);
         }
 
-        let rect = if let Some(mut widget) = tree.get_mut(target) {
+        let rect = if let Some(mut widget) = root.get_mut(target) {
             widget.set_focused(true);
 
             Some(Rect::min_size(
@@ -174,7 +174,7 @@ fn give_focus(tree: &mut Tree, root: WidgetId, target: WidgetId) {
         };
 
         if let Some(rect) = rect {
-            scroll::scroll_to(tree, target, rect);
+            scroll::scroll_to(root, target, rect);
         }
     }
 }

@@ -1,7 +1,16 @@
-use std::{any::Any, sync::mpsc::Receiver, time::Instant};
+use std::{
+    any::{Any, TypeId},
+    pin::Pin,
+    sync::{
+        Arc,
+        mpsc::{Receiver, Sender},
+    },
+    time::Instant,
+};
 
 use ike_core::{
-    Modifiers, Offset, Point, PointerButton, PointerId, ScrollDelta, Size, WindowSizing,
+    AnyWidgetId, BuildCx, Modifiers, Offset, Point, PointerButton, PointerId, Root, RootSignal,
+    ScrollDelta, Size, WidgetId, WindowSizing, WindowUpdate,
 };
 use ike_skia::{
     SkiaPainter,
@@ -12,14 +21,12 @@ use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
-    event_loop::{ActiveEventLoop, EventLoop},
+    event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
     window::{Window, WindowId},
 };
 
 use crate::{
-    Context,
     app::{AnyEffect, UiBuilder},
-    context::Event,
     key::convert_winit_key,
 };
 
@@ -44,7 +51,13 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
     let (sender, receiver) = std::sync::mpsc::channel();
     let context = Context {
-        app: ike_core::AppState::new(),
+        root: ike_core::Root::new({
+            let sender = sender.clone();
+
+            move |signal| {
+                let _ = sender.send(Event::Signal(signal));
+            }
+        }),
         proxy: event_loop.create_proxy(),
         entries: Vec::new(),
         sender,
@@ -96,10 +109,8 @@ struct WindowState {
 
     vulkan: VulkanWindow,
 
-    id:       ike_core::WindowId,
-    window:   Window,
-    min_size: Size,
-    max_size: Size,
+    id:     ike_core::WindowId,
+    window: Window,
 }
 
 impl<T> ApplicationHandler for AppState<'_, T> {
@@ -115,7 +126,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
         );
 
         self.state = Some(state);
-        self.update_windows(event_loop);
+        self.handle_events(event_loop);
     }
 
     fn window_event(
@@ -132,22 +143,17 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             WindowEvent::RedrawRequested => {
                 if let Some(animate) = window.animate.take() {
                     let delta_time = animate.elapsed();
-                    self.context.app.animate(window.id, delta_time);
-
-                    if self.context.app.window_needs_animate(window.id) {
-                        window.animate = Some(Instant::now());
-                        window.window.request_redraw();
-                    }
+                    self.context.root.animate(window.id, delta_time);
                 }
 
-                let desc = self.context.app.get_window(window.id).unwrap();
+                let desc = self.context.root.get_window(window.id).unwrap();
 
                 let new_window_size = window.vulkan.draw(
                     &mut self.painter,
-                    desc.color,
+                    desc.color(),
                     window.window.scale_factor() as f32,
                     || window.window.pre_present_notify(),
-                    |canvas| self.context.app.draw(window.id, canvas),
+                    |canvas| self.context.root.draw(window.id, canvas),
                 );
 
                 if let Some(size) = new_window_size.flatten() {
@@ -168,11 +174,11 @@ impl<T> ApplicationHandler for AppState<'_, T> {
 
                 match event {
                     WindowEvent::Resized(..) => {
-                        self.context.app.window_resized(window.id, size);
+                        self.context.root.window_resized(window.id, size);
                     }
 
                     WindowEvent::ScaleFactorChanged { .. } => {
-                        (self.context.app).window_scaled(window.id, scale as f32, size);
+                        (self.context.root).window_scaled(window.id, scale as f32, size);
                     }
 
                     _ => unreachable!(),
@@ -180,17 +186,17 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             }
 
             WindowEvent::Focused(is_focused) => {
-                self.context.app.window_focused(window.id, is_focused);
+                self.context.root.window_focused(window.id, is_focused);
             }
 
             WindowEvent::CursorEntered { device_id } => {
                 let id = PointerId::from_hash(device_id);
-                self.context.app.pointer_entered(window.id, id);
+                self.context.root.pointer_entered(window.id, id);
             }
 
             WindowEvent::CursorLeft { device_id } => {
                 let id = PointerId::from_hash(device_id);
-                self.context.app.pointer_left(window.id, id);
+                self.context.root.pointer_left(window.id, id);
             }
 
             WindowEvent::CursorMoved {
@@ -200,7 +206,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                 let position = position.to_logical(window.window.scale_factor());
                 let position = Point::new(position.x, position.y);
 
-                self.context.app.pointer_moved(
+                self.context.root.pointer_moved(
                     window.id,
                     PointerId::from_hash(device_id),
                     position,
@@ -218,7 +224,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                     ),
                 };
 
-                self.context.app.pointer_scrolled(
+                self.context.root.pointer_scrolled(
                     window.id,
                     delta,
                     PointerId::from_hash(device_id),
@@ -241,7 +247,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
 
                 let pressed = matches!(state, ElementState::Pressed);
 
-                self.context.app.pointer_button(
+                self.context.root.pointer_button(
                     window.id,
                     PointerId::from_hash(device_id),
                     button,
@@ -252,7 +258,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             WindowEvent::KeyboardInput { event, .. } => {
                 let pressed = matches!(event.state, ElementState::Pressed);
 
-                self.context.app.key_press(
+                self.context.root.key_press(
                     window.id,
                     convert_winit_key(event.logical_key),
                     event.repeat,
@@ -280,7 +286,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                     modifiers |= Modifiers::META;
                 }
 
-                self.context.app.modifiers_changed(window.id, modifiers);
+                self.context.root.modifiers_changed(window.id, modifiers);
             }
 
             WindowEvent::CloseRequested => {
@@ -290,13 +296,11 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             _ => {}
         }
 
-        self.handle_events();
-        self.update_windows(event_loop);
+        self.handle_events(event_loop);
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, _event: ()) {
-        self.handle_events();
-        self.update_windows(event_loop);
+        self.handle_events(event_loop);
     }
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
@@ -305,8 +309,8 @@ impl<T> ApplicationHandler for AppState<'_, T> {
 }
 
 impl<T> AppState<'_, T> {
-    fn handle_events(&mut self) {
-        for event in self.receiver.try_iter() {
+    fn handle_events(&mut self, event_loop: &ActiveEventLoop) {
+        while let Ok(event) = self.receiver.try_recv() {
             match event {
                 Event::Rebuild => {
                     let mut view = (self.build)(self.data);
@@ -338,43 +342,77 @@ impl<T> AppState<'_, T> {
                 Event::Spawn(future) => {
                     self.runtime.spawn(future);
                 }
+
+                Event::Signal(signal) => self.handle_signal(event_loop, signal),
             }
         }
     }
 
-    fn update_windows(&mut self, event_loop: &ActiveEventLoop) {
-        for desc in self.context.app.windows() {
-            match self.windows.iter_mut().find(|w| w.id == desc.id()) {
-                Some(window) => window.update(desc),
+    fn handle_signal(&mut self, event_loop: &ActiveEventLoop, signal: RootSignal) {
+        match signal {
+            RootSignal::RequestRedraw(id) => {
+                if let Some(window) = self.windows.iter().find(|w| w.id == id) {
+                    window.window.request_redraw();
+                }
+            }
 
-                None => {
-                    self.windows.push(WindowState::new(
-                        &mut self.vulkan,
-                        event_loop,
-                        desc,
-                    ));
+            RootSignal::RequestAnimate(id) => {
+                if let Some(window) = self.windows.iter_mut().find(|w| w.id == id) {
+                    window.animate = Some(Instant::now());
+                    window.window.request_redraw();
+                }
+            }
+
+            RootSignal::CreateWindow(id) => {
+                if let Some(window) = self.context.root.get_window(id) {
+                    let window = WindowState::new(&mut self.vulkan, event_loop, window);
+                    self.windows.push(window);
+                }
+            }
+
+            RootSignal::RemoveWindow(id) => {
+                self.windows.retain(|w| w.id != id);
+            }
+
+            RootSignal::UpdateWindow(id, update) => {
+                let Some(win) = self.windows.iter_mut().find(|w| w.id == id) else {
+                    return;
+                };
+
+                match update {
+                    WindowUpdate::Title(title) => win.window.set_title(&title),
+
+                    WindowUpdate::Sizing(sizing) => {
+                        if let WindowSizing::Resizable {
+                            min_size, max_size, ..
+                        } = sizing
+                        {
+                            win.window.set_min_inner_size(Some(LogicalSize::new(
+                                min_size.width,
+                                min_size.height,
+                            )));
+
+                            win.window.set_max_inner_size(Some(LogicalSize::new(
+                                max_size.width,
+                                max_size.height,
+                            )));
+                        }
+                    }
+
+                    WindowUpdate::Visible(visible) => {
+                        win.window.set_visible(visible);
+                    }
+
+                    WindowUpdate::Decorated(decorated) => {
+                        win.window.set_decorations(decorated);
+                    }
+
+                    WindowUpdate::Cursor(cursor) => {
+                        win.window.set_cursor(cursor);
+                    }
                 }
             }
         }
-
-        for window in &mut self.windows {
-            if self.context.app.window_needs_animate(window.id) && window.animate.is_none() {
-                window.animate = Some(Instant::now());
-                window.window.request_redraw();
-            }
-
-            if self.context.app.window_needs_draw(window.id) {
-                window.window.request_redraw();
-            }
-        }
-
-        self.windows.retain(|state| {
-            let Some(_window) = self.context.app.get_window(state.id) else {
-                return false;
-            };
-
-            true
-        });
     }
 }
 
@@ -386,7 +424,7 @@ impl WindowState {
     ) -> Self {
         use winit::dpi::LogicalSize;
 
-        let size = match desc.sizing {
+        let size = match desc.sizing() {
             WindowSizing::FitContent => LogicalSize::new(
                 desc.current_size().width,
                 desc.current_size().height,
@@ -396,31 +434,33 @@ impl WindowState {
             }
         };
 
-        let min_size = match desc.sizing {
+        let min_size = match desc.sizing() {
             WindowSizing::FitContent => size,
-            WindowSizing::Resizable { min_size, .. } => {
-                LogicalSize::new(min_size.width, min_size.height)
-            }
+            WindowSizing::Resizable { min_size, .. } => LogicalSize::new(
+                min_size.width.max(1.0),
+                min_size.height.max(1.0),
+            ),
         };
 
-        let max_size = match desc.sizing {
+        let max_size = match desc.sizing() {
             WindowSizing::FitContent => size,
-            WindowSizing::Resizable { max_size, .. } => {
-                LogicalSize::new(max_size.width, max_size.height)
-            }
+            WindowSizing::Resizable { max_size, .. } => LogicalSize::new(
+                max_size.width.max(1.0),
+                max_size.height.max(1.0),
+            ),
         };
 
         let attributes = Window::default_attributes()
-            .with_title(&desc.title)
-            .with_visible(desc.visible)
-            .with_decorations(desc.decorated)
+            .with_title(desc.title())
+            .with_visible(desc.is_visible())
+            .with_decorations(desc.is_decorated())
             .with_transparent(true)
             .with_min_inner_size(min_size)
             .with_max_inner_size(max_size)
             .with_inner_size(size)
             .with_cursor(desc.cursor())
             .with_resizable(matches!(
-                desc.sizing,
+                desc.sizing(),
                 WindowSizing::Resizable { .. }
             ));
 
@@ -436,57 +476,155 @@ impl WindowState {
             )
         };
 
-        let (min_size, max_size) = match desc.sizing {
-            WindowSizing::FitContent => (Size::ZERO, Size::ZERO),
-            WindowSizing::Resizable {
-                min_size, max_size, ..
-            } => (min_size, max_size),
-        };
-
         Self {
             animate: None,
             id: desc.id(),
             vulkan,
             window,
-            min_size,
-            max_size,
         }
-    }
-
-    fn update(&mut self, desc: &ike_core::Window) {
-        if self.window.title() != desc.title {
-            self.window.set_title(&desc.title);
-        }
-
-        if let WindowSizing::Resizable {
-            min_size, max_size, ..
-        } = desc.sizing
-        {
-            if self.min_size != min_size {
-                self.window.set_min_inner_size(Some(LogicalSize::new(
-                    min_size.width,
-                    min_size.height,
-                )));
-                self.min_size = min_size;
-            }
-
-            if self.max_size != max_size {
-                self.window.set_max_inner_size(Some(LogicalSize::new(
-                    max_size.width,
-                    max_size.height,
-                )));
-                self.max_size = max_size;
-            }
-        }
-
-        self.window.set_decorations(desc.decorated);
-        self.window.set_visible(desc.visible);
-        self.window.set_cursor(desc.cursor());
     }
 
     fn resize(&mut self) {
         let size = self.window.inner_size();
 
         (self.vulkan).resize(size.width, size.height);
+    }
+}
+
+pub struct Context {
+    root:    Root,
+    proxy:   EventLoopProxy<()>,
+    entries: Vec<Entry>,
+    sender:  Sender<Event>,
+
+    use_type_names_unsafe: bool,
+}
+
+impl Context {
+    pub fn create_window(&mut self, contents: impl AnyWidgetId) -> ike_core::WindowId {
+        self.root.create_window(contents.upcast())
+    }
+
+    pub fn remove_window(&mut self, window: ike_core::WindowId) {
+        self.root.remove_window(window)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn is_using_type_names(&self) -> bool {
+        self.use_type_names_unsafe
+    }
+
+    #[allow(dead_code)]
+    pub(crate) unsafe fn use_type_names(&mut self, enabled: bool) {
+        self.use_type_names_unsafe = enabled;
+    }
+}
+
+struct Entry {
+    value:     Box<dyn Any>,
+    type_id:   TypeId,
+    type_name: &'static str,
+}
+
+#[derive(Clone)]
+pub struct Proxy {
+    sender: Sender<Event>,
+    proxy:  EventLoopProxy<()>,
+}
+
+enum Event {
+    Rebuild,
+    Event(ori::Event),
+    Spawn(Pin<Box<dyn Future<Output = ()> + Send>>),
+    Signal(RootSignal),
+}
+
+impl BuildCx for Context {
+    fn root(&self) -> &Root {
+        &self.root
+    }
+
+    fn root_mut(&mut self) -> &mut Root {
+        &mut self.root
+    }
+}
+
+impl ori::BaseElement for Context {
+    type Element = WidgetId;
+}
+
+impl ori::AsyncContext for Context {
+    type Proxy = Proxy;
+
+    fn proxy(&mut self) -> Self::Proxy {
+        Proxy {
+            sender: self.sender.clone(),
+            proxy:  self.proxy.clone(),
+        }
+    }
+}
+
+impl ori::ProviderContext for Context {
+    fn push_context<T: Any>(&mut self, context: Box<T>) {
+        self.entries.push(Entry {
+            value:     context,
+            type_id:   TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        })
+    }
+
+    fn pop_context<T: Any>(&mut self) -> Option<Box<T>> {
+        self.entries.pop()?.value.downcast().ok()
+    }
+
+    fn get_context<T: Any>(&self) -> Option<&T> {
+        let entry = match self.use_type_names_unsafe {
+            true => self
+                .entries
+                .iter()
+                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
+            false => self
+                .entries
+                .iter()
+                .rfind(|e| e.type_id == TypeId::of::<T>())?,
+        };
+
+        Some(unsafe { &*(entry.value.as_ref() as *const _ as *const T) })
+    }
+
+    fn get_context_mut<T: Any>(&mut self) -> Option<&mut T> {
+        let entry = match self.use_type_names_unsafe {
+            true => self
+                .entries
+                .iter_mut()
+                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
+            false => self
+                .entries
+                .iter_mut()
+                .rfind(|e| e.type_id == TypeId::of::<T>())?,
+        };
+
+        Some(unsafe { &mut *(entry.value.as_mut() as *mut _ as *mut T) })
+    }
+}
+
+impl ori::Proxy for Proxy {
+    fn clone(&self) -> Arc<dyn ori::Proxy> {
+        Arc::new(Clone::clone(self))
+    }
+
+    fn rebuild(&self) {
+        let _ = self.sender.send(Event::Rebuild);
+        let _ = self.proxy.send_event(());
+    }
+
+    fn event(&self, event: ori::Event) {
+        let _ = self.sender.send(Event::Event(event));
+        let _ = self.proxy.send_event(());
+    }
+
+    fn spawn_boxed(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
+        let _ = self.sender.send(Event::Spawn(future));
+        let _ = self.proxy.send_event(());
     }
 }

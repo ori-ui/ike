@@ -95,7 +95,10 @@ where
             &mut old.contents,
         );
 
-        let mut widget = cx.get_mut(*element);
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return;
+        };
+
         update_children(&mut widget, children);
 
         if self.axis != old.axis {
@@ -136,8 +139,9 @@ where
     ) -> ori::Action {
         let action = self.contents.seq_event(children, states, cx, data, event);
 
-        let mut widget = cx.get_mut(*element);
-        update_children(&mut widget, children);
+        if let Some(mut widget) = cx.get_mut(*element) {
+            update_children(&mut widget, children);
+        }
 
         action
     }

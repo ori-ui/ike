@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     Affine, Canvas, Clip, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
-    PointerPropagate, Propagate, Rect, Size, Space, UpdateCx,
+    PointerPropagate, Propagate, Rect, Size, Space, UpdateCx, WindowId,
 };
 
 pub trait Widget: Any {
@@ -91,6 +91,8 @@ pub enum ChildUpdate {
 pub trait AnyWidget: Widget {
     fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget>;
 
+    fn upcast_ptr(ptr: *mut Self) -> *mut dyn Widget;
+
     fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self;
 
     fn is(widget: &dyn Widget) -> bool;
@@ -99,6 +101,10 @@ pub trait AnyWidget: Widget {
 impl AnyWidget for dyn Widget {
     fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget> {
         boxed
+    }
+
+    fn upcast_ptr(ptr: *mut Self) -> *mut dyn Widget {
+        ptr
     }
 
     fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
@@ -118,6 +124,10 @@ where
         boxed
     }
 
+    fn upcast_ptr(ptr: *mut Self) -> *mut dyn Widget {
+        ptr
+    }
+
     fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
         ptr as *mut Self
     }
@@ -129,6 +139,7 @@ where
 
 #[derive(Debug)]
 pub struct WidgetState {
+    pub(crate) widget_id:        WidgetId,
     pub(crate) transform:        Affine,
     pub(crate) global_transform: Affine,
     pub(crate) size:             Size,
@@ -138,6 +149,7 @@ pub struct WidgetState {
     pub(crate) previous_space:   Option<Space>,
     pub(crate) cursor:           CursorIcon,
     pub(crate) clip:             Option<Clip>,
+    pub(crate) window:           Option<WindowId>,
 
     pub(crate) is_hovered:  bool,
     pub(crate) has_hovered: bool,
@@ -168,8 +180,9 @@ pub struct WidgetState {
 }
 
 impl WidgetState {
-    pub(crate) fn new<T: Widget>() -> Self {
+    pub(crate) fn new<T: Widget>(id: WidgetId) -> Self {
         Self {
+            widget_id:        id,
             transform:        Affine::IDENTITY,
             global_transform: Affine::IDENTITY,
             size:             Size::new(0.0, 0.0),
@@ -179,6 +192,7 @@ impl WidgetState {
             previous_space:   None,
             cursor:           CursorIcon::Default,
             clip:             None,
+            window:           None,
 
             is_hovered:  false,
             has_hovered: false,

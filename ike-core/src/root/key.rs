@@ -1,13 +1,13 @@
 use keyboard_types::{Key, Modifiers, NamedKey};
 
 use crate::{
-    AppState, EventCx, KeyEvent, Propagate, WidgetId, WindowId, app::focus, context::FocusUpdate,
-    key::KeyPressEvent,
+    BuildCx, EventCx, KeyEvent, Propagate, Root, WidgetId, WindowId, context::FocusUpdate,
+    key::KeyPressEvent, root::focus,
 };
 
-impl AppState {
+impl Root {
     pub fn modifiers_changed(&mut self, window: WindowId, modifiers: Modifiers) {
-        if let Some(window) = self.windows.iter_mut().find(|w| w.id == window) {
+        if let Some(window) = self.get_window_mut(window) {
             window.modifiers = modifiers;
         }
     }
@@ -20,7 +20,7 @@ impl AppState {
         text: Option<&str>,
         pressed: bool,
     ) -> bool {
-        let Some(window) = self.windows.iter_mut().find(|w| w.id == window) else {
+        let Some(window) = self.get_window_mut(window) else {
             return false;
         };
 
@@ -48,11 +48,7 @@ impl AppState {
         };
 
         if key == Key::Named(NamedKey::Tab) && pressed && !handled {
-            focus::focus_next(
-                &mut self.tree,
-                contents,
-                !modifiers.shift(),
-            );
+            focus::focus_next(self, contents, !modifiers.shift());
         }
 
         handled
@@ -60,9 +56,9 @@ impl AppState {
 }
 
 fn send_key_event(
-    app: &mut AppState,
+    root: &mut Root,
     window: WindowId,
-    root: WidgetId,
+    root_widget: WidgetId,
     target: WidgetId,
     event: &KeyEvent,
 ) -> Propagate {
@@ -73,13 +69,13 @@ fn send_key_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current {
-        let mut widget = app.tree.get_mut(id).unwrap();
+        let mut widget = root.get_mut(id).unwrap();
 
         if let Propagate::Bubble = propagate {
-            let (tree, widget, state) = widget.split();
+            let (tree, root, widget, state) = widget.split();
             let mut cx = EventCx {
                 window,
-                windows: &mut app.windows,
+                root,
                 tree,
                 state,
                 id,
@@ -92,11 +88,11 @@ fn send_key_event(
         current = widget.state().parent;
     }
 
-    if let Some(mut target) = app.tree.get_mut(target) {
+    if let Some(mut target) = root.get_mut(target) {
         target.propagate_state();
     }
 
-    focus::update_focus(&mut app.tree, root, focus);
+    focus::update_focus(root, root_widget, focus);
 
     propagate
 }

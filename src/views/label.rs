@@ -148,10 +148,11 @@ impl<T> ori::View<Context, T> for Label {
         {
             let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
             let theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
-            let mut widget = cx.get_mut(*element);
 
-            let paragraph = self.build_paragraph(&palette, &theme);
-            widgets::Label::set_text(&mut widget, paragraph);
+            if let Some(mut widget) = cx.get_mut(*element) {
+                let paragraph = self.build_paragraph(&palette, &theme);
+                widgets::Label::set_text(&mut widget, paragraph);
+            }
         }
     }
 

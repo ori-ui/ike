@@ -1,4 +1,4 @@
-use ike_core::{AnyWidgetId, Color, Size, WindowId, WindowSizing};
+use ike_core::{AnyWidgetId, BuildCx, Color, Size, WindowId, WindowSizing};
 use ori::ProviderContext;
 
 use crate::{Context, Palette, View};
@@ -75,15 +75,17 @@ where
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let window = cx.app.create_window(contents.upcast());
+        let id = cx.create_window(contents);
 
-        window.title = self.title.clone();
-        window.sizing = self.sizing;
-        window.visible = self.visible;
-        window.decorated = self.decorated;
-        window.color = self.color.unwrap_or(palette.background);
+        cx.set_window_title(id, self.title.clone());
+        cx.set_window_sizing(id, self.sizing);
+        cx.set_window_visible(id, self.visible);
+        cx.set_window_decorated(id, self.decorated);
+        cx.set_window_color(
+            id,
+            self.color.unwrap_or(palette.background),
+        );
 
-        let id = window.id();
         (ori::NoElement, (id, contents, state))
     }
 
@@ -105,13 +107,34 @@ where
 
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
 
-        if let Some(window) = cx.app.get_window_mut(*id) {
-            window.contents = contents.upcast();
-            window.title = self.title.clone();
-            window.sizing = self.sizing;
-            window.visible = self.visible;
-            window.decorated = self.decorated;
-            window.color = self.color.unwrap_or(palette.background);
+        if let Some(window) = cx.root().get_window(*id)
+            && window.contents() != contents.upcast()
+            && let Some(prev) = cx.set_window_contents(*id, *contents)
+        {
+            cx.remove(prev)
+        }
+
+        if self.title != old.title {
+            cx.set_window_title(*id, self.title.clone());
+        }
+
+        if self.sizing != old.sizing {
+            cx.set_window_sizing(*id, self.sizing);
+        }
+
+        if self.visible != old.visible {
+            cx.set_window_visible(*id, self.visible);
+        }
+
+        if self.decorated != old.decorated {
+            cx.set_window_decorated(*id, self.decorated);
+        }
+
+        if self.color != old.color {
+            cx.set_window_color(
+                *id,
+                self.color.unwrap_or(palette.background),
+            );
         }
     }
 
@@ -122,7 +145,7 @@ where
         cx: &mut Context,
         _data: &mut T,
     ) {
-        cx.app.remove_window(window);
+        cx.remove_window(window);
     }
 
     fn event(
@@ -135,8 +158,11 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if let Some(window) = cx.app.get_window_mut(*id) {
-            window.contents = contents.upcast();
+        if let Some(window) = cx.root().get_window(*id)
+            && window.contents() != contents.upcast()
+            && let Some(prev) = cx.set_window_contents(*id, *contents)
+        {
+            cx.remove(prev)
         }
 
         action

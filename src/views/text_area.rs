@@ -338,7 +338,9 @@ impl<T> ori::View<Context, T> for TextArea<T> {
             .cloned()
             .unwrap_or_default();
 
-        let mut widget = cx.get_mut(*element);
+        let Some(mut widget) = cx.get_mut(*element) else {
+            return;
+        };
 
         if self.text != old.text
             || self.font_size != old.font_size

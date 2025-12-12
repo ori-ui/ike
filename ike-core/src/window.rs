@@ -30,17 +30,16 @@ pub struct Window {
     pub(crate) scale:        f32,
     pub(crate) pointers:     Vec<Pointer>,
     pub(crate) modifiers:    Modifiers,
-    pub(crate) is_focused:   bool,
-    pub(crate) current_size: Size,
+    pub(crate) size:         Size,
     pub(crate) properties:   Vec<Box<dyn Any>>,
     pub(crate) cursor:       CursorIcon,
-
-    pub title:     String,
-    pub contents:  WidgetId,
-    pub sizing:    WindowSizing,
-    pub visible:   bool,
-    pub decorated: bool,
-    pub color:     Color,
+    pub(crate) title:        String,
+    pub(crate) contents:     WidgetId,
+    pub(crate) sizing:       WindowSizing,
+    pub(crate) is_focused:   bool,
+    pub(crate) is_visible:   bool,
+    pub(crate) is_decorated: bool,
+    pub(crate) color:        Color,
 }
 
 impl Window {
@@ -57,19 +56,43 @@ impl Window {
     }
 
     pub fn current_size(&self) -> Size {
-        self.current_size
+        self.size
     }
 
     pub fn modifiers(&self) -> Modifiers {
         self.modifiers
     }
 
+    pub fn cursor(&self) -> CursorIcon {
+        self.cursor
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn sizing(&self) -> WindowSizing {
+        self.sizing
+    }
+
+    pub fn contents(&self) -> WidgetId {
+        self.contents
+    }
+
     pub fn is_focused(&self) -> bool {
         self.is_focused
     }
 
-    pub fn cursor(&self) -> CursorIcon {
-        self.cursor
+    pub fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    pub fn is_decorated(&self) -> bool {
+        self.is_decorated
+    }
+
+    pub fn color(&self) -> Color {
+        self.color
     }
 
     pub fn add_property<T: Any>(&mut self, property: T) {
