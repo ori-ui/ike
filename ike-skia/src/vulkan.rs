@@ -6,7 +6,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::{SkiaCanvas, SkiaPainter};
 
-pub struct VulkanContext {
+pub struct SkiaVulkanContext {
     entry:        ash::Entry,
     instance:     ash::Instance,
     physical:     vk::PhysicalDevice,
@@ -15,7 +15,7 @@ pub struct VulkanContext {
     queue:        vk::Queue,
 }
 
-impl Drop for VulkanContext {
+impl Drop for SkiaVulkanContext {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_device(None);
@@ -24,7 +24,7 @@ impl Drop for VulkanContext {
     }
 }
 
-impl VulkanContext {
+impl SkiaVulkanContext {
     pub fn new(display: impl HasDisplayHandle) -> Self {
         let entry = unsafe { ash::Entry::load().unwrap() };
 
@@ -104,7 +104,7 @@ impl VulkanContext {
     }
 }
 
-pub struct VulkanWindow {
+pub struct SkiaVulkanWindow {
     entry:            ash::Entry,
     instance:         ash::Instance,
     device:           ash::Device,
@@ -129,7 +129,7 @@ pub struct VulkanWindow {
     height:           u32,
 }
 
-impl Drop for VulkanWindow {
+impl Drop for SkiaVulkanWindow {
     fn drop(&mut self) {
         unsafe {
             let _ = self.device.device_wait_idle();
@@ -159,13 +159,23 @@ impl Drop for VulkanWindow {
     }
 }
 
-impl VulkanWindow {
+impl SkiaVulkanWindow {
+    const SDR_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+        format:      vk::Format::B8G8R8A8_UNORM,
+        color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+    };
+
+    const HDR_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+        format:      vk::Format::A2B10G10R10_UNORM_PACK32,
+        color_space: vk::ColorSpaceKHR::HDR10_ST2084_EXT,
+    };
+
     /// # Safety
     /// - `window` must have a valid display and window handle.
     /// - Display and window handles from `window` must be vaild for the `display` `context` was
     ///   created with.
     pub unsafe fn new(
-        context: &mut VulkanContext,
+        context: &mut SkiaVulkanContext,
         window: impl HasDisplayHandle + HasWindowHandle,
         width: u32,
         height: u32,
@@ -235,9 +245,16 @@ impl VulkanWindow {
             vk::PresentModeKHR::FIFO
         };
 
-        let surface_format = vk::SurfaceFormatKHR {
-            format:      vk::Format::B8G8R8A8_UNORM,
-            color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+        let surface_formats = unsafe {
+            instance
+                .get_physical_device_surface_formats(context.physical, surface)
+                .unwrap()
+        };
+
+        let surface_format = if surface_formats.contains(&Self::HDR_FORMAT) {
+            Self::HDR_FORMAT
+        } else {
+            Self::SDR_FORMAT
         };
 
         let composite_alpha = if capabilities
@@ -365,14 +382,30 @@ impl VulkanWindow {
         }
 
         while self.skia_surfaces.len() < self.swapchain_images.len() {
+            let color_type = if self.surface_format == Self::HDR_FORMAT {
+                skia_safe::ColorType::RGBA1010102
+            } else {
+                skia_safe::ColorType::BGRA8888
+            };
+
+            let color_space = if self.surface_format == Self::HDR_FORMAT {
+                skia_safe::ColorSpace::new_cicp(
+                    skia_safe::named_primaries::CicpId::Rec2020,
+                    skia_safe::named_transfer_fn::CicpId::Rec2020_10bit,
+                )
+                .unwrap()
+            } else {
+                skia_safe::ColorSpace::new_srgb()
+            };
+
             let image_info = skia_safe::ImageInfo::new(
                 skia_safe::ISize::new(
                     width.max(1) as i32,
                     height.max(1) as i32,
                 ),
-                skia_safe::ColorType::BGRA8888,
+                color_type,
                 skia_safe::AlphaType::Premul,
-                None,
+                color_space,
             );
 
             let mut surface = skia_safe::gpu::surfaces::render_target(
@@ -454,11 +487,11 @@ impl VulkanWindow {
 
             canvas.reset_matrix();
             canvas.scale((scale_factor, scale_factor));
-            canvas.clear(skia_safe::Color::from_argb(
-                f32::round(clear_color.a * 255.0) as u8,
-                f32::round(clear_color.r * 255.0) as u8,
-                f32::round(clear_color.g * 255.0) as u8,
-                f32::round(clear_color.b * 255.0) as u8,
+            canvas.clear(skia_safe::Color4f::new(
+                clear_color.r,
+                clear_color.g,
+                clear_color.b,
+                clear_color.a,
             ));
 
             let mut canvas = SkiaCanvas { painter, canvas };

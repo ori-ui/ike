@@ -1,6 +1,6 @@
 use ike_core::{
-    BuildCx, Color, FontStretch, FontStyle, FontWeight, Paragraph, TextAlign, TextStyle, TextWrap,
-    WidgetId, widgets,
+    BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
+    TextWrap, WidgetId, widgets,
 };
 use ori::ProviderContext;
 
@@ -96,9 +96,10 @@ impl Label {
                 .clone()
                 .unwrap_or_else(|| theme.font_family.clone().into_owned()),
 
-            color: self
-                .color
-                .unwrap_or_else(|| theme.color.unwrap_or(palette.contrast)),
+            paint: Paint::from(
+                self.color
+                    .unwrap_or_else(|| theme.color.unwrap_or(palette.contrast)),
+            ),
         };
 
         let mut paragraph = Paragraph::new(

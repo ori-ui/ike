@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{Color, Rect};
+use crate::{Paint, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TextAlign {
@@ -132,7 +132,7 @@ pub struct TextStyle {
     pub font_weight:  FontWeight,
     pub font_stretch: FontStretch,
     pub font_style:   FontStyle,
-    pub color:        Color,
+    pub paint:        Paint,
 }
 
 /// A font weight.

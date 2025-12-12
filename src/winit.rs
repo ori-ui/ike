@@ -14,7 +14,7 @@ use ike_core::{
 };
 use ike_skia::{
     SkiaPainter,
-    vulkan::{VulkanContext, VulkanWindow},
+    vulkan::{SkiaVulkanContext, SkiaVulkanWindow},
 };
 use ori::AsyncContext;
 use winit::{
@@ -41,7 +41,7 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
     let runtime = tokio::runtime::Handle::current();
     let event_loop = EventLoop::with_user_event().build().unwrap();
-    let vulkan = VulkanContext::new(&event_loop);
+    let vulkan = SkiaVulkanContext::new(&event_loop);
 
     let mut painter = SkiaPainter::new();
     painter.load_font(
@@ -101,13 +101,13 @@ struct AppState<'a, T> {
     context: Context,
     windows: Vec<WindowState>,
 
-    vulkan: VulkanContext,
+    vulkan: SkiaVulkanContext,
 }
 
 struct WindowState {
     animate: Option<Instant>,
 
-    vulkan: VulkanWindow,
+    vulkan: SkiaVulkanWindow,
 
     id:     ike_core::WindowId,
     window: Window,
@@ -418,7 +418,7 @@ impl<T> AppState<'_, T> {
 
 impl WindowState {
     fn new(
-        vulkan: &mut VulkanContext,
+        vulkan: &mut SkiaVulkanContext,
         event_loop: &ActiveEventLoop,
         desc: &ike_core::Window,
     ) -> Self {
@@ -468,7 +468,7 @@ impl WindowState {
 
         let vulkan = unsafe {
             let physical = window.inner_size();
-            VulkanWindow::new(
+            SkiaVulkanWindow::new(
                 vulkan,
                 &window,
                 physical.width,

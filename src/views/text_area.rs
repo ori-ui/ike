@@ -1,6 +1,6 @@
 use ike_core::{
-    BuildCx, Color, FontStretch, FontStyle, FontWeight, Paragraph, TextAlign, TextStyle, TextWrap,
-    WidgetId,
+    BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
+    TextWrap, WidgetId,
     widgets::{self, NewlineBehaviour, SubmitBehaviour},
 };
 use ori::{AsyncContext, ProviderContext, Proxy};
@@ -234,11 +234,11 @@ impl<T> TextArea<T> {
                     .unwrap_or_else(|| text_theme.font_family.clone().into_owned())
             }),
 
-            color: self.color.unwrap_or_else(|| {
+            paint: Paint::from(self.color.unwrap_or_else(|| {
                 text_area_theme
                     .color
                     .unwrap_or_else(|| text_theme.color.unwrap_or(palette.contrast_low(0)))
-            }),
+            })),
         };
 
         let mut paragraph = Paragraph::new(

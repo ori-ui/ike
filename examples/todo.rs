@@ -175,7 +175,7 @@ fn ui(data: &mut Data) -> impl Effect<Data> + use<> {
                 todos(data),
                 width(240.0, filters()),
             )),
-        ))),
+        ))), //.color(Color::rgb(1.0, 0.0, 0.0)),
     )
 }
 

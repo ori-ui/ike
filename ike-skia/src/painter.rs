@@ -116,7 +116,7 @@ impl SkiaPainter {
     ) -> &mut skia_safe::textlayout::Paragraph {
         let weak = Paragraph::downgrade(paragraph);
 
-        let (current_max_width, paragraph) = self.paragraphs.entry(weak).or_insert_with(|| {
+        if !self.paragraphs.contains_key(&weak) {
             let mut style = skia_safe::textlayout::ParagraphStyle::new();
 
             let align = match paragraph.align {
@@ -141,13 +141,9 @@ impl SkiaPainter {
                 skia_style.set_font_size(style.font_size);
                 skia_style.set_font_families(&[&style.font_family]);
                 skia_style.set_font_style(Self::create_font_style(style));
-                skia_style.foreground().set_anti_alias(true);
-                skia_style.set_color(skia_safe::Color::from_argb(
-                    f32::round(style.color.a * 255.0) as u8,
-                    f32::round(style.color.r * 255.0) as u8,
-                    f32::round(style.color.g * 255.0) as u8,
-                    f32::round(style.color.b * 255.0) as u8,
-                ));
+
+                let paint = self.create_paint(&style.paint);
+                skia_style.set_foreground_paint(paint);
 
                 builder.push_style(&skia_style);
                 builder.add_text(text);
@@ -157,8 +153,10 @@ impl SkiaPainter {
             let mut paragraph = builder.build();
             paragraph.layout(max_width);
 
-            (max_width, paragraph)
-        });
+            self.paragraphs.insert(weak.clone(), (max_width, paragraph));
+        }
+
+        let (current_max_width, paragraph) = self.paragraphs.get_mut(&weak).unwrap();
 
         if *current_max_width != max_width {
             paragraph.layout(max_width);
@@ -175,12 +173,10 @@ impl SkiaPainter {
 
             match paint.shader {
                 Shader::Solid(color) => {
-                    skia_paint.set_color(skia_safe::Color::from_argb(
-                        f32::round(color.a * 255.0) as u8,
-                        f32::round(color.r * 255.0) as u8,
-                        f32::round(color.g * 255.0) as u8,
-                        f32::round(color.b * 255.0) as u8,
-                    ));
+                    skia_paint.set_color4f(
+                        skia_safe::Color4f::new(color.r, color.g, color.b, color.a),
+                        None,
+                    );
                 }
             }
 

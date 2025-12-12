@@ -1,5 +1,5 @@
 use ike_core::{
-    BorderWidth, BuildCx, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Padding,
+    BorderWidth, BuildCx, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Padding, Paint,
     Paragraph, TextAlign, TextStyle, TextWrap, WidgetId,
     widgets::{self, NewlineBehaviour, SubmitBehaviour},
 };
@@ -317,7 +317,7 @@ impl<T> Entry<T> {
                     .unwrap_or_else(|| text_theme.font_family.clone().into_owned())
             }),
 
-            color,
+            paint: Paint::from(color),
         };
 
         let mut paragraph = Paragraph::new(
