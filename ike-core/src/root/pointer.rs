@@ -60,13 +60,7 @@ impl Root {
             };
             let event = PointerEvent::Move(event);
 
-            match send_pointer_event(
-                self,
-                window_id,
-                window_contents,
-                target,
-                &event,
-            ) {
+            match send_pointer_event(self, window_contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -85,13 +79,7 @@ impl Root {
             };
             let event = PointerEvent::Move(event);
 
-            match send_pointer_event(
-                self,
-                window_id,
-                window_contents,
-                target,
-                &event,
-            ) {
+            match send_pointer_event(self, window_contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -138,13 +126,7 @@ impl Root {
                 false => PointerEvent::Up(event),
             };
 
-            let handled = match send_pointer_event(
-                self,
-                window_id,
-                window_contents,
-                target,
-                &event,
-            ) {
+            let handled = match send_pointer_event(self, window_contents, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Stop => true,
 
@@ -218,11 +200,8 @@ impl Root {
             delta,
         });
 
-        let contents = window.contents;
-        let window_id = window.id;
-        match send_pointer_event(
-            self, window_id, contents, target, &event,
-        ) {
+        let window_contents = window.contents;
+        match send_pointer_event(self, window_contents, target, &event) {
             PointerPropagate::Bubble => false,
             PointerPropagate::Stop => true,
 
@@ -349,7 +328,6 @@ fn find_widget_at(tree: &Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
 
 fn send_pointer_event(
     root: &mut Root,
-    window: WindowId,
     root_widget: WidgetId,
     target: WidgetId,
     event: &PointerEvent,
@@ -366,11 +344,9 @@ fn send_pointer_event(
         if let PointerPropagate::Bubble = propagate {
             let (tree, root, widget, state) = widget.split();
             let mut cx = EventCx {
-                window,
                 root,
                 tree,
                 state,
-                id,
                 focus: &mut focus,
             };
 

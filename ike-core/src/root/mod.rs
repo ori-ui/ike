@@ -248,14 +248,12 @@ impl Root {
 
         {
             let _span = tracing::info_span!("draw");
-
-            widget.draw_recursive(window_id, canvas);
+            widget.draw_recursive(canvas);
         }
 
         {
             let _span = tracing::info_span!("draw_over");
-
-            widget.draw_over_recursive(window_id, canvas);
+            widget.draw_over_recursive(canvas);
         }
 
         matches!(sizing, WindowSizing::FitContent).then_some(new_window_size)

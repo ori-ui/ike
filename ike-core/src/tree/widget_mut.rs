@@ -247,10 +247,10 @@ where
         (widget, cx)
     }
 
-    pub(crate) fn split_layout_cx<'b>(&'b mut self, window: WindowId) -> (&'b mut T, LayoutCx<'b>) {
+    pub(crate) fn split_layout_cx<'b>(&'b mut self, scale: f32) -> (&'b mut T, LayoutCx<'b>) {
         let (tree, root, widget, state) = self.split();
         let cx = LayoutCx {
-            window,
+            scale,
             root,
             tree,
             state,
@@ -258,14 +258,9 @@ where
         (widget, cx)
     }
 
-    pub(crate) fn split_draw_cx<'b>(&'b mut self, window: WindowId) -> (&'b mut T, DrawCx<'b>) {
+    pub(crate) fn split_draw_cx<'b>(&'b mut self) -> (&'b mut T, DrawCx<'b>) {
         let (tree, root, widget, state) = self.split();
-        let cx = DrawCx {
-            window,
-            root,
-            tree,
-            state,
-        };
+        let cx = DrawCx { root, tree, state };
         (widget, cx)
     }
 
@@ -310,7 +305,7 @@ where
 
     pub(crate) fn layout_recursive(
         &mut self,
-        window: WindowId,
+        scale: f32,
         painter: &mut dyn Painter,
         space: Space,
     ) -> Size {
@@ -328,14 +323,12 @@ where
         self.state_mut().needs_layout = false;
 
         let mut size = {
-            let (widget, mut cx) = self.split_layout_cx(window);
+            let (widget, mut cx) = self.split_layout_cx(scale);
             widget.layout(&mut cx, painter, space)
         };
 
-        if self.is_pixel_perfect()
-            && let Some(window) = self.root.get_window(window)
-        {
-            size = size.ceil_to_scale(window.scale());
+        if self.is_pixel_perfect() {
+            size = size.ceil_to_scale(scale);
         }
 
         if !size.is_finite() {
@@ -348,18 +341,14 @@ where
         size
     }
 
-    pub(crate) fn compose_recursive(&mut self, window: WindowId, transform: Affine) {
+    pub(crate) fn compose_recursive(&mut self, scale_factor: f32, transform: Affine) {
         if self.is_stashed() {
             return;
         }
 
-        if self.is_pixel_perfect()
-            && let Some(window) = self.root.get_window(window)
-        {
-            let scale = window.scale();
-
+        if self.is_pixel_perfect() {
             let transform = &mut self.state_mut().transform;
-            transform.offset = transform.offset.round_to_scale(scale);
+            transform.offset = transform.offset.round_to_scale(scale_factor);
         }
 
         let _span = self.enter_span();
@@ -367,7 +356,7 @@ where
         let transform = transform * self.transform();
         self.state_mut().global_transform = transform;
 
-        self.for_each_child(|child| child.compose_recursive(window, transform));
+        self.for_each_child(|child| child.compose_recursive(scale_factor, transform));
 
         self.update_state();
 
@@ -375,7 +364,7 @@ where
         widget.compose(&mut cx);
     }
 
-    pub(crate) fn draw_recursive(&mut self, window: WindowId, canvas: &mut dyn Canvas) {
+    pub(crate) fn draw_recursive(&mut self, canvas: &mut dyn Canvas) {
         if self.is_stashed() {
             return;
         }
@@ -385,25 +374,25 @@ where
         canvas.transform(self.transform(), &mut |canvas| {
             if let Some(ref clip) = self.state().clip {
                 canvas.clip(&clip.clone(), &mut |canvas| {
-                    let (widget, mut cx) = self.split_draw_cx(window);
+                    let (widget, mut cx) = self.split_draw_cx();
                     widget.draw(&mut cx, canvas);
 
                     self.for_each_child(|child| {
-                        child.draw_recursive(window, canvas);
+                        child.draw_recursive(canvas);
                     });
                 });
             } else {
-                let (widget, mut cx) = self.split_draw_cx(window);
+                let (widget, mut cx) = self.split_draw_cx();
                 widget.draw(&mut cx, canvas);
 
                 self.for_each_child(|child| {
-                    child.draw_recursive(window, canvas);
+                    child.draw_recursive(canvas);
                 });
             }
         });
     }
 
-    pub(crate) fn draw_over_recursive(&mut self, window: WindowId, canvas: &mut dyn Canvas) {
+    pub(crate) fn draw_over_recursive(&mut self, canvas: &mut dyn Canvas) {
         self.state_mut().needs_draw = false;
 
         if self.is_stashed() {
@@ -415,19 +404,19 @@ where
         canvas.transform(self.transform(), &mut |canvas| {
             if let Some(ref clip) = self.state().clip {
                 canvas.clip(&clip.clone(), &mut |canvas| {
-                    let (widget, mut cx) = self.split_draw_cx(window);
+                    let (widget, mut cx) = self.split_draw_cx();
                     widget.draw_over(&mut cx, canvas);
 
                     self.for_each_child(|child| {
-                        child.draw_over_recursive(window, canvas);
+                        child.draw_over_recursive(canvas);
                     });
                 });
             } else {
-                let (widget, mut cx) = self.split_draw_cx(window);
+                let (widget, mut cx) = self.split_draw_cx();
                 widget.draw_over(&mut cx, canvas);
 
                 self.for_each_child(|child| {
-                    child.draw_over_recursive(window, canvas);
+                    child.draw_over_recursive(canvas);
                 });
             }
         });

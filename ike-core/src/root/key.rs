@@ -38,12 +38,9 @@ impl Root {
 
         let contents = window.contents;
         let modifiers = window.modifiers;
-        let window = window.id;
 
         let handled = match focus::find_focused(&self.tree, contents) {
-            Some(target) => {
-                send_key_event(self, window, contents, target, &event) == Propagate::Stop
-            }
+            Some(target) => send_key_event(self, contents, target, &event) == Propagate::Stop,
             None => false,
         };
 
@@ -57,7 +54,6 @@ impl Root {
 
 fn send_key_event(
     root: &mut Root,
-    window: WindowId,
     root_widget: WidgetId,
     target: WidgetId,
     event: &KeyEvent,
@@ -74,11 +70,9 @@ fn send_key_event(
         if let Propagate::Bubble = propagate {
             let (tree, root, widget, state) = widget.split();
             let mut cx = EventCx {
-                window,
                 root,
                 tree,
                 state,
-                id,
                 focus: &mut focus,
             };
 

@@ -6,6 +6,7 @@ pub(super) fn layout_window(
     painter: &mut dyn Painter,
 ) -> Size {
     let window = widget.get_window(window_id).unwrap();
+    let scale = window.scale();
 
     let max_size = match window.sizing {
         WindowSizing::FitContent => Size::all(f32::INFINITY),
@@ -17,12 +18,12 @@ pub(super) fn layout_window(
     let size = {
         let _span = tracing::info_span!("layout").entered();
         let space = Space::new(Size::all(0.0), max_size);
-        widget.layout_recursive(window_id, painter, space)
+        widget.layout_recursive(scale, painter, space)
     };
 
     if needs_layout {
         let _span = tracing::info_span!("compose").entered();
-        widget.compose_recursive(window_id, Affine::IDENTITY);
+        widget.compose_recursive(scale, Affine::IDENTITY);
     }
 
     size

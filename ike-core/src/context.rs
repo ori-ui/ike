@@ -1,6 +1,6 @@
 use crate::{
     Affine, AnyWidget, Clip, CursorIcon, Offset, Painter, Point, Rect, Size, Space, Tree, WidgetId,
-    WidgetRef, Window, WindowId, root::RootState, widget::WidgetState,
+    WidgetRef, Window, root::RootState, widget::WidgetState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -12,12 +12,10 @@ pub(crate) enum FocusUpdate {
 }
 
 pub struct EventCx<'a> {
-    pub(crate) window: WindowId,
-    pub(crate) root:   &'a mut RootState,
-    pub(crate) tree:   &'a mut Tree,
-    pub(crate) state:  &'a mut WidgetState,
-    pub(crate) id:     WidgetId,
-    pub(crate) focus:  &'a mut FocusUpdate,
+    pub(crate) root:  &'a mut RootState,
+    pub(crate) tree:  &'a mut Tree,
+    pub(crate) state: &'a mut WidgetState,
+    pub(crate) focus: &'a mut FocusUpdate,
 }
 
 pub struct UpdateCx<'a> {
@@ -27,26 +25,21 @@ pub struct UpdateCx<'a> {
 }
 
 pub struct LayoutCx<'a> {
-    pub(crate) window: WindowId,
-    pub(crate) root:   &'a mut RootState,
-    pub(crate) tree:   &'a mut Tree,
-    pub(crate) state:  &'a mut WidgetState,
+    pub(crate) scale: f32,
+    pub(crate) root:  &'a mut RootState,
+    pub(crate) tree:  &'a mut Tree,
+    pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct DrawCx<'a> {
-    pub(crate) window: WindowId,
-    pub(crate) root:   &'a mut RootState,
-    pub(crate) tree:   &'a mut Tree,
-    pub(crate) state:  &'a mut WidgetState,
+    pub(crate) root:  &'a mut RootState,
+    pub(crate) tree:  &'a mut Tree,
+    pub(crate) state: &'a mut WidgetState,
 }
 
 impl EventCx<'_> {
-    pub fn window(&self) -> &Window {
-        self.root.get_window(self.window).unwrap()
-    }
-
     pub fn request_focus(&mut self) {
-        *self.focus = FocusUpdate::Target(self.id);
+        *self.focus = FocusUpdate::Target(self.id());
     }
 
     pub fn request_unfocus(&mut self) {
@@ -59,12 +52,6 @@ impl EventCx<'_> {
 
     pub fn request_focus_previous(&mut self) {
         *self.focus = FocusUpdate::Previous;
-    }
-}
-
-impl UpdateCx<'_> {
-    pub fn window(&self) -> &Window {
-        self.root.get_window(self.state.window.unwrap()).unwrap()
     }
 }
 
@@ -85,7 +72,7 @@ impl LayoutCx<'_> {
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
         let child = self.state.children[index];
         let mut child = self.tree.get_mut(self.root, child).unwrap();
-        child.layout_recursive(self.window, painter, space)
+        child.layout_recursive(self.scale, painter, space)
     }
 
     pub fn place_child(&mut self, index: usize, offset: Offset) {
@@ -104,16 +91,6 @@ impl LayoutCx<'_> {
 
     pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
         self.state.clip = rect.into();
-    }
-
-    pub fn window(&self) -> &Window {
-        self.root.get_window(self.window).unwrap()
-    }
-}
-
-impl DrawCx<'_> {
-    pub fn window(&self) -> &Window {
-        self.root.get_window(self.window).unwrap()
     }
 }
 
@@ -183,8 +160,12 @@ impl_contexts! {
             self.tree.get(self.root, self.state.children[index])
         }
 
+        pub fn get_window(&self) -> Option<&Window> {
+            self.root.get_window(self.state.window?)
+        }
+
         pub fn is_window_focused(&self) -> bool {
-            self.window().is_focused()
+            self.get_window().is_some_and(|window| window.is_focused())
         }
 
         pub fn is_pixel_perfect(&self) -> bool {
