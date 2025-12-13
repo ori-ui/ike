@@ -1,8 +1,8 @@
 use keyboard_types::{Key, Modifiers, NamedKey};
 
 use crate::{
-    BuildCx, EventCx, KeyEvent, Propagate, Root, WidgetId, WindowId, context::FocusUpdate,
-    key::KeyPressEvent, root::focus,
+    BuildCx, EventCx, KeyEvent, KeyPressEvent, Propagate, Root, WidgetId, WindowId,
+    context::FocusUpdate, root::focus,
 };
 
 impl Root {
@@ -12,7 +12,7 @@ impl Root {
         }
     }
 
-    pub fn key_press(
+    pub fn key_pressed(
         &mut self,
         window: WindowId,
         key: Key,
@@ -20,7 +20,7 @@ impl Root {
         text: Option<&str>,
         pressed: bool,
     ) -> bool {
-        let Some(window) = self.get_window_mut(window) else {
+        let Some(window) = self.get_window(window) else {
             return false;
         };
 
@@ -39,7 +39,7 @@ impl Root {
         let contents = window.contents;
         let modifiers = window.modifiers;
 
-        let handled = match focus::find_focused(&self.tree, contents) {
+        let handled = match focus::find_focused(&self.arena, contents) {
             Some(target) => send_key_event(self, contents, target, &event) == Propagate::Stop,
             None => false,
         };
@@ -65,25 +65,24 @@ fn send_key_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current {
-        let mut widget = root.get_mut(id).unwrap();
+        let widget = root.get_mut(id).unwrap();
 
         if let Propagate::Bubble = propagate {
-            let (tree, root, widget, state) = widget.split();
             let mut cx = EventCx {
-                root,
-                tree,
-                state,
+                root:  widget.cx.root,
+                arena: widget.cx.arena,
+                state: widget.cx.state,
                 focus: &mut focus,
             };
 
-            propagate = widget.on_key_event(&mut cx, event);
+            propagate = widget.widget.on_key_event(&mut cx, event);
         }
 
-        current = widget.state().parent;
+        current = widget.cx.parent();
     }
 
     if let Some(mut target) = root.get_mut(target) {
-        target.propagate_state();
+        target.cx.propagate_state();
     }
 
     focus::update_focus(root, root_widget, focus);

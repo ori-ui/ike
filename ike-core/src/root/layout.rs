@@ -5,7 +5,10 @@ pub(super) fn layout_window(
     window_id: WindowId,
     painter: &mut dyn Painter,
 ) -> Size {
-    let window = widget.get_window(window_id).unwrap();
+    let Some(window) = widget.cx.root.get_window(window_id) else {
+        return Size::ZERO;
+    };
+
     let scale = window.scale();
 
     let max_size = match window.sizing {
@@ -13,7 +16,7 @@ pub(super) fn layout_window(
         WindowSizing::Resizable { .. } => window.size,
     };
 
-    let needs_layout = widget.state().needs_layout;
+    let needs_layout = widget.cx.state.needs_layout;
 
     let size = {
         let _span = tracing::info_span!("layout").entered();

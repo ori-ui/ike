@@ -1,0 +1,364 @@
+use std::{marker::PhantomData, mem, time::Duration};
+
+use crate::{
+    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, MutCx, Painter, RefCx, Size, Space,
+    Update, Widget, WidgetId, WidgetRef,
+};
+
+pub struct WidgetMut<'a, T = dyn Widget>
+where
+    T: ?Sized + AnyWidget,
+{
+    pub widget: &'a mut T,
+    pub cx:     MutCx<'a>,
+}
+
+impl<T> Drop for WidgetMut<'_, T>
+where
+    T: ?Sized + AnyWidget,
+{
+    fn drop(&mut self) {
+        let id = self.cx.id();
+        let entry = &self.cx.arena.entries[id.index as usize];
+        entry.borrowed.set(false);
+    }
+}
+
+impl<'a, T> WidgetMut<'a, T>
+where
+    T: ?Sized + AnyWidget,
+{
+    pub fn id(&self) -> WidgetId<T> {
+        let id = self.cx.state.id;
+
+        WidgetId {
+            index:      id.index,
+            generation: id.generation,
+            marker:     PhantomData,
+        }
+    }
+
+    pub fn upcast(&mut self) -> WidgetMut<'_, dyn Widget> {
+        WidgetMut {
+            widget: T::upcast_mut(self.widget),
+
+            cx: MutCx {
+                root:  self.cx.root,
+                arena: self.cx.arena,
+                state: self.cx.state,
+            },
+        }
+    }
+
+    pub fn to_ref(&self) -> WidgetRef<'_, T> {
+        WidgetRef {
+            widget: self.widget,
+
+            cx: RefCx {
+                root:  self.cx.root,
+                arena: self.cx.arena,
+                state: self.cx.state,
+            },
+        }
+    }
+
+    pub fn set_stashed(&mut self, is_stashed: bool) {
+        self.set_stashed_without_propagate(is_stashed);
+        self.cx.propagate_state();
+    }
+
+    /// Add a child to widget.
+    pub fn add_child(&mut self, child: impl AnyWidgetId) {
+        let child = child.upcast();
+        self.cx.arena.debug_validate_id(child);
+
+        let window = self.cx.state.window;
+        if let Some(mut child) = self.cx.get_mut(child) {
+            child.cx.set_window_recursive(window);
+        }
+
+        let id = self.id();
+        if let Some(child_state) = self.cx.arena.get_state_mut(child.index) {
+            child_state.parent = Some(id.upcast());
+        }
+
+        let index = self.cx.state.children.len();
+        self.cx.state.children.push(child.upcast());
+        self.update_without_propagate(Update::Children(ChildUpdate::Added(
+            index,
+        )));
+        self.cx.request_layout();
+    }
+
+    /// Swap two children of a widget.
+    pub fn swap_children(&mut self, index_a: usize, index_b: usize) {
+        self.cx.state.children.swap(index_a, index_b);
+        self.update_without_propagate(Update::Children(ChildUpdate::Swapped(
+            index_a, index_b,
+        )));
+        self.cx.request_layout();
+    }
+
+    /// Replace the child of a widget with another returning the previous child.
+    pub fn replace_child(&mut self, index: usize, child: impl AnyWidgetId) -> WidgetId {
+        let child = child.upcast();
+        self.cx.arena.debug_validate_id(child);
+
+        let window = self.cx.state.window;
+        if let Some(mut child) = self.cx.get_mut(child) {
+            child.cx.set_window_recursive(window);
+        }
+
+        let id = self.id();
+        if let Some(child_state) = self.cx.arena.get_state_mut(child.index) {
+            assert!(child_state.parent.is_none());
+            child_state.parent = Some(id.upcast());
+        }
+
+        let prev_child = mem::replace(
+            &mut self.cx.state.children[index],
+            child,
+        );
+
+        let update = Update::Children(ChildUpdate::Replaced(index));
+        self.update_without_propagate(update);
+        self.cx.request_layout();
+
+        let window = self.cx.state.window;
+        if let Some(mut prev_child) = self.cx.get_mut(prev_child) {
+            prev_child.cx.set_window_recursive(window);
+        }
+
+        prev_child
+    }
+
+    pub fn remove_child(&mut self, index: usize) {
+        let id = self.cx.state.children.remove(index);
+
+        let update = Update::Children(ChildUpdate::Removed(index));
+        self.update_without_propagate(update);
+
+        if !self.cx.arena.free_recursive(id) {
+            tracing::error!(
+                "`remove_child` was called, while a descendant of the removed widget was borrowed"
+            );
+        }
+
+        self.cx.request_layout();
+    }
+}
+
+impl<'a, T> WidgetMut<'a, T>
+where
+    T: ?Sized + AnyWidget,
+{
+    pub(crate) fn set_stashed_without_propagate(&mut self, is_stashed: bool) {
+        if self.cx.is_stashed() == is_stashed {
+            return;
+        }
+
+        if !is_stashed && self.cx.get_parent().is_some_and(|p| p.cx.is_stashed()) {
+            return;
+        }
+
+        self.cx.state.is_stashing = is_stashed;
+        self.set_stashed_recursive(is_stashed);
+    }
+
+    fn set_stashed_recursive(&mut self, is_stashed: bool) {
+        self.cx.for_each_child(|child| {
+            child.set_stashed_recursive(is_stashed);
+        });
+
+        self.cx.state.is_stashed = is_stashed;
+        self.cx.state.needs_layout = true;
+
+        if !is_stashed {
+            self.cx.state.is_focused = false;
+            self.cx.state.is_hovered = false;
+            self.cx.state.is_active = false;
+
+            self.update_without_propagate(Update::Focused(false));
+            self.update_without_propagate(Update::Hovered(false));
+            self.update_without_propagate(Update::Active(false));
+        }
+
+        self.update_without_propagate(Update::Stashed(is_stashed));
+        self.cx.update_state();
+    }
+
+    pub(crate) fn set_hovered(&mut self, is_hovered: bool) {
+        self.cx.state.is_hovered = is_hovered;
+        self.update_without_propagate(Update::Hovered(is_hovered));
+        self.cx.propagate_state();
+    }
+
+    pub(crate) fn set_active(&mut self, is_active: bool) {
+        self.cx.state.is_active = is_active;
+        self.update_without_propagate(Update::Active(is_active));
+        self.cx.propagate_state();
+    }
+
+    pub(crate) fn set_focused(&mut self, is_focused: bool) {
+        self.cx.state.is_focused = is_focused;
+        self.update_without_propagate(Update::Focused(is_focused));
+        self.cx.propagate_state();
+    }
+
+    pub(crate) fn update_without_propagate(&mut self, update: Update) {
+        self.widget.update(&mut self.cx.as_update_cx(), update);
+    }
+
+    pub(crate) fn update_recursive(&mut self, update: Update) {
+        let _span = self.cx.enter_span();
+
+        self.cx.for_each_child(|child| {
+            child.update_recursive(update.clone());
+        });
+
+        self.cx.update_state();
+
+        if let Update::WindowScaleChanged(..) = update
+            && self.cx.is_pixel_perfect()
+        {
+            self.cx.state.needs_layout = true;
+        }
+
+        self.update_without_propagate(update);
+    }
+
+    pub(crate) fn animate_recursive(&mut self, dt: Duration) {
+        if self.cx.is_stashed() || !self.cx.state.needs_animate {
+            return;
+        }
+
+        let _span = self.cx.enter_span();
+
+        self.cx.for_each_child(|child| child.animate_recursive(dt));
+
+        self.cx.state.needs_animate = false;
+        self.cx.update_state();
+
+        self.widget.animate(&mut self.cx.as_update_cx(), dt);
+    }
+
+    pub(crate) fn layout_recursive(
+        &mut self,
+        scale: f32,
+        painter: &mut dyn Painter,
+        space: Space,
+    ) -> Size {
+        if self.cx.state.is_stashing {
+            self.cx.state.transform = Affine::IDENTITY;
+            self.cx.state.size = space.min;
+            return space.min;
+        }
+
+        if self.cx.state.previous_space == Some(space) && !self.cx.state.needs_layout {
+            return self.cx.state.size;
+        }
+
+        let _span = self.cx.enter_span();
+        self.cx.state.needs_layout = false;
+
+        let mut size = self.widget.layout(
+            &mut self.cx.as_layout_cx(scale),
+            painter,
+            space,
+        );
+
+        if self.cx.is_pixel_perfect() {
+            size = size.ceil_to_scale(scale);
+        }
+
+        if !size.is_finite() {
+            tracing::warn!(size = ?size, "size is not finite");
+        }
+
+        self.cx.state.size = size;
+        self.cx.state.previous_space = Some(space);
+
+        size
+    }
+
+    pub(crate) fn compose_recursive(&mut self, scale_factor: f32, transform: Affine) {
+        if self.cx.is_stashed() {
+            return;
+        }
+
+        if self.cx.is_pixel_perfect() {
+            let transform = &mut self.cx.state.transform;
+            transform.offset = transform.offset.round_to_scale(scale_factor);
+        }
+
+        let _span = self.cx.enter_span();
+
+        let transform = transform * self.cx.transform();
+        self.cx.state.global_transform = transform;
+
+        self.cx.for_each_child(|child| {
+            child.compose_recursive(scale_factor, transform);
+        });
+
+        self.cx.update_state();
+        self.widget.compose(&mut self.cx.as_update_cx());
+    }
+
+    pub(crate) fn draw_recursive(&mut self, canvas: &mut dyn Canvas) {
+        if self.cx.is_stashed() {
+            return;
+        }
+
+        let _span = self.cx.enter_span();
+
+        canvas.transform(self.cx.transform(), &mut |canvas| {
+            if let Some(ref clip) = self.cx.state.clip {
+                canvas.clip(&clip.clone(), &mut |canvas| {
+                    let mut cx = self.cx.as_draw_cx();
+                    self.widget.draw(&mut cx, canvas);
+
+                    self.cx.for_each_child(|child| {
+                        child.draw_recursive(canvas);
+                    });
+                });
+            } else {
+                let mut cx = self.cx.as_draw_cx();
+                self.widget.draw(&mut cx, canvas);
+
+                self.cx.for_each_child(|child| {
+                    child.draw_recursive(canvas);
+                });
+            }
+        });
+    }
+
+    pub(crate) fn draw_over_recursive(&mut self, canvas: &mut dyn Canvas) {
+        self.cx.state.needs_draw = false;
+
+        if self.cx.is_stashed() {
+            return;
+        }
+
+        let _span = self.cx.enter_span();
+
+        canvas.transform(self.cx.transform(), &mut |canvas| {
+            if let Some(ref clip) = self.cx.state.clip {
+                canvas.clip(&clip.clone(), &mut |canvas| {
+                    let mut cx = self.cx.as_draw_cx();
+                    self.widget.draw_over(&mut cx, canvas);
+
+                    self.cx.for_each_child(|child| {
+                        child.draw_over_recursive(canvas);
+                    });
+                });
+            } else {
+                let mut cx = self.cx.as_draw_cx();
+                self.widget.draw_over(&mut cx, canvas);
+
+                self.cx.for_each_child(|child| {
+                    child.draw_over_recursive(canvas);
+                });
+            }
+        });
+    }
+}

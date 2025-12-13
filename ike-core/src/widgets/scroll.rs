@@ -56,52 +56,52 @@ impl Scroll {
     }
 
     pub fn set_axis(this: &mut WidgetMut<Self>, axis: Axis) {
-        this.axis = axis;
-        this.request_layout();
+        this.widget.axis = axis;
+        this.cx.request_layout();
     }
 
     pub fn set_bar_width(this: &mut WidgetMut<Self>, width: f32) {
-        this.bar_width = width;
-        this.request_layout();
+        this.widget.bar_width = width;
+        this.cx.request_layout();
     }
 
     pub fn set_bar_padding(this: &mut WidgetMut<Self>, padding: Padding) {
-        this.bar_padding = padding;
-        this.request_layout();
+        this.widget.bar_padding = padding;
+        this.cx.request_layout();
     }
 
     pub fn set_bar_border_width(this: &mut WidgetMut<Self>, border_width: BorderWidth) {
-        this.bar_border_width = border_width;
-        this.request_layout();
+        this.widget.bar_border_width = border_width;
+        this.cx.request_layout();
     }
 
     pub fn set_bar_corner_radius(this: &mut WidgetMut<Self>, corner_radius: CornerRadius) {
-        this.bar_corner_radius = corner_radius;
-        this.request_draw();
+        this.widget.bar_corner_radius = corner_radius;
+        this.cx.request_draw();
     }
 
     pub fn set_knob_corner_radius(this: &mut WidgetMut<Self>, corner_radius: CornerRadius) {
-        this.knob_corner_radius = corner_radius;
-        this.request_draw();
+        this.widget.knob_corner_radius = corner_radius;
+        this.cx.request_draw();
     }
 
     pub fn set_bar_border_paint(this: &mut WidgetMut<Self>, paint: Paint) {
-        this.bar_border_paint = paint;
-        this.request_draw();
+        this.widget.bar_border_paint = paint;
+        this.cx.request_draw();
     }
 
     pub fn set_bar_paint(this: &mut WidgetMut<Self>, paint: Paint) {
-        this.bar_paint = paint;
-        this.request_draw();
+        this.widget.bar_paint = paint;
+        this.cx.request_draw();
     }
 
     pub fn set_knob_paint(this: &mut WidgetMut<Self>, paint: Paint) {
-        this.knob_paint = paint;
-        this.request_draw();
+        this.widget.knob_paint = paint;
+        this.cx.request_draw();
     }
 
     pub fn set_transition(this: &mut WidgetMut<Self>, transition: Transition) {
-        this.scroll.set_transition(transition);
+        this.widget.scroll.set_transition(transition);
     }
 
     fn overflow(&self) -> f32 {

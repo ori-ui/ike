@@ -44,8 +44,8 @@ impl Stack {
     }
 
     pub fn set_flex(this: &mut WidgetMut<Self>, index: usize, flex: f32, tight: bool) {
-        this.flex[index] = (flex, tight);
-        this.request_layout();
+        this.widget.flex[index] = (flex, tight);
+        this.cx.request_layout();
     }
 
     pub fn get_flex(&self, index: usize) -> (f32, bool) {
@@ -53,23 +53,23 @@ impl Stack {
     }
 
     pub fn set_axis(this: &mut WidgetMut<Self>, axis: Axis) {
-        this.axis = axis;
-        this.request_layout();
+        this.widget.axis = axis;
+        this.cx.request_layout();
     }
 
     pub fn set_justify(this: &mut WidgetMut<Self>, justify: Justify) {
-        this.justify = justify;
-        this.request_layout();
+        this.widget.justify = justify;
+        this.cx.request_layout();
     }
 
     pub fn set_align(this: &mut WidgetMut<Self>, align: Align) {
-        this.align = align;
-        this.request_layout();
+        this.widget.align = align;
+        this.cx.request_layout();
     }
 
     pub fn set_gap(this: &mut WidgetMut<Self>, gap: f32) {
-        this.gap = gap;
-        this.request_layout();
+        this.widget.gap = gap;
+        this.cx.request_layout();
     }
 }
 
@@ -82,7 +82,7 @@ impl Widget for Stack {
             min_minor = max_minor;
         }
 
-        let total_gap = self.gap * cx.children().len().saturating_sub(1) as f32;
+        let total_gap = self.gap * cx.iter_children().len().saturating_sub(1) as f32;
 
         let mut flex_sum = 0.0;
         let mut major_sum = total_gap;
@@ -161,7 +161,7 @@ impl Widget for Stack {
 
         let excess_major = major - major_sum + total_gap;
 
-        let count = cx.children().len();
+        let count = cx.iter_children().len();
         let gap = match self.justify {
             Justify::Start | Justify::Center | Justify::End => self.gap,
             Justify::SpaceBetween => excess_major / (count.saturating_sub(1)) as f32,

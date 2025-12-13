@@ -5,7 +5,7 @@ use keyboard_types::NamedKey;
 use crate::{
     BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Key, KeyEvent, LayoutCx,
     Offset, Paint, Painter, Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect,
-    Size, Space, TextLayoutLine, Update, UpdateCx, Widget, WidgetMut,
+    Size, Space, TextLayoutLine, Update, UpdateCx, Widget, WidgetMut, event::TextEvent,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -94,52 +94,52 @@ impl TextArea {
         // the new text might place the cursor in the middle of a unicode character,
         // in which case we want to move the cursor to avoid crashes.
 
-        this.cursor = this.cursor.min(paragraph.text.len());
-        while !paragraph.text.is_char_boundary(this.cursor) {
-            this.cursor -= 1;
+        this.widget.cursor = this.widget.cursor.min(paragraph.text.len());
+        while !paragraph.text.is_char_boundary(this.widget.cursor) {
+            this.widget.cursor -= 1;
         }
 
-        if let Some(ref mut selection) = this.selection {
+        if let Some(ref mut selection) = this.widget.selection {
             *selection = (*selection).min(paragraph.text.len());
             while !paragraph.text.is_char_boundary(*selection) {
                 *selection -= 1;
             }
         }
 
-        this.paragraph = paragraph;
-        this.request_layout();
+        this.widget.paragraph = paragraph;
+        this.cx.request_layout();
     }
 
     pub fn set_selection_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.selection_color = color;
-        this.request_draw();
+        this.widget.selection_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_cursor_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.cursor_color = color;
-        this.request_draw();
+        this.widget.cursor_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_blink_rate(this: &mut WidgetMut<Self>, rate: f32) {
-        this.blink_rate = rate;
+        this.widget.blink_rate = rate;
     }
 
     pub fn set_newline_behaviour(this: &mut WidgetMut<Self>, behaviour: NewlineBehaviour) {
-        this.newline_behaviour = behaviour;
-        this.request_draw();
+        this.widget.newline_behaviour = behaviour;
+        this.cx.request_draw();
     }
 
     pub fn set_submit_behaviour(this: &mut WidgetMut<Self>, behaviour: SubmitBehaviour) {
-        this.submit_behaviour = behaviour;
-        this.request_draw();
+        this.widget.submit_behaviour = behaviour;
+        this.cx.request_draw();
     }
 
     pub fn set_on_change(this: &mut WidgetMut<Self>, on_change: impl FnMut(&str) + 'static) {
-        this.on_change = Some(Box::new(on_change));
+        this.widget.on_change = Some(Box::new(on_change));
     }
 
     pub fn set_on_submit(this: &mut WidgetMut<Self>, on_submit: impl FnMut(&str) + 'static) {
-        this.on_submit = Some(Box::new(on_submit));
+        this.widget.on_submit = Some(Box::new(on_submit));
     }
 
     pub fn text(&self) -> &str {
@@ -467,7 +467,7 @@ impl Widget for TextArea {
     fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {
         cx.request_draw();
 
-        if cx.is_focused() && self.selection.is_none() {
+        if cx.is_focused() && self.selection.is_none() && cx.is_window_focused() {
             self.blink += dt.as_secs_f32() * self.blink_rate;
 
             cx.request_animate();
@@ -623,6 +623,19 @@ impl Widget for TextArea {
 
                     _ => Propagate::Bubble,
                 }
+            }
+
+            _ => Propagate::Bubble,
+        }
+    }
+
+    fn on_text_event(&mut self, cx: &mut EventCx<'_>, event: &TextEvent) -> Propagate {
+        match event {
+            TextEvent::Paste(event) if self.is_editable => {
+                self.insert_text(&event.contents);
+                cx.request_layout();
+
+                Propagate::Stop
             }
 
             _ => Propagate::Bubble,

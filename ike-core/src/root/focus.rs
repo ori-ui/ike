@@ -1,18 +1,18 @@
-use crate::{BuildCx, Point, Rect, Root, Tree, WidgetId, context::FocusUpdate, root::scroll};
+use crate::{Arena, BuildCx, Point, Rect, Root, WidgetId, context::FocusUpdate, root::scroll};
 
 /// Find the currently focused widget.
-pub(super) fn find_focused(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
-    let state = tree.get_state_unchecked(root.index);
+pub(super) fn find_focused(arena: &Arena, root: WidgetId) -> Option<WidgetId> {
+    let state = arena.get_state(root.index)?;
 
     if state.is_focused {
         return Some(root);
     }
 
     for &child in &state.children {
-        let child_state = tree.get_state_unchecked(child.index);
+        let child_state = arena.get_state(child.index)?;
 
         if child_state.has_focused {
-            return find_focused(tree, child);
+            return find_focused(arena, child);
         }
     }
 
@@ -24,7 +24,7 @@ pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: Focus
         FocusUpdate::None => {}
 
         FocusUpdate::Unfocus => {
-            if let Some(focused) = find_focused(&root.tree, root_widget)
+            if let Some(focused) = find_focused(&root.arena, root_widget)
                 && let Some(mut widget) = root.get_mut(focused)
             {
                 widget.set_focused(false);
@@ -46,8 +46,8 @@ pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: Focus
 }
 
 pub(super) fn focus_next(root: &mut Root, id: WidgetId, forward: bool) -> Option<WidgetId> {
-    let current = find_focused(&root.tree, id);
-    let focused = find_next_focusable(&root.tree, id, forward);
+    let current = find_focused(&root.arena, id);
+    let focused = find_next_focusable(&root.arena, id, forward);
 
     if current != focused {
         if let Some(current) = current
@@ -61,7 +61,7 @@ pub(super) fn focus_next(root: &mut Root, id: WidgetId, forward: bool) -> Option
 
                 Some(Rect::min_size(
                     Point::ORIGIN,
-                    widget.size(),
+                    widget.cx.size(),
                 ))
             } else {
                 None
@@ -76,8 +76,8 @@ pub(super) fn focus_next(root: &mut Root, id: WidgetId, forward: bool) -> Option
     focused
 }
 
-fn find_first_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<WidgetId> {
-    let state = tree.get_state_unchecked(id.index);
+fn find_first_focusable(arena: &Arena, id: WidgetId, forward: bool) -> Option<WidgetId> {
+    let state = arena.get_state(id.index)?;
 
     if state.accepts_focus {
         return Some(id);
@@ -85,13 +85,13 @@ fn find_first_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widg
 
     if forward {
         for &child in state.children.iter() {
-            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+            if let Some(focusable) = find_first_focusable(arena, child, forward) {
                 return Some(focusable);
             }
         }
     } else {
         for &child in state.children.iter().rev() {
-            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+            if let Some(focusable) = find_first_focusable(arena, child, forward) {
                 return Some(focusable);
             }
         }
@@ -100,21 +100,21 @@ fn find_first_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widg
     None
 }
 
-fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<WidgetId> {
-    let state = tree.get_state_unchecked(id.index);
+fn find_next_focusable(arena: &Arena, id: WidgetId, forward: bool) -> Option<WidgetId> {
+    let state = arena.get_state(id.index)?;
 
     if !state.has_focused {
-        return find_first_focusable(tree, id, forward);
+        return find_first_focusable(arena, id, forward);
     }
 
     if forward {
         let mut children = state.children.iter().copied();
 
         for child in children.by_ref() {
-            let child_state = tree.get_state_unchecked(child.index);
+            let child_state = arena.get_state(child.index)?;
 
             if child_state.has_focused {
-                if let Some(focusable) = find_next_focusable(tree, child, forward) {
+                if let Some(focusable) = find_next_focusable(arena, child, forward) {
                     return Some(focusable);
                 }
 
@@ -123,7 +123,7 @@ fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widge
         }
 
         for child in children {
-            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+            if let Some(focusable) = find_first_focusable(arena, child, forward) {
                 return Some(focusable);
             }
         }
@@ -131,10 +131,10 @@ fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widge
         let mut children = state.children.iter().copied().rev();
 
         for child in children.by_ref() {
-            let child_state = tree.get_state_unchecked(child.index);
+            let child_state = arena.get_state(child.index)?;
 
             if child_state.has_focused {
-                if let Some(focusable) = find_next_focusable(tree, child, forward) {
+                if let Some(focusable) = find_next_focusable(arena, child, forward) {
                     return Some(focusable);
                 }
 
@@ -143,7 +143,7 @@ fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widge
         }
 
         for child in children {
-            if let Some(focusable) = find_first_focusable(tree, child, forward) {
+            if let Some(focusable) = find_first_focusable(arena, child, forward) {
                 return Some(focusable);
             }
         }
@@ -153,7 +153,7 @@ fn find_next_focusable(tree: &Tree, id: WidgetId, forward: bool) -> Option<Widge
 }
 
 fn give_focus(root: &mut Root, root_widget: WidgetId, target: WidgetId) {
-    let current = find_focused(&root.tree, root_widget);
+    let current = find_focused(&root.arena, root_widget);
 
     if current != Some(target) {
         if let Some(current) = current
@@ -167,7 +167,7 @@ fn give_focus(root: &mut Root, root_widget: WidgetId, target: WidgetId) {
 
             Some(Rect::min_size(
                 Point::ORIGIN,
-                widget.size(),
+                widget.cx.size(),
             ))
         } else {
             None

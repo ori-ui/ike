@@ -1,7 +1,7 @@
 use crate::{
     BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Painter,
     Paragraph, Size, Space, TextAlign, TextWrap, Widget, WidgetId,
-    tree::{WidgetMut, WidgetRef},
+    arena::{WidgetMut, WidgetRef},
     widgets::{Label, NewlineBehaviour, SubmitBehaviour, TextArea},
 };
 
@@ -44,114 +44,105 @@ impl Entry {
     }
 
     pub fn set_placeholder(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        Label::set_text(
-            &mut this.get_mut(this.placeholder).unwrap(),
-            paragraph,
-        )
+        if let Some(mut placeholder) = this.cx.get_mut(this.widget.placeholder) {
+            Label::set_text(&mut placeholder, paragraph);
+        }
     }
 
     pub fn set_min_width(this: &mut WidgetMut<Self>, min_width: f32) {
-        this.min_width = min_width;
-        this.request_layout();
+        this.widget.min_width = min_width;
+        this.cx.request_layout();
     }
 
     pub fn set_max_width(this: &mut WidgetMut<Self>, max_width: f32) {
-        this.max_width = max_width;
-        this.request_layout();
+        this.widget.max_width = max_width;
+        this.cx.request_layout();
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
-        this.padding = padding;
-        this.request_layout();
+        this.widget.padding = padding;
+        this.cx.request_layout();
     }
 
     pub fn set_border_width(this: &mut WidgetMut<Self>, border_width: BorderWidth) {
-        this.border_width = border_width;
-        this.request_layout();
+        this.widget.border_width = border_width;
+        this.cx.request_layout();
     }
 
     pub fn set_corner_radius(this: &mut WidgetMut<Self>, corner_radius: CornerRadius) {
-        this.corner_radius = corner_radius;
-        this.request_draw();
+        this.widget.corner_radius = corner_radius;
+        this.cx.request_draw();
     }
 
     pub fn set_background_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.background_color = color;
-        this.request_draw();
+        this.widget.background_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_border_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.border_color = color;
-        this.request_draw();
+        this.widget.border_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_focus_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.focus_color = color;
-        this.request_draw();
+        this.widget.focus_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        TextArea::set_text(
-            &mut this.get_mut(this.text_area).unwrap(),
-            paragraph,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_text(&mut text_area, paragraph);
+        }
     }
 
     pub fn set_selection_color(this: &mut WidgetMut<Self>, color: Color) {
-        TextArea::set_selection_color(
-            &mut this.get_mut(this.text_area).unwrap(),
-            color,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_selection_color(&mut text_area, color);
+        }
     }
 
     pub fn set_cursor_color(this: &mut WidgetMut<Self>, color: Color) {
-        TextArea::set_cursor_color(
-            &mut this.get_mut(this.text_area).unwrap(),
-            color,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_cursor_color(&mut text_area, color);
+        }
     }
 
     pub fn set_blink_rate(this: &mut WidgetMut<Self>, rate: f32) {
-        TextArea::set_blink_rate(
-            &mut this.get_mut(this.text_area).unwrap(),
-            rate,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_blink_rate(&mut text_area, rate);
+        }
     }
 
     pub fn set_newline_behaviour(this: &mut WidgetMut<Self>, behaviour: NewlineBehaviour) {
-        TextArea::set_newline_behaviour(
-            &mut this.get_mut(this.text_area).unwrap(),
-            behaviour,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_newline_behaviour(&mut text_area, behaviour);
+        }
     }
 
     pub fn set_submit_behaviour(this: &mut WidgetMut<Self>, behaviour: SubmitBehaviour) {
-        TextArea::set_submit_behaviour(
-            &mut this.get_mut(this.text_area).unwrap(),
-            behaviour,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_submit_behaviour(&mut text_area, behaviour);
+        }
     }
 
     pub fn set_on_change(this: &mut WidgetMut<Self>, on_change: impl FnMut(&str) + 'static) {
-        TextArea::set_on_change(
-            &mut this.get_mut(this.text_area).unwrap(),
-            on_change,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_on_change(&mut text_area, on_change);
+        }
     }
 
     pub fn set_on_submit(this: &mut WidgetMut<Self>, on_submit: impl FnMut(&str) + 'static) {
-        TextArea::set_on_submit(
-            &mut this.get_mut(this.text_area).unwrap(),
-            on_submit,
-        );
+        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+            TextArea::set_on_submit(&mut text_area, on_submit);
+        }
     }
 
     pub fn text_area<'a>(this: &'a WidgetRef<'_, Self>) -> WidgetRef<'a, TextArea> {
-        this.get(this.text_area).unwrap()
+        this.cx.get(this.widget.text_area).unwrap()
     }
 
     pub fn text_area_mut<'a>(this: &'a mut WidgetMut<'a, Self>) -> WidgetMut<'a, TextArea> {
-        this.get_mut(this.text_area).unwrap()
+        this.cx.get_mut(this.widget.text_area).unwrap()
     }
 }
 
@@ -162,7 +153,10 @@ impl Widget for Entry {
         space.max.width = space.max.width.min(self.max_width);
         space.min.width = space.min.width.min(space.max.width);
 
-        let has_text = cx.get(self.text_area).text().is_empty();
+        let has_text = cx
+            .get(self.text_area)
+            .is_some_and(|w| w.widget.text().is_empty());
+
         cx.set_child_stashed(1, !has_text);
 
         let placeholder_size = cx.layout_child(1, painter, space);

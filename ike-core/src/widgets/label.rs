@@ -13,8 +13,8 @@ impl Label {
     }
 
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        this.paragraph = paragraph;
-        this.request_layout();
+        this.widget.paragraph = paragraph;
+        this.cx.request_layout();
     }
 }
 

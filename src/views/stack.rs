@@ -152,24 +152,24 @@ fn update_children(
     children: &mut impl ElementSeq<Flex<WidgetId>>,
 ) {
     for child in children.iter() {
-        if !widget.is_child(child.contents) {
+        if !widget.cx.is_child(child.contents) {
             widget.add_child(child.contents);
         }
     }
 
     for (i, child) in children.iter().enumerate() {
-        if widget.children()[i] != child.contents {
+        if widget.cx.children()[i] != child.contents {
             widget.swap_children(i, i + 1);
         }
 
-        let (flex, tight) = widgets::Stack::get_flex(widget, i);
+        let (flex, tight) = widget.widget.get_flex(i);
 
         if child.flex != flex || child.tight != tight {
             widgets::Stack::set_flex(widget, i, child.flex, child.tight);
         }
     }
 
-    let count = widget.children().len();
+    let count = widget.cx.children().len();
 
     for i in (children.count()..count).rev() {
         widget.remove_child(i);

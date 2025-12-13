@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    BuildCx, Canvas, Color, CursorIcon, Modifiers, Size, Tree, Update, WidgetId, Window, WindowId,
+    Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Size, Update, WidgetId, Window, WindowId,
     WindowSizing,
 };
 
@@ -15,11 +15,12 @@ mod layout;
 mod pointer;
 mod scroll;
 mod signal;
+mod text;
 
 pub use signal::{RootSignal, WindowUpdate};
 
 pub struct Root {
-    pub(crate) tree:  Tree,
+    pub(crate) arena: Arena,
     pub(crate) state: RootState,
 }
 
@@ -119,7 +120,7 @@ impl RootState {
 impl Root {
     pub fn new(sink: impl Fn(RootSignal) + 'static) -> Self {
         Self {
-            tree:  Tree::new(),
+            arena: Arena::new(),
             state: RootState {
                 windows: Vec::new(),
                 sink:    Box::new(sink),
@@ -159,7 +160,7 @@ impl Root {
         self.state.signal(RootSignal::CreateWindow(id));
 
         if let Some(mut widget) = self.get_mut(contents) {
-            widget.set_window_recursive(Some(id));
+            widget.cx.set_window_recursive(Some(id));
         }
 
         id
@@ -193,8 +194,8 @@ impl Root {
         contents: WidgetId,
     ) -> Option<WidgetId> {
         if let Some(mut widget) = self.get_mut(contents) {
-            widget.set_window_recursive(Some(window));
-            widget.request_layout();
+            widget.cx.set_window_recursive(Some(window));
+            widget.cx.request_layout();
         };
 
         if let Some(window) = self.get_window_mut(window) {
@@ -236,7 +237,7 @@ impl Root {
         let pointer_position = window.pointers.first().map(|p| p.position);
 
         let new_window_size = {
-            let mut widget = self.tree.get_mut(&mut self.state, contents).unwrap();
+            let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
             layout::layout_window(&mut widget, window_id, canvas.painter())
         };
 
@@ -244,7 +245,7 @@ impl Root {
             pointer::update_hovered(self, window_id, contents, position);
         }
 
-        let mut widget = self.tree.get_mut(&mut self.state, contents).unwrap();
+        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
 
         {
             let _span = tracing::info_span!("draw");
@@ -267,7 +268,7 @@ impl Root {
         let _span = tracing::info_span!("animate");
 
         let contents = window.contents;
-        let mut widget = self.tree.get_mut(&mut self.state, contents).unwrap();
+        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
         widget.animate_recursive(delta_time);
     }
 
@@ -279,7 +280,7 @@ impl Root {
         window.is_focused = is_focused;
 
         let contents = window.contents;
-        let mut widget = self.tree.get_mut(&mut self.state, contents).unwrap();
+        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
         let update = Update::WindowFocused(is_focused);
         widget.update_recursive(update);
     }
@@ -292,10 +293,10 @@ impl Root {
         window.size = new_size;
 
         let contents = window.contents;
-        let mut widget = self.tree.get_mut(&mut self.state, contents).unwrap();
+        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
         let update = Update::WindowResized(new_size);
         widget.update_recursive(update);
-        widget.request_layout();
+        widget.cx.request_layout();
     }
 
     pub fn window_scaled(&mut self, window: WindowId, new_scale: f32, new_size: Size) {
@@ -307,7 +308,7 @@ impl Root {
         window.size = new_size;
 
         let contents = window.contents;
-        let mut widget = self.tree.get_mut(&mut self.state, contents).unwrap();
+        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
         let update = Update::WindowScaleChanged(new_scale);
         widget.update_recursive(update);
     }

@@ -22,9 +22,9 @@ impl Aligned {
     }
 
     pub fn set_alignment(this: &mut WidgetMut<Self>, x: f32, y: f32) {
-        this.x = x;
-        this.y = y;
-        this.request_layout();
+        this.widget.x = x;
+        this.widget.y = y;
+        this.cx.request_layout();
     }
 }
 

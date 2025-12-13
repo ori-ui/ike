@@ -38,6 +38,9 @@ features = [
   "rwh_06",
 ]
 
+[target.'cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))'.dependencies.copypasta]
+version = "0.10"
+
 [dependencies.libloading]
 version = "0.9"
 optional = true

@@ -29,28 +29,28 @@ impl Container {
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
-        this.padding = padding;
-        this.request_layout();
+        this.widget.padding = padding;
+        this.cx.request_layout();
     }
 
     pub fn set_border_width(this: &mut WidgetMut<Self>, border_width: BorderWidth) {
-        this.border_width = border_width;
-        this.request_layout();
+        this.widget.border_width = border_width;
+        this.cx.request_layout();
     }
 
     pub fn set_corner_radius(this: &mut WidgetMut<Self>, corner_radius: CornerRadius) {
-        this.corner_radius = corner_radius;
-        this.request_draw();
+        this.widget.corner_radius = corner_radius;
+        this.cx.request_draw();
     }
 
     pub fn set_background_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.background_color = color;
-        this.request_draw();
+        this.widget.background_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_border_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.border_color = color;
-        this.request_draw();
+        this.widget.border_color = color;
+        this.cx.request_draw();
     }
 }
 

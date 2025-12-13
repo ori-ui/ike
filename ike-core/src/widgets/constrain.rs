@@ -28,27 +28,27 @@ impl Constrain {
     }
 
     pub fn set_min_size(this: &mut WidgetMut<Self>, min_size: Size) {
-        this.request_layout();
+        this.cx.request_layout();
 
-        if this.min_size.begin(min_size) {
-            this.request_animate();
+        if this.widget.min_size.begin(min_size) {
+            this.cx.request_animate();
         }
     }
 
     pub fn set_max_size(this: &mut WidgetMut<Self>, max_size: Size) {
-        this.request_layout();
+        this.cx.request_layout();
 
-        if this.max_size.begin(max_size) {
-            this.request_animate();
+        if this.widget.max_size.begin(max_size) {
+            this.cx.request_animate();
         }
     }
 
     pub fn set_min_size_transition(this: &mut WidgetMut<Self>, transition: Transition) {
-        this.min_size.set_transition(transition);
+        this.widget.min_size.set_transition(transition);
     }
 
     pub fn set_max_size_transition(this: &mut WidgetMut<Self>, transition: Transition) {
-        this.max_size.set_transition(transition);
+        this.widget.max_size.set_transition(transition);
     }
 }
 

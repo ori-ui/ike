@@ -1,6 +1,6 @@
 use crate::{
     AnyWidgetId, Color, Root, Widget, WidgetId, WindowId, WindowSizing,
-    tree::{WidgetMut, WidgetRef},
+    arena::{WidgetMut, WidgetRef},
     widget::AnyWidget,
 };
 
@@ -14,7 +14,7 @@ pub trait BuildCx {
         T: ?Sized + AnyWidget,
     {
         let root = self.root();
-        root.tree.get(&root.state, id)
+        root.arena.get(&root.state, id)
     }
 
     fn get_mut<T>(&mut self, id: WidgetId<T>) -> Option<WidgetMut<'_, T>>
@@ -23,7 +23,7 @@ pub trait BuildCx {
         T: ?Sized + AnyWidget,
     {
         let root = self.root_mut();
-        root.tree.get_mut(&mut root.state, id)
+        root.arena.get_mut(&mut root.state, id)
     }
 
     fn insert<T>(&mut self, widget: T) -> WidgetMut<'_, T>
@@ -32,7 +32,7 @@ pub trait BuildCx {
         T: Widget,
     {
         let root = self.root_mut();
-        root.tree.insert(&mut root.state, widget)
+        root.arena.insert(&mut root.state, widget)
     }
 
     fn remove(&mut self, id: impl AnyWidgetId)
@@ -40,7 +40,7 @@ pub trait BuildCx {
         Self: Sized,
     {
         let root = self.root_mut();
-        root.tree.remove(&mut root.state, id.upcast());
+        root.arena.remove(&mut root.state, id.upcast());
     }
 
     fn is_parent(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
@@ -50,7 +50,10 @@ pub trait BuildCx {
         let parent = parent.upcast();
         let child = child.upcast();
 
-        self.root().tree.get_state_unchecked(child.index).parent == Some(parent)
+        self.root()
+            .arena
+            .get_state(child.index)
+            .is_some_and(|child| child.parent == Some(parent))
     }
 
     #[must_use]

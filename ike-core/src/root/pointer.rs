@@ -1,7 +1,7 @@
 use crate::{
-    BuildCx, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent,
-    PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, Root, ScrollDelta,
-    Tree, WidgetId, WindowId, context::FocusUpdate, root::focus,
+    Arena, BuildCx, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent,
+    PointerEvent, PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, Root,
+    ScrollDelta, WidgetId, WindowId, context::FocusUpdate, root::focus,
 };
 
 impl Root {
@@ -25,7 +25,7 @@ impl Root {
 
         window.pointers.retain(|p| p.id == id);
 
-        if let Some(hovered) = find_hovered(&self.tree, window.contents)
+        if let Some(hovered) = find_hovered(&self.arena, window.contents)
             && let Some(mut widget) = self.get_mut(hovered)
         {
             widget.set_hovered(false);
@@ -53,7 +53,7 @@ impl Root {
         );
 
         // if there is an active widget, target it with the event
-        if let Some(target) = find_active(&self.tree, window_contents) {
+        if let Some(target) = find_active(&self.arena, window_contents) {
             let event = PointerMoveEvent {
                 pointer: id,
                 position,
@@ -96,7 +96,7 @@ impl Root {
         }
     }
 
-    pub fn pointer_button(
+    pub fn pointer_pressed(
         &mut self,
         window: WindowId,
         id: PointerId,
@@ -115,7 +115,7 @@ impl Root {
         let window_contents = window.contents;
         let pointer_position = pointer.position;
 
-        let handled = if let Some(target) = find_pointer_target(&self.tree, window_contents) {
+        let handled = if let Some(target) = find_pointer_target(&self.arena, window_contents) {
             let event = PointerButtonEvent {
                 button,
                 position: pointer.position,
@@ -143,7 +143,12 @@ impl Root {
                 }
             };
 
-            if !pressed && self.tree.get_state_unchecked(target.index).is_active {
+            let target_is_active = self
+                .arena
+                .get_state(target.index)
+                .is_some_and(|s| s.is_active);
+
+            if !pressed && target_is_active {
                 if let Some(mut widget) = self.get_mut(target) {
                     widget.set_active(false);
                 }
@@ -161,14 +166,14 @@ impl Root {
             false
         };
 
-        if let Some(focused) = focus::find_focused(&self.tree, window_contents)
+        if let Some(focused) = focus::find_focused(&self.arena, window_contents)
             && let Some(mut widget) = self.get_mut(focused)
             && button == PointerButton::Primary
             && pressed
         {
-            let local = widget.state().global_transform.inverse() * pointer_position;
+            let local = widget.cx.global_transform().inverse() * pointer_position;
 
-            if !Rect::min_size(Point::ORIGIN, widget.state().size).contains(local) {
+            if !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local) {
                 widget.set_focused(false);
             }
         }
@@ -190,7 +195,7 @@ impl Root {
             return false;
         };
 
-        let Some(target) = find_pointer_target(&self.tree, window.contents) else {
+        let Some(target) = find_pointer_target(&self.arena, window.contents) else {
             return false;
         };
 
@@ -212,44 +217,44 @@ impl Root {
     }
 }
 
-fn find_pointer_target(tree: &Tree, root: WidgetId) -> Option<WidgetId> {
-    if let Some(target) = find_active(tree, root) {
+fn find_pointer_target(arena: &Arena, root: WidgetId) -> Option<WidgetId> {
+    if let Some(target) = find_active(arena, root) {
         Some(target)
     } else {
-        find_hovered(tree, root)
+        find_hovered(arena, root)
     }
 }
 
-fn find_active(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
-    let state = tree.get_state_unchecked(id.index);
+fn find_active(arena: &Arena, id: WidgetId) -> Option<WidgetId> {
+    let state = arena.get_state(id.index)?;
 
     if state.is_active {
         return Some(id);
     }
 
     for &child in &state.children {
-        let child_state = tree.get_state_unchecked(child.index);
-
-        if child_state.has_active {
-            return find_active(tree, child);
+        if let Some(child_state) = arena.get_state(child.index)
+            && child_state.has_active
+        {
+            return find_active(arena, child);
         }
     }
 
     None
 }
 
-fn find_hovered(tree: &Tree, id: WidgetId) -> Option<WidgetId> {
-    let state = tree.get_state_unchecked(id.index);
+fn find_hovered(arena: &Arena, id: WidgetId) -> Option<WidgetId> {
+    let state = arena.get_state(id.index)?;
 
     if state.is_hovered {
         return Some(id);
     }
 
     for &child in &state.children {
-        let child_state = tree.get_state_unchecked(child.index);
-
-        if child_state.has_hovered {
-            return find_hovered(tree, child);
+        if let Some(child_state) = arena.get_state(child.index)
+            && child_state.has_hovered
+        {
+            return find_hovered(arena, child);
         }
     }
 
@@ -262,33 +267,33 @@ pub fn update_hovered(
     id: WidgetId,
     point: Point,
 ) -> Option<WidgetId> {
-    if let Some(active) = find_active(&root.tree, id)
-        && let Some(mut widget) = root.tree.get_mut(&mut root.state, active)
+    if let Some(active) = find_active(&root.arena, id)
+        && let Some(mut widget) = root.arena.get_mut(&mut root.state, active)
     {
-        widget.root.set_window_cursor(window, widget.cursor());
+        widget.cx.root.set_window_cursor(window, widget.cx.cursor());
 
-        let local = widget.state().global_transform.inverse() * point;
-        let is_hovered = Rect::min_size(Point::ORIGIN, widget.size()).contains(local);
+        let local = widget.cx.global_transform().inverse() * point;
+        let is_hovered = Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local);
 
-        if is_hovered != widget.is_hovered() {
+        if is_hovered != widget.cx.is_hovered() {
             widget.set_hovered(is_hovered);
         }
 
         return is_hovered.then_some(active);
     }
 
-    let current = find_hovered(&root.tree, id);
-    let hovered = find_widget_at(&root.tree, id, point);
+    let current = find_hovered(&root.arena, id);
+    let hovered = find_widget_at(&root.arena, id, point);
 
     if current != hovered {
         if let Some(current) = current
-            && let Some(mut widget) = root.tree.get_mut(&mut root.state, current)
+            && let Some(mut widget) = root.arena.get_mut(&mut root.state, current)
         {
             widget.set_hovered(false);
         }
 
         if let Some(hovered) = hovered
-            && let Some(mut widget) = root.tree.get_mut(&mut root.state, hovered)
+            && let Some(mut widget) = root.arena.get_mut(&mut root.state, hovered)
         {
             widget.set_hovered(true);
         }
@@ -297,7 +302,7 @@ pub fn update_hovered(
     if let Some(hovered) = hovered
         && let Some(widget) = root.get_mut(hovered)
     {
-        widget.root.set_window_cursor(window, widget.cursor());
+        widget.cx.root.set_window_cursor(window, widget.cx.cursor());
     } else {
         root.state.set_window_cursor(window, CursorIcon::Default);
     }
@@ -305,8 +310,8 @@ pub fn update_hovered(
     hovered
 }
 
-fn find_widget_at(tree: &Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
-    let state = tree.get_state_unchecked(id.index);
+fn find_widget_at(arena: &Arena, id: WidgetId, point: Point) -> Option<WidgetId> {
+    let state = arena.get_state(id.index)?;
     let local = state.global_transform.inverse() * point;
 
     if !Rect::min_size(Point::ORIGIN, state.size).contains(local) {
@@ -314,7 +319,7 @@ fn find_widget_at(tree: &Tree, id: WidgetId, point: Point) -> Option<WidgetId> {
     }
 
     for &child in &state.children {
-        if let Some(id) = find_widget_at(tree, child, point) {
+        if let Some(id) = find_widget_at(arena, child, point) {
             return Some(id);
         }
     }
@@ -339,25 +344,24 @@ fn send_pointer_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current
-        && let Some(mut widget) = root.get_mut(id)
+        && let Some(widget) = root.get_mut(id)
     {
         if let PointerPropagate::Bubble = propagate {
-            let (tree, root, widget, state) = widget.split();
             let mut cx = EventCx {
-                root,
-                tree,
-                state,
+                root:  widget.cx.root,
+                arena: widget.cx.arena,
+                state: widget.cx.state,
                 focus: &mut focus,
             };
 
-            propagate = widget.on_pointer_event(&mut cx, event);
+            propagate = widget.widget.on_pointer_event(&mut cx, event);
         }
 
-        current = widget.state().parent;
+        current = widget.cx.parent();
     }
 
     if let Some(mut target) = root.get_mut(target) {
-        target.propagate_state();
+        target.cx.propagate_state();
     }
 
     focus::update_focus(root, root_widget, focus);

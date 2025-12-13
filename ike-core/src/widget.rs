@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     Affine, Canvas, Clip, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
-    PointerPropagate, Propagate, Rect, Size, Space, UpdateCx, WindowId,
+    PointerPropagate, Propagate, Rect, Size, Space, UpdateCx, WindowId, event::TextEvent,
 };
 
 pub trait Widget: Any {
@@ -52,7 +52,21 @@ pub trait Widget: Any {
         Propagate::Bubble
     }
 
+    fn on_text_event(&mut self, cx: &mut EventCx<'_>, event: &TextEvent) -> Propagate {
+        let _ = cx;
+        let _ = event;
+
+        Propagate::Bubble
+    }
+
     fn accepts_pointer() -> bool
+    where
+        Self: Sized,
+    {
+        false
+    }
+
+    fn accepts_text() -> bool
     where
         Self: Sized,
     {
@@ -89,9 +103,7 @@ pub enum ChildUpdate {
 }
 
 pub trait AnyWidget: Widget {
-    fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget>;
-
-    fn upcast_ptr(ptr: *mut Self) -> *mut dyn Widget;
+    fn upcast_mut(&mut self) -> &mut dyn Widget;
 
     fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self;
 
@@ -99,12 +111,8 @@ pub trait AnyWidget: Widget {
 }
 
 impl AnyWidget for dyn Widget {
-    fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget> {
-        boxed
-    }
-
-    fn upcast_ptr(ptr: *mut Self) -> *mut dyn Widget {
-        ptr
+    fn upcast_mut(&mut self) -> &mut dyn Widget {
+        self
     }
 
     fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
@@ -120,12 +128,8 @@ impl<T> AnyWidget for T
 where
     T: Widget,
 {
-    fn upcast_boxed(boxed: Box<Self>) -> Box<dyn Widget> {
-        boxed
-    }
-
-    fn upcast_ptr(ptr: *mut Self) -> *mut dyn Widget {
-        ptr
+    fn upcast_mut(&mut self) -> &mut dyn Widget {
+        self
     }
 
     fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
@@ -139,7 +143,7 @@ where
 
 #[derive(Debug)]
 pub struct WidgetState {
-    pub(crate) widget_id:        WidgetId,
+    pub(crate) id:               WidgetId,
     pub(crate) transform:        Affine,
     pub(crate) global_transform: Affine,
     pub(crate) size:             Size,
@@ -181,8 +185,10 @@ pub struct WidgetState {
 
 impl WidgetState {
     pub(crate) fn new<T: Widget>(id: WidgetId) -> Self {
+        #[allow(clippy::redundant_field_names)]
         Self {
-            widget_id:        id,
+            id: id,
+
             transform:        Affine::IDENTITY,
             global_transform: Affine::IDENTITY,
             size:             Size::new(0.0, 0.0),

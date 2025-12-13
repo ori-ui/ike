@@ -247,7 +247,7 @@ where
             return;
         };
 
-        if !widget.is_child(*contents) {
+        if !widget.cx.is_child(*contents) {
             widgets::Button::set_child(&mut widget, *contents);
         }
 
@@ -322,7 +322,7 @@ where
             return action;
         };
 
-        if !widget.is_child(*contents) {
+        if !widget.cx.is_child(*contents) {
             widgets::Button::set_child(&mut widget, *contents);
         }
 

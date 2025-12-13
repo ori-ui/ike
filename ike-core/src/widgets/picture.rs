@@ -45,18 +45,18 @@ impl Picture {
     }
 
     pub fn set_contents(this: &mut WidgetMut<Self>, contents: Picturable) {
-        this.contents = contents;
-        this.request_layout();
+        this.widget.contents = contents;
+        this.cx.request_layout();
     }
 
     pub fn set_fit(this: &mut WidgetMut<Self>, fit: Fit) {
-        this.fit = fit;
-        this.request_layout();
+        this.widget.fit = fit;
+        this.cx.request_layout();
     }
 
     pub fn set_color(this: &mut WidgetMut<Self>, color: Option<Color>) {
-        this.color = color;
-        this.request_draw();
+        this.widget.color = color;
+        this.cx.request_draw();
     }
 }
 

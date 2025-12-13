@@ -487,6 +487,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
             let text = match self.text {
                 Some(ref text) => text.clone(),
                 None => widgets::Entry::text_area(&widget.to_ref())
+                    .widget
                     .text()
                     .to_owned(),
             };

@@ -44,67 +44,67 @@ impl Button {
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
-        this.padding = padding;
-        this.request_layout();
+        this.widget.padding = padding;
+        this.cx.request_layout();
     }
 
     pub fn set_border_width(this: &mut WidgetMut<Self>, border_width: BorderWidth) {
-        this.border_width = border_width;
-        this.request_layout();
+        this.widget.border_width = border_width;
+        this.cx.request_layout();
     }
 
     pub fn set_corner_radius(this: &mut WidgetMut<Self>, corner_radius: CornerRadius) {
-        this.corner_radius = corner_radius;
-        this.request_draw();
+        this.widget.corner_radius = corner_radius;
+        this.cx.request_draw();
     }
 
     pub fn set_border_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.border_color = color;
-        this.request_draw();
+        this.widget.border_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_focus_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.focus_color = color;
-        this.request_draw();
+        this.widget.focus_color = color;
+        this.cx.request_draw();
     }
 
     pub fn set_idle_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.idle_color = color;
+        this.widget.idle_color = color;
         Self::update_color(this);
     }
 
     pub fn set_hovered_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.hovered_color = color;
+        this.widget.hovered_color = color;
         Self::update_color(this);
     }
 
     pub fn set_active_color(this: &mut WidgetMut<Self>, color: Color) {
-        this.active_color = color;
+        this.widget.active_color = color;
         Self::update_color(this);
     }
 
     pub fn set_transition(this: &mut WidgetMut<Self>, transition: Transition) {
-        this.color.set_transition(transition);
+        this.widget.color.set_transition(transition);
     }
 
     fn update_color(this: &mut WidgetMut<Self>) {
-        let color = if this.is_active() {
-            this.active_color
-        } else if this.is_hovered() {
-            this.hovered_color
+        let color = if this.cx.is_active() {
+            this.widget.active_color
+        } else if this.cx.is_hovered() {
+            this.widget.hovered_color
         } else {
-            this.idle_color
+            this.widget.idle_color
         };
 
-        this.request_draw();
+        this.cx.request_draw();
 
-        if this.color.begin(color) {
-            this.request_animate();
+        if this.widget.color.begin(color) {
+            this.cx.request_animate();
         }
     }
 
     pub fn set_on_click(this: &mut WidgetMut<Self>, on_click: impl FnMut() + 'static) {
-        this.on_click = Box::new(on_click);
+        this.widget.on_click = Box::new(on_click);
     }
 }
 

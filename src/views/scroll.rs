@@ -223,7 +223,7 @@ where
             return;
         };
 
-        if !widget.is_child(*contents) {
+        if !widget.cx.is_child(*contents) {
             widgets::Scroll::set_child(&mut widget, *contents);
         }
 
@@ -299,7 +299,7 @@ where
         let action = self.contents.event(contents, state, cx, data, event);
 
         if let Some(mut widget) = cx.get_mut(*element)
-            && !widget.is_child(*contents)
+            && !widget.cx.is_child(*contents)
         {
             widgets::Scroll::set_child(&mut widget, *contents);
         }

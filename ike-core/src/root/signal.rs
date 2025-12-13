@@ -6,6 +6,9 @@ use crate::{WindowId, WindowSizing};
 pub enum RootSignal {
     RequestRedraw(WindowId),
     RequestAnimate(WindowId),
+
+    ClipboardSet(String),
+
     CreateWindow(WindowId),
     RemoveWindow(WindowId),
     UpdateWindow(WindowId, WindowUpdate),

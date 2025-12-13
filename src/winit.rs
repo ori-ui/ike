@@ -67,6 +67,29 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
     let view = build(data);
 
+    #[cfg(target_os = "linux")]
+    let clipboard = {
+        use copypasta::{
+            wayland_clipboard::create_clipboards_from_external,
+            x11_clipboard::{Clipboard, X11ClipboardContext},
+        };
+        use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};
+
+        let display_handle = event_loop.display_handle().unwrap();
+        if let RawDisplayHandle::Wayland(handle) = display_handle.as_raw() {
+            unsafe {
+                let (_primary, clipboard) =
+                    create_clipboards_from_external(handle.display.as_ptr());
+                Box::new(clipboard) as Box<_>
+            }
+        } else {
+            Box::new(X11ClipboardContext::<Clipboard>::new().unwrap()) as Box<_>
+        }
+    };
+
+    #[cfg(not(target_os = "linux"))]
+    let clipboard = Box::new(copypasta::ClipboardContext::new().unwrap());
+
     let mut state = AppState {
         data,
 
@@ -76,6 +99,7 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
         runtime,
         receiver,
+        clipboard,
 
         painter,
         context,
@@ -97,9 +121,10 @@ struct AppState<'a, T> {
     runtime:  tokio::runtime::Handle,
     receiver: Receiver<Event>,
 
-    painter: SkiaPainter,
-    context: Context,
-    windows: Vec<WindowState>,
+    clipboard: Box<dyn copypasta::ClipboardProvider>,
+    painter:   SkiaPainter,
+    context:   Context,
+    windows:   Vec<WindowState>,
 
     vulkan: SkiaVulkanContext,
 }
@@ -247,7 +272,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
 
                 let pressed = matches!(state, ElementState::Pressed);
 
-                self.context.root.pointer_button(
+                self.context.root.pointer_pressed(
                     window.id,
                     PointerId::from_hash(device_id),
                     button,
@@ -256,15 +281,35 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
-                let pressed = matches!(event.state, ElementState::Pressed);
+                let action_mod = match self.context.root.get_window(window.id) {
+                    Some(window) if cfg!(target_os = "macos") => window.modifiers().meta(),
+                    Some(window) => window.modifiers().ctrl(),
+                    None => false,
+                };
 
-                self.context.root.key_press(
-                    window.id,
-                    convert_winit_key(event.logical_key),
-                    event.repeat,
-                    event.text.as_deref(),
-                    pressed,
-                );
+                if matches!(
+                    event.logical_key,
+                    winit::keyboard::Key::Character(ref c) if c == "v",
+                ) && event.state.is_pressed()
+                    && action_mod
+                    && cfg!(any(
+                        target_os = "linux",
+                        target_os = "macos",
+                        target_os = "windows"
+                    ))
+                {
+                    if let Ok(text) = self.clipboard.get_contents() {
+                        self.context.root.text_pasted(window.id, text);
+                    }
+                } else {
+                    self.context.root.key_pressed(
+                        window.id,
+                        convert_winit_key(event.logical_key),
+                        event.repeat,
+                        event.text.as_deref(),
+                        event.state.is_pressed(),
+                    );
+                }
             }
 
             WindowEvent::ModifiersChanged(mods) => {
@@ -361,6 +406,10 @@ impl<T> AppState<'_, T> {
                     window.animate = Some(Instant::now());
                     window.window.request_redraw();
                 }
+            }
+
+            RootSignal::ClipboardSet(text) => {
+                let _ = self.clipboard.set_contents(text);
             }
 
             RootSignal::CreateWindow(id) => {

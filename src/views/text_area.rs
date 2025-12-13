@@ -353,7 +353,7 @@ impl<T> ori::View<Context, T> for TextArea<T> {
             || self.wrap != old.wrap
             || self.color != old.color
         {
-            let text = self.text.as_deref().unwrap_or_else(|| widget.text());
+            let text = self.text.as_deref().unwrap_or_else(|| widget.widget.text());
 
             let paragraph = self.build_paragraph(text, &palette, &text_theme, &theme);
             widgets::TextArea::set_text(&mut widget, paragraph);
