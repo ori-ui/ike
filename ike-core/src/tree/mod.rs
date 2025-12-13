@@ -1,7 +1,7 @@
 mod widget_mut;
 mod widget_ref;
 
-use std::marker::PhantomData;
+use std::{cell::Cell, marker::PhantomData};
 
 pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
@@ -19,7 +19,7 @@ pub struct Tree {
 
 struct Entry {
     generation: u32,
-    borrowed:   bool,
+    borrowed:   Cell<bool>,
     widget:     *mut dyn Widget,
     state:      *mut WidgetState,
 }
@@ -87,7 +87,7 @@ impl Tree {
             let state = WidgetState::new::<T>(id.upcast());
             self.entries.push(Entry {
                 generation: 0,
-                borrowed:   false,
+                borrowed:   Cell::new(false),
                 widget:     Box::into_raw(Box::new(widget)),
                 state:      Box::into_raw(Box::new(state)),
             });
@@ -96,7 +96,7 @@ impl Tree {
         };
 
         let entry = &mut self.entries[id.index as usize];
-        entry.borrowed = true;
+        entry.borrowed.set(true);
 
         WidgetMut {
             id,
@@ -136,7 +136,6 @@ impl Tree {
 
         let old_widget = entry.widget;
 
-        entry.borrowed = false;
         entry.widget = Box::into_raw(Box::new(Tombstone));
         let _ = unsafe { Box::from_raw(old_widget) };
 
@@ -154,10 +153,14 @@ impl Tree {
     {
         let entry = self.entries.get(id.index as usize)?;
 
-        if id.generation != entry.generation || entry.borrowed || !T::is(unsafe { &*entry.widget })
+        if id.generation != entry.generation
+            || entry.borrowed.get()
+            || !T::is(unsafe { &*entry.widget })
         {
             return None;
         }
+
+        entry.borrowed.set(true);
 
         Some(WidgetRef {
             id,
@@ -179,10 +182,14 @@ impl Tree {
     {
         let entry = self.entries.get_mut(id.index as usize)?;
 
-        if id.generation != entry.generation || entry.borrowed || !T::is(unsafe { &*entry.widget })
+        if id.generation != entry.generation
+            || entry.borrowed.get()
+            || !T::is(unsafe { &*entry.widget })
         {
             return None;
         }
+
+        entry.borrowed.set(true);
 
         Some(WidgetMut {
             id,
@@ -195,14 +202,14 @@ impl Tree {
 
     pub(crate) fn get_state_unchecked(&self, index: u32) -> &WidgetState {
         let entry = &self.entries[index as usize];
-        assert!(!entry.borrowed);
+        assert!(!entry.borrowed.get());
 
         unsafe { &*entry.state }
     }
 
     pub(crate) fn get_state_unchecked_mut(&mut self, index: u32) -> &mut WidgetState {
         let entry = &mut self.entries[index as usize];
-        assert!(!entry.borrowed);
+        assert!(!entry.borrowed.get());
 
         unsafe { &mut *entry.state }
     }
@@ -226,5 +233,57 @@ impl Widget for Tombstone {
         _space: Space,
     ) -> Size {
         unreachable!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{LayoutCx, Painter, Root, Size, Space, Tree, Widget};
+
+    struct TestWidget(f32);
+
+    impl Widget for TestWidget {
+        fn layout(
+            &mut self,
+            _cx: &mut LayoutCx<'_>,
+            _painter: &mut dyn Painter,
+            space: Space,
+        ) -> Size {
+            space.min
+        }
+    }
+
+    #[test]
+    fn insert_and_get() {
+        let mut root = Root::new(|_| {});
+        let mut tree = Tree::new();
+
+        let id = tree.insert(&mut root.state, TestWidget(0.0)).id();
+        assert!(tree.get(&root.state, id).is_some());
+    }
+
+    #[test]
+    fn get_mutability() {
+        let mut root = Root::new(|_| {});
+        let mut tree = Tree::new();
+
+        let a = tree.insert(&mut root.state, TestWidget(0.0)).id();
+        let b = tree.insert(&mut root.state, TestWidget(1.0)).id();
+
+        let mut widget = tree.get_mut(&mut root.state, a).unwrap();
+
+        // getting a widget while it's borrowed mutable is not possible
+        assert!(widget.get(a).is_none());
+        assert!(widget.get_mut(a).is_none());
+
+        // but getting others is
+        assert!(widget.get(b).is_some());
+        assert!(widget.get_mut(b).is_some());
+
+        widget.0 = 10.0;
+        drop(widget);
+
+        // getting a widget after the reference has been dropped is possible
+        assert!(tree.get(&root.state, a).is_some());
     }
 }

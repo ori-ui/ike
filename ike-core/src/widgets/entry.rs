@@ -162,10 +162,8 @@ impl Widget for Entry {
         space.max.width = space.max.width.min(self.max_width);
         space.min.width = space.min.width.min(space.max.width);
 
-        cx.set_child_stashed(
-            1,
-            !cx.get(self.text_area).text().is_empty(),
-        );
+        let has_text = cx.get(self.text_area).text().is_empty();
+        cx.set_child_stashed(1, !has_text);
 
         let placeholder_size = cx.layout_child(1, painter, space);
         space.min.width = space.min.width.max(placeholder_size.width);

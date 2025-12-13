@@ -448,12 +448,12 @@ where
 
     pub(crate) fn in_tree<U>(&mut self, f: impl FnOnce(&mut RootState, &mut Tree) -> U) -> U {
         let entry = &mut self.tree.entries[self.id.index as usize];
-        entry.borrowed = false;
+        entry.borrowed.set(false);
 
         let output = f(self.root, self.tree);
 
         let entry = &mut self.tree.entries[self.id.index as usize];
-        entry.borrowed = true;
+        entry.borrowed.set(true);
 
         output
     }
@@ -507,7 +507,7 @@ where
     T: ?Sized + AnyWidget,
 {
     fn drop(&mut self) {
-        let entry = &mut self.tree.entries[self.id.index as usize];
-        entry.borrowed = false;
+        let entry = &self.tree.entries[self.id.index as usize];
+        entry.borrowed.set(false);
     }
 }

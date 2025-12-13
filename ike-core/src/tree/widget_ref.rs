@@ -37,6 +37,16 @@ where
     }
 }
 
+impl<T> Drop for WidgetRef<'_, T>
+where
+    T: ?Sized,
+{
+    fn drop(&mut self) {
+        let entry = &self.tree.entries[self.id.index as usize];
+        entry.borrowed.set(false);
+    }
+}
+
 macro_rules! impl_widget_ref {
     ($name:ident) => {
         impl<'a, T> $name<'a, T>
