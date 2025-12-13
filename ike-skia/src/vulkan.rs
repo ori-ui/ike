@@ -166,8 +166,8 @@ impl SkiaVulkanWindow {
     };
 
     const HDR_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format:      vk::Format::R16G16B16A16_SFLOAT,
-        color_space: vk::ColorSpaceKHR::EXTENDED_SRGB_NONLINEAR_EXT,
+        format:      vk::Format::A2B10G10R10_UNORM_PACK32,
+        color_space: vk::ColorSpaceKHR::HDR10_ST2084_EXT,
     };
 
     /// # Safety
@@ -382,10 +382,20 @@ impl SkiaVulkanWindow {
         }
 
         while self.skia_surfaces.len() < self.swapchain_images.len() {
-            let color_type = if self.surface_format == Self::HDR_FORMAT {
-                skia_safe::ColorType::RGBAF16
+            let (color_type, color_space) = if self.surface_format == Self::HDR_FORMAT {
+                (
+                    skia_safe::ColorType::RGBA1010102,
+                    skia_safe::ColorSpace::new_cicp(
+                        skia_safe::named_primaries::CicpId::Rec2020,
+                        skia_safe::named_transfer_fn::CicpId::PQ,
+                    )
+                    .unwrap(),
+                )
             } else {
-                skia_safe::ColorType::BGRA8888
+                (
+                    skia_safe::ColorType::BGRA8888,
+                    skia_safe::ColorSpace::new_srgb(),
+                )
             };
 
             let image_info = skia_safe::ImageInfo::new(
@@ -395,7 +405,7 @@ impl SkiaVulkanWindow {
                 ),
                 color_type,
                 skia_safe::AlphaType::Premul,
-                skia_safe::ColorSpace::new_srgb(),
+                color_space,
             );
 
             let mut surface = skia_safe::gpu::surfaces::render_target(
