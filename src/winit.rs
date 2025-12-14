@@ -78,8 +78,8 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
         let display_handle = event_loop.display_handle().unwrap();
         if let RawDisplayHandle::Wayland(handle) = display_handle.as_raw() {
             unsafe {
-                let (_primary, clipboard) =
-                    create_clipboards_from_external(handle.display.as_ptr());
+                let display = handle.display.as_ptr();
+                let (_primary, clipboard) = create_clipboards_from_external(display);
                 Box::new(clipboard) as Box<_>
             }
         } else {
@@ -358,37 +358,43 @@ impl<T> AppState<'_, T> {
         while let Ok(event) = self.receiver.try_recv() {
             match event {
                 Event::Rebuild => {
-                    let mut view = (self.build)(self.data);
-                    ori::View::rebuild(
-                        &mut view,
-                        &mut ori::NoElement,
-                        self.state.as_mut().unwrap(),
-                        &mut self.context,
-                        self.data,
-                        &mut self.view,
-                    );
+                    if let Some(ref mut state) = self.state {
+                        let mut view = (self.build)(self.data);
+                        ori::View::rebuild(
+                            &mut view,
+                            &mut ori::NoElement,
+                            state,
+                            &mut self.context,
+                            self.data,
+                            &mut self.view,
+                        );
 
-                    self.view = view;
+                        self.view = view;
+                    }
                 }
 
                 Event::Event(mut event) => {
-                    let action = ori::View::event(
-                        &mut self.view,
-                        &mut ori::NoElement,
-                        self.state.as_mut().unwrap(),
-                        &mut self.context,
-                        self.data,
-                        &mut event,
-                    );
+                    if let Some(ref mut state) = self.state {
+                        let action = ori::View::event(
+                            &mut self.view,
+                            &mut ori::NoElement,
+                            state,
+                            &mut self.context,
+                            self.data,
+                            &mut event,
+                        );
 
-                    self.context.send_action(action);
+                        self.context.send_action(action);
+                    }
                 }
 
                 Event::Spawn(future) => {
                     self.runtime.spawn(future);
                 }
 
-                Event::Signal(signal) => self.handle_signal(event_loop, signal),
+                Event::Signal(signal) => {
+                    self.handle_signal(event_loop, signal);
+                }
             }
         }
     }
