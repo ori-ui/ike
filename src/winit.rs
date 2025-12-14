@@ -161,6 +161,12 @@ impl<T> ApplicationHandler for AppState<'_, T> {
         event: WindowEvent,
     ) {
         let Some(window) = self.windows.iter_mut().find(|w| w.window.id() == window_id) else {
+            tracing::error!(
+                window = ?window_id,
+                event = ?event,
+                "window event received for invalid window",
+            );
+
             return;
         };
 
@@ -195,6 +201,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                 let scale = window.window.scale_factor();
                 let size = window.window.inner_size().to_logical(scale);
 
+                let scale = scale as f32;
                 let size = Size::new(size.width, size.height);
 
                 match event {
@@ -203,7 +210,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                     }
 
                     WindowEvent::ScaleFactorChanged { .. } => {
-                        (self.context.root).window_scaled(window.id, scale as f32, size);
+                        self.context.root.window_scaled(window.id, scale, size);
                     }
 
                     _ => unreachable!(),
