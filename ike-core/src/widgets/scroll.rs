@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use crate::{
-    AnyWidgetId, Axis, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx,
-    LayoutCx, Padding, Paint, Painter, Point, PointerEvent, PointerPropagate, Rect, ScrollDelta,
-    Size, Space, Transition, Transitioned, Update, UpdateCx, Widget, WidgetMut,
+    AnyWidgetId, Axis, BorderWidth, BuildCx, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
+    EventCx, LayoutCx, Padding, Paint, Painter, Point, PointerEvent, PointerPropagate, Rect,
+    ScrollDelta, Size, Space, Transition, Transitioned, Update, UpdateCx, Widget, WidgetMut,
 };
 
 pub struct Scroll {
@@ -188,13 +188,16 @@ impl Widget for Scroll {
             self.scroll.set(clamped_scroll);
         }
 
-        cx.place_child(
-            0,
-            self.axis.pack_offset(-*self.scroll, 0.0),
-        );
+        let offset = self.axis.pack_offset(-*self.scroll, 0.0);
+        cx.place_child(0, offset);
         cx.set_clip(Rect::min_size(Point::ORIGIN, size));
 
         size
+    }
+
+    fn compose(&mut self, cx: &mut ComposeCx<'_>) {
+        let offset = self.axis.pack_offset(-*self.scroll, 0.0);
+        cx.place_child(0, offset);
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
@@ -260,15 +263,18 @@ impl Widget for Scroll {
                 cx.request_animate();
             }
 
-            cx.request_layout();
+            cx.request_compose();
         }
     }
 
     fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {
-        cx.request_layout();
+        cx.request_compose();
 
         if self.scroll.animate(dt) {
             cx.request_animate();
+            cx.set_pixel_perfect(false);
+        } else {
+            cx.set_pixel_perfect(true);
         }
     }
 
@@ -288,7 +294,7 @@ impl Widget for Scroll {
                     }
 
                     self.drag_offset = major - self.knob_offset();
-                    cx.request_layout();
+                    cx.request_compose();
 
                     PointerPropagate::Capture
                 } else {
@@ -304,7 +310,7 @@ impl Widget for Scroll {
                 let fraction = point.clamp(0.0, self.knob_space()) / self.knob_space();
 
                 self.scroll.set(self.overflow() * fraction);
-                cx.request_layout();
+                cx.request_compose();
 
                 PointerPropagate::Bubble
             }
@@ -327,7 +333,7 @@ impl Widget for Scroll {
 
                     ScrollDelta::Pixel(..) => {
                         self.scroll.set(scroll);
-                        cx.request_layout();
+                        cx.request_compose();
                     }
                 }
 

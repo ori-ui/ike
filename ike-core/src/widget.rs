@@ -7,14 +7,15 @@ use std::{
 };
 
 use crate::{
-    Affine, Canvas, Clip, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
-    PointerPropagate, Propagate, Rect, Size, Space, UpdateCx, WindowId, event::TextEvent,
+    Affine, Canvas, Clip, ComposeCx, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter,
+    PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, UpdateCx, WindowId,
+    event::TextEvent,
 };
 
 pub trait Widget: Any {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size;
 
-    fn compose(&mut self, cx: &mut UpdateCx<'_>) {
+    fn compose(&mut self, cx: &mut ComposeCx<'_>) {
         let _ = cx;
     }
 
@@ -169,6 +170,7 @@ pub struct WidgetState {
     /// Whether the widget is currently stashing itself and descendants.
     pub(crate) is_stashing: bool,
 
+    pub(crate) needs_compose: bool,
     pub(crate) needs_animate: bool,
     pub(crate) needs_layout:  bool,
     pub(crate) needs_draw:    bool,
@@ -212,6 +214,7 @@ impl WidgetState {
             is_stashed:  false,
             is_stashing: false,
 
+            needs_compose: false,
             needs_animate: false,
             needs_layout:  true,
             needs_draw:    true,
@@ -249,6 +252,7 @@ impl WidgetState {
         self.has_active |= child.has_active;
         self.has_focused |= child.has_focused;
 
+        self.needs_compose |= child.needs_compose && !child.is_stashed;
         self.needs_animate |= child.needs_animate && !child.is_stashed;
         self.needs_layout |= child.needs_layout && !child.is_stashed;
         self.needs_draw |= child.needs_draw && !child.is_stashed;

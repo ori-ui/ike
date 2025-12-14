@@ -41,12 +41,11 @@ pub struct SubmitBehaviour {
     pub clear_text: bool,
 }
 
-pub struct TextArea {
+pub struct TextArea<const EDITABLE: bool = true> {
     paragraph:         Paragraph,
     selection_color:   Color,
     cursor_color:      Color,
     blink_rate:        f32,
-    is_editable:       bool,
     newline_behaviour: NewlineBehaviour,
     submit_behaviour:  SubmitBehaviour,
 
@@ -62,12 +61,8 @@ pub struct TextArea {
     cursor_anchor: Option<f32>,
 }
 
-impl TextArea {
-    pub fn new(
-        cx: &mut impl BuildCx,
-        paragraph: Paragraph,
-        is_editable: bool,
-    ) -> WidgetMut<'_, Self> {
+impl<const EDITABLE: bool> TextArea<EDITABLE> {
+    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
         let cursor = paragraph.text.len();
 
         cx.insert(Self {
@@ -75,7 +70,6 @@ impl TextArea {
             selection_color: Color::BLUE,
             cursor_color: Color::BLACK,
             blink_rate: 5.0,
-            is_editable,
             newline_behaviour: NewlineBehaviour::Enter,
             submit_behaviour: SubmitBehaviour::default(),
 
@@ -147,7 +141,7 @@ impl TextArea {
     }
 }
 
-impl TextArea {
+impl<const EDITABLE: bool> TextArea<EDITABLE> {
     fn set_cursor(&mut self, cursor: usize, select: bool) {
         if !select {
             self.selection = None
@@ -181,6 +175,19 @@ impl TextArea {
         }
 
         line.end_index
+    }
+
+    fn get_selection(&self) -> Option<&str> {
+        match self.selection {
+            Some(selection) => {
+                let start = usize::min(self.cursor, selection);
+                let end = usize::max(self.cursor, selection);
+
+                Some(&self.text()[start..end])
+            }
+
+            None => None,
+        }
     }
 
     fn move_forward(&mut self, select: bool) {
@@ -417,7 +424,7 @@ impl TextArea {
     }
 }
 
-impl Widget for TextArea {
+impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         self.lines = painter.layout_text(&self.paragraph, space.max.width);
         let size = painter.measure_text(&self.paragraph, space.max.width);
@@ -441,7 +448,7 @@ impl Widget for TextArea {
 
         self.draw_selection(canvas);
 
-        if cx.is_window_focused() && self.is_editable {
+        if cx.is_window_focused() && EDITABLE {
             self.draw_cursor(cx, canvas);
         }
     }
@@ -503,19 +510,42 @@ impl Widget for TextArea {
 
     fn on_key_event(&mut self, cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {
         match event {
-            KeyEvent::Down(event) if self.is_editable => {
-                if let Some(ref text) = event.text
-                    && !text.chars().any(|c| c.is_ascii_control())
-                {
-                    self.insert_text(text);
-
-                    self.changed();
-                    cx.request_layout();
-
-                    return Propagate::Stop;
-                }
+            KeyEvent::Down(event) => {
+                let action_mod = match cfg!(target_os = "macos") {
+                    true => event.modifiers.meta(),
+                    false => event.modifiers.ctrl(),
+                };
 
                 match event.key {
+                    Key::Character(ref c) if c == "c" && action_mod => {
+                        if let Some(selection) = self.get_selection() {
+                            cx.set_clipboard(selection.to_owned());
+                        }
+
+                        Propagate::Stop
+                    }
+
+                    Key::Character(ref c) if c == "x" && action_mod => {
+                        if let Some(selection) = self.get_selection() {
+                            cx.set_clipboard(selection.to_owned());
+                        }
+
+                        self.remove_selection();
+                        cx.request_layout();
+
+                        Propagate::Stop
+                    }
+
+                    _ if matches!(event.text, Some(ref text) if !text.chars().any(|c| c.is_ascii_control()))
+                        && EDITABLE =>
+                    {
+                        self.insert_text(event.text.as_ref().unwrap());
+
+                        self.changed();
+                        cx.request_layout();
+                        Propagate::Stop
+                    }
+
                     Key::Named(NamedKey::ArrowRight) => {
                         self.move_forward(event.modifiers.shift());
                         cx.request_draw();
@@ -548,7 +578,7 @@ impl Widget for TextArea {
                         Propagate::Stop
                     }
 
-                    Key::Named(NamedKey::Delete) => {
+                    Key::Named(NamedKey::Delete) if EDITABLE => {
                         if self.selection.is_some() {
                             self.remove_selection();
 
@@ -566,7 +596,7 @@ impl Widget for TextArea {
                         Propagate::Stop
                     }
 
-                    Key::Named(NamedKey::Backspace) => {
+                    Key::Named(NamedKey::Backspace) if EDITABLE => {
                         if self.selection.is_some() {
                             self.remove_selection();
 
@@ -588,7 +618,8 @@ impl Widget for TextArea {
                     Key::Named(NamedKey::Enter)
                         if self
                             .newline_behaviour
-                            .insert_newline(event.modifiers.shift()) =>
+                            .insert_newline(event.modifiers.shift())
+                            && EDITABLE =>
                     {
                         self.insert_text("\n");
 
@@ -602,7 +633,8 @@ impl Widget for TextArea {
                     Key::Named(NamedKey::Enter)
                         if !self
                             .newline_behaviour
-                            .insert_newline(event.modifiers.shift()) =>
+                            .insert_newline(event.modifiers.shift())
+                            && EDITABLE =>
                     {
                         if let Some(ref mut on_submit) = self.on_submit {
                             on_submit(&self.paragraph.text);
@@ -631,7 +663,7 @@ impl Widget for TextArea {
 
     fn on_text_event(&mut self, cx: &mut EventCx<'_>, event: &TextEvent) -> Propagate {
         match event {
-            TextEvent::Paste(event) if self.is_editable => {
+            TextEvent::Paste(event) if EDITABLE => {
                 self.insert_text(&event.contents);
                 cx.request_layout();
 
@@ -647,6 +679,6 @@ impl Widget for TextArea {
     }
 
     fn accepts_focus() -> bool {
-        true
+        EDITABLE
     }
 }

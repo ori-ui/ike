@@ -1,14 +1,13 @@
 use ike_core::{
     BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
-    TextWrap, WidgetId,
-    widgets::{self, NewlineBehaviour, SubmitBehaviour},
+    TextWrap, WidgetId, widgets,
 };
-use ori::{AsyncContext, ProviderContext, Proxy};
+use ori::ProviderContext;
 
 use crate::{Context, Palette, views::TextTheme};
 
 #[derive(Clone, Debug)]
-pub struct TextAreaTheme {
+pub struct ProseTheme {
     pub font_size:       Option<f32>,
     pub font_family:     Option<String>,
     pub font_weight:     Option<FontWeight>,
@@ -23,7 +22,7 @@ pub struct TextAreaTheme {
     pub blink_rate:      f32,
 }
 
-impl Default for TextAreaTheme {
+impl Default for ProseTheme {
     fn default() -> Self {
         Self {
             font_size:       None,
@@ -42,67 +41,43 @@ impl Default for TextAreaTheme {
     }
 }
 
-pub fn text_area<T>() -> TextArea<T> {
-    TextArea::new()
+pub fn prose(text: impl Into<String>) -> Prose {
+    Prose::new(text)
 }
 
-pub struct TextArea<T> {
-    text:              Option<String>,
-    font_size:         Option<f32>,
-    font_family:       Option<String>,
-    font_weight:       Option<FontWeight>,
-    font_stretch:      Option<FontStretch>,
-    font_style:        Option<FontStyle>,
-    line_height:       Option<f32>,
-    align:             Option<TextAlign>,
-    wrap:              Option<TextWrap>,
-    color:             Option<Color>,
-    cursor_color:      Option<Color>,
-    selection_color:   Option<Color>,
-    blink_rate:        Option<f32>,
-    newline_behaviour: NewlineBehaviour,
-    submit_behaviour:  SubmitBehaviour,
-
-    #[allow(clippy::type_complexity)]
-    on_change: Box<dyn FnMut(&mut T, String) -> ori::Action>,
-    #[allow(clippy::type_complexity)]
-    on_submit: Box<dyn FnMut(&mut T, String) -> ori::Action>,
+pub struct Prose {
+    text:            String,
+    font_size:       Option<f32>,
+    font_family:     Option<String>,
+    font_weight:     Option<FontWeight>,
+    font_stretch:    Option<FontStretch>,
+    font_style:      Option<FontStyle>,
+    line_height:     Option<f32>,
+    align:           Option<TextAlign>,
+    wrap:            Option<TextWrap>,
+    color:           Option<Color>,
+    cursor_color:    Option<Color>,
+    selection_color: Option<Color>,
+    blink_rate:      Option<f32>,
 }
 
-impl<T> Default for TextArea<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> TextArea<T> {
-    pub fn new() -> Self {
+impl Prose {
+    pub fn new(text: impl Into<String>) -> Self {
         Self {
-            text:         None,
-            font_size:    None,
-            font_family:  None,
-            font_weight:  None,
-            font_stretch: None,
-            font_style:   None,
-            line_height:  None,
-            align:        None,
-            wrap:         None,
-            color:        None,
-
-            cursor_color:      None,
-            selection_color:   None,
-            blink_rate:        None,
-            newline_behaviour: NewlineBehaviour::Enter,
-            submit_behaviour:  SubmitBehaviour::default(),
-
-            on_change: Box::new(|_, _| ori::Action::new()),
-            on_submit: Box::new(|_, _| ori::Action::new()),
+            text:            text.into(),
+            font_size:       None,
+            font_family:     None,
+            font_weight:     None,
+            font_stretch:    None,
+            font_style:      None,
+            line_height:     None,
+            align:           None,
+            wrap:            None,
+            color:           None,
+            cursor_color:    None,
+            selection_color: None,
+            blink_rate:      None,
         }
-    }
-
-    pub fn text(mut self, text: impl Into<String>) -> Self {
-        self.text = Some(text.into());
-        self
     }
 
     pub fn font_size(mut self, font_size: f32) -> Self {
@@ -164,47 +139,15 @@ impl<T> TextArea<T> {
         self.blink_rate = Some(rate);
         self
     }
-
-    pub fn newline_behaviour(mut self, behaviour: NewlineBehaviour) -> Self {
-        self.newline_behaviour = behaviour;
-        self
-    }
-
-    pub fn submit_behaviour(mut self, behaviour: SubmitBehaviour) -> Self {
-        self.submit_behaviour = behaviour;
-        self
-    }
-
-    pub fn on_change<A, I>(
-        mut self,
-        mut on_change: impl FnMut(&mut T, String) -> A + 'static,
-    ) -> Self
-    where
-        A: ori::IntoAction<I>,
-    {
-        self.on_change = Box::new(move |data, text| on_change(data, text).into_action());
-        self
-    }
-
-    pub fn on_submit<A, I>(
-        mut self,
-        mut on_submit: impl FnMut(&mut T, String) -> A + 'static,
-    ) -> Self
-    where
-        A: ori::IntoAction<I>,
-    {
-        self.on_submit = Box::new(move |data, text| on_submit(data, text).into_action());
-        self
-    }
 }
 
-impl<T> TextArea<T> {
+impl Prose {
     fn build_paragraph(
         &self,
         text: &str,
         palette: &Palette,
         text_theme: &TextTheme,
-        text_area_theme: &TextAreaTheme,
+        text_area_theme: &ProseTheme,
     ) -> Paragraph {
         let style = TextStyle {
             font_size: self
@@ -257,41 +200,36 @@ impl<T> TextArea<T> {
         paragraph
     }
 
-    fn get_cursor_color(&self, palette: &Palette, theme: &TextAreaTheme) -> Color {
+    fn get_cursor_color(&self, palette: &Palette, theme: &ProseTheme) -> Color {
         self.cursor_color
             .unwrap_or_else(|| theme.cursor_color.unwrap_or(palette.contrast))
     }
 
-    fn get_selection_color(&self, palette: &Palette, theme: &TextAreaTheme) -> Color {
+    fn get_selection_color(&self, palette: &Palette, theme: &ProseTheme) -> Color {
         self.selection_color
             .unwrap_or_else(|| theme.selection_color.unwrap_or(palette.info))
     }
 }
 
-enum TextAreaEvent {
-    Change(String),
-    Submit(String),
-}
-
-impl<T> ori::ViewMarker for TextArea<T> {}
-impl<T> ori::View<Context, T> for TextArea<T> {
-    type Element = WidgetId<widgets::TextArea>;
+impl ori::ViewMarker for Prose {}
+impl<T> ori::View<Context, T> for Prose {
+    type Element = WidgetId<widgets::TextArea<false>>;
     type State = ori::ViewId;
 
     fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
         let text_theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
-        let theme = cx
-            .get_context::<TextAreaTheme>()
-            .cloned()
-            .unwrap_or_default();
-        let proxy = cx.proxy();
+        let theme = cx.get_context::<ProseTheme>().cloned().unwrap_or_default();
         let id = ori::ViewId::next();
 
-        let text = self.text.as_deref().unwrap_or("");
-        let paragraph = self.build_paragraph(text, &palette, &text_theme, &theme);
+        let paragraph = self.build_paragraph(
+            &self.text,
+            &palette,
+            &text_theme,
+            &theme,
+        );
 
-        let mut widget = widgets::TextArea::new(cx, paragraph, true);
+        let mut widget = widgets::TextArea::<false>::new(cx, paragraph);
 
         let cursor_color = self.get_cursor_color(&palette, &theme);
         let selection_color = self.get_selection_color(&palette, &theme);
@@ -300,25 +238,6 @@ impl<T> ori::View<Context, T> for TextArea<T> {
         widgets::TextArea::set_cursor_color(&mut widget, cursor_color);
         widgets::TextArea::set_selection_color(&mut widget, selection_color);
         widgets::TextArea::set_blink_rate(&mut widget, blink_rate);
-        widgets::TextArea::set_newline_behaviour(&mut widget, self.newline_behaviour);
-        widgets::TextArea::set_submit_behaviour(&mut widget, self.submit_behaviour);
-
-        widgets::TextArea::set_on_change(&mut widget, {
-            let proxy = Clone::clone(&proxy);
-            move |text| {
-                proxy.event(ori::Event::new(
-                    TextAreaEvent::Change(text.into()),
-                    id,
-                ))
-            }
-        });
-
-        widgets::TextArea::set_on_submit(&mut widget, move |text| {
-            proxy.event(ori::Event::new(
-                TextAreaEvent::Submit(text.into()),
-                id,
-            ))
-        });
 
         (widget.id(), id)
     }
@@ -333,10 +252,7 @@ impl<T> ori::View<Context, T> for TextArea<T> {
     ) {
         let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
         let text_theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
-        let theme = cx
-            .get_context::<TextAreaTheme>()
-            .cloned()
-            .unwrap_or_default();
+        let theme = cx.get_context::<ProseTheme>().cloned().unwrap_or_default();
 
         let Some(mut widget) = cx.get_mut(*element) else {
             return;
@@ -353,9 +269,13 @@ impl<T> ori::View<Context, T> for TextArea<T> {
             || self.wrap != old.wrap
             || self.color != old.color
         {
-            let text = self.text.as_deref().unwrap_or_else(|| widget.widget.text());
+            let paragraph = self.build_paragraph(
+                &self.text,
+                &palette,
+                &text_theme,
+                &theme,
+            );
 
-            let paragraph = self.build_paragraph(text, &palette, &text_theme, &theme);
             widgets::TextArea::set_text(&mut widget, paragraph);
         }
 
@@ -373,14 +293,6 @@ impl<T> ori::View<Context, T> for TextArea<T> {
             let blink_rate = self.blink_rate.unwrap_or(theme.blink_rate);
             widgets::TextArea::set_blink_rate(&mut widget, blink_rate);
         }
-
-        if self.newline_behaviour != old.newline_behaviour {
-            widgets::TextArea::set_newline_behaviour(&mut widget, self.newline_behaviour);
-        }
-
-        if self.submit_behaviour != old.submit_behaviour {
-            widgets::TextArea::set_submit_behaviour(&mut widget, self.submit_behaviour);
-        }
     }
 
     fn teardown(
@@ -396,15 +308,11 @@ impl<T> ori::View<Context, T> for TextArea<T> {
     fn event(
         &mut self,
         _element: &mut Self::Element,
-        id: &mut Self::State,
+        _id: &mut Self::State,
         _cx: &mut Context,
-        data: &mut T,
-        event: &mut ori::Event,
+        _data: &mut T,
+        _event: &mut ori::Event,
     ) -> ori::Action {
-        match event.take_targeted(*id) {
-            Some(TextAreaEvent::Change(text)) => (self.on_change)(data, text),
-            Some(TextAreaEvent::Submit(text)) => (self.on_submit)(data, text),
-            None => ori::Action::new(),
-        }
+        ori::Action::new()
     }
 }

@@ -281,27 +281,29 @@ where
         size
     }
 
-    pub(crate) fn compose_recursive(&mut self, scale_factor: f32, transform: Affine) {
+    pub(crate) fn compose_recursive(&mut self, scale: f32, transform: Affine) {
         if self.cx.is_stashed() {
             return;
         }
 
-        if self.cx.is_pixel_perfect() {
-            let transform = &mut self.cx.state.transform;
-            transform.offset = transform.offset.round_to_scale(scale_factor);
-        }
-
         let _span = self.cx.enter_span();
 
-        let transform = transform * self.cx.transform();
-        self.cx.state.global_transform = transform;
+        let global_transform = transform * self.cx.transform();
+
+        if self.cx.global_transform() == global_transform && !self.cx.state.needs_compose {
+            return;
+        }
+
+        self.cx.state.global_transform = global_transform;
+        self.cx.state.needs_compose = false;
+
+        self.widget.compose(&mut self.cx.as_compose_cx(scale));
 
         self.cx.for_each_child(|child| {
-            child.compose_recursive(scale_factor, transform);
+            child.compose_recursive(scale, global_transform);
         });
 
         self.cx.update_state();
-        self.widget.compose(&mut self.cx.as_update_cx());
     }
 
     pub(crate) fn draw_recursive(&mut self, canvas: &mut dyn Canvas) {

@@ -121,6 +121,12 @@ impl Affine {
     }
 }
 
+impl From<Offset> for Affine {
+    fn from(offset: Offset) -> Self {
+        Self::translate(offset)
+    }
+}
+
 impl Mul<Point> for Affine {
     type Output = Point;
 

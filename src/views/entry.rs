@@ -486,10 +486,10 @@ impl<T> ori::View<Context, T> for Entry<T> {
         {
             let text = match self.text {
                 Some(ref text) => text.clone(),
-                None => widgets::Entry::text_area(&widget.to_ref())
-                    .widget
-                    .text()
-                    .to_owned(),
+                None => widgets::Entry::get_text_area(&widget.to_ref())
+                    .map_or(String::new(), |widget| {
+                        widget.widget.text().to_owned()
+                    }),
             };
 
             let color = self.get_color(&palette, &text_theme, &theme);

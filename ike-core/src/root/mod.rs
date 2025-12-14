@@ -31,6 +31,11 @@ pub struct RootState {
 
 impl RootState {
     pub(crate) fn signal(&self, signal: RootSignal) {
+        tracing::trace!(
+            signal = ?signal,
+            "root signal emitted",
+        );
+
         (self.sink)(signal);
     }
 
@@ -196,7 +201,13 @@ impl Root {
         if let Some(mut widget) = self.get_mut(contents) {
             widget.cx.set_window_recursive(Some(window));
             widget.cx.request_layout();
-        };
+        } else {
+            tracing::error!(
+                window = ?window,
+                contents = ?contents,
+                "tried to set window contents to a widget that doesn't exist",
+            );
+        }
 
         if let Some(window) = self.get_window_mut(window) {
             Some(mem::replace(
@@ -204,6 +215,12 @@ impl Root {
                 contents,
             ))
         } else {
+            tracing::error!(
+                window = ?window,
+                contents = ?contents,
+                "tried to set contents of a window that doens't exit",
+            );
+
             None
         }
     }
@@ -230,37 +247,59 @@ impl Root {
 
     #[must_use]
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
-        let window_id = window;
         let window = self.state.get_window(window)?;
+        let window_id = window.id;
         let sizing = window.sizing;
         let contents = window.contents;
         let pointer_position = window.pointers.first().map(|p| p.position);
 
-        let new_window_size = {
-            let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
-            layout::layout_window(&mut widget, window_id, canvas.painter())
+        let (new_window_size, update_hovered) = if let Some(mut widget) =
+            self.arena.get_mut(&mut self.state, contents)
+        {
+            let needs_layout = widget.cx.state.needs_layout;
+            let new_window_size = layout::layout_window(&mut widget, window_id, canvas.painter());
+            let needs_compose = widget.cx.state.needs_compose;
+            layout::compose_window(&mut widget, window_id);
+
+            (
+                Some(new_window_size),
+                needs_layout || needs_compose,
+            )
+        } else {
+            tracing::error!(
+                window = ?window_id,
+                contents = ?contents,
+                "`draw` called, but window contents doesn't exist",
+            );
+
+            (None, false)
         };
 
-        if let Some(position) = pointer_position {
+        if let Some(position) = pointer_position
+            && update_hovered
+        {
             pointer::update_hovered(self, window_id, contents, position);
         }
 
-        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
+        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
+            {
+                let _span = tracing::info_span!("draw");
+                widget.draw_recursive(canvas);
+            }
 
-        {
-            let _span = tracing::info_span!("draw");
-            widget.draw_recursive(canvas);
+            {
+                let _span = tracing::info_span!("draw_over");
+                widget.draw_over_recursive(canvas);
+            }
         }
 
-        {
-            let _span = tracing::info_span!("draw_over");
-            widget.draw_over_recursive(canvas);
-        }
-
-        matches!(sizing, WindowSizing::FitContent).then_some(new_window_size)
+        matches!(sizing, WindowSizing::FitContent)
+            .then_some(new_window_size)
+            .flatten()
     }
 
     pub fn animate(&mut self, window: WindowId, delta_time: Duration) {
+        let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
         };
@@ -268,11 +307,18 @@ impl Root {
         let _span = tracing::info_span!("animate");
 
         let contents = window.contents;
-        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
-        widget.animate_recursive(delta_time);
+        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
+            widget.animate_recursive(delta_time);
+        } else {
+            tracing::error!(
+                window = ?window_id,
+                "`animate` called a on window that doesn't exist",
+            );
+        }
     }
 
     pub fn window_focused(&mut self, window: WindowId, is_focused: bool) {
+        let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
         };
@@ -280,12 +326,19 @@ impl Root {
         window.is_focused = is_focused;
 
         let contents = window.contents;
-        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
-        let update = Update::WindowFocused(is_focused);
-        widget.update_recursive(update);
+        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
+            let update = Update::WindowFocused(is_focused);
+            widget.update_recursive(update);
+        } else {
+            tracing::error!(
+                window = ?window_id,
+                "`window_focused` called on a window that doesn't exist",
+            );
+        }
     }
 
     pub fn window_resized(&mut self, window: WindowId, new_size: Size) {
+        let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
         };
@@ -293,13 +346,20 @@ impl Root {
         window.size = new_size;
 
         let contents = window.contents;
-        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
-        let update = Update::WindowResized(new_size);
-        widget.update_recursive(update);
-        widget.cx.request_layout();
+        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
+            let update = Update::WindowResized(new_size);
+            widget.update_recursive(update);
+            widget.cx.request_layout();
+        } else {
+            tracing::error!(
+                window = ?window_id,
+                "`window_resized` called on a window that doesn't exist",
+            );
+        }
     }
 
     pub fn window_scaled(&mut self, window: WindowId, new_scale: f32, new_size: Size) {
+        let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
         };
@@ -308,9 +368,16 @@ impl Root {
         window.size = new_size;
 
         let contents = window.contents;
-        let mut widget = self.arena.get_mut(&mut self.state, contents).unwrap();
-        let update = Update::WindowScaleChanged(new_scale);
-        widget.update_recursive(update);
+        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
+            let update = Update::WindowScaleChanged(new_scale);
+            widget.update_recursive(update);
+            widget.cx.request_layout();
+        } else {
+            tracing::error!(
+                window = ?window_id,
+                "`window_scaled` called on a window that doesn't exist",
+            );
+        }
     }
 }
 

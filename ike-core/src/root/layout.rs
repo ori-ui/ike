@@ -6,6 +6,11 @@ pub(super) fn layout_window(
     painter: &mut dyn Painter,
 ) -> Size {
     let Some(window) = widget.cx.root.get_window(window_id) else {
+        tracing::error!(
+            window = ?window_id,
+            "tried to layout window that doesn't exist",
+        );
+
         return Size::ZERO;
     };
 
@@ -16,18 +21,19 @@ pub(super) fn layout_window(
         WindowSizing::Resizable { .. } => window.size,
     };
 
-    let needs_layout = widget.cx.state.needs_layout;
+    let _span = tracing::info_span!("layout").entered();
+    let space = Space::new(Size::all(0.0), max_size);
+    widget.layout_recursive(scale, painter, space)
+}
 
-    let size = {
-        let _span = tracing::info_span!("layout").entered();
-        let space = Space::new(Size::all(0.0), max_size);
-        widget.layout_recursive(scale, painter, space)
-    };
-
-    if needs_layout {
+pub(super) fn compose_window(widget: &mut WidgetMut, window: WindowId) {
+    if let Some(window) = widget.cx.root.get_window(window) {
         let _span = tracing::info_span!("compose").entered();
-        widget.compose_recursive(scale, Affine::IDENTITY);
+        widget.compose_recursive(window.scale, Affine::IDENTITY);
+    } else {
+        tracing::error!(
+            window = ?window,
+            "tried to compose window that doesn't exist",
+        );
     }
-
-    size
 }

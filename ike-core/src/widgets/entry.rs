@@ -21,7 +21,7 @@ pub struct Entry {
 
 impl Entry {
     pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
-        let text_area = TextArea::new(cx, paragraph, true).id();
+        let text_area = TextArea::new(cx, paragraph).id();
         let placeholder = Paragraph::new(16.0, TextAlign::Start, TextWrap::None);
         let placeholder = Label::new(cx, placeholder).id();
 
@@ -137,12 +137,14 @@ impl Entry {
         }
     }
 
-    pub fn text_area<'a>(this: &'a WidgetRef<'_, Self>) -> WidgetRef<'a, TextArea> {
-        this.cx.get(this.widget.text_area).unwrap()
+    pub fn get_text_area<'a>(this: &'a WidgetRef<'_, Self>) -> Option<WidgetRef<'a, TextArea>> {
+        this.cx.get(this.widget.text_area)
     }
 
-    pub fn text_area_mut<'a>(this: &'a mut WidgetMut<'a, Self>) -> WidgetMut<'a, TextArea> {
-        this.cx.get_mut(this.widget.text_area).unwrap()
+    pub fn get_text_area_mut<'a>(
+        this: &'a mut WidgetMut<'a, Self>,
+    ) -> Option<WidgetMut<'a, TextArea>> {
+        this.cx.get_mut(this.widget.text_area)
     }
 }
 

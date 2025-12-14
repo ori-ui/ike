@@ -5,10 +5,10 @@ mod container;
 mod entry;
 mod label;
 mod picture;
+mod prose;
 mod scroll;
 mod stack;
 mod text;
-mod text_area;
 mod window;
 
 pub use aligned::{
@@ -24,8 +24,8 @@ pub use container::{Container, ContainerTheme, container};
 pub use entry::{Entry, EntryTheme, entry};
 pub use label::{Label, label};
 pub use picture::{Picture, picture};
+pub use prose::{Prose, ProseTheme, prose};
 pub use scroll::{Scroll, hscroll, vscroll};
 pub use stack::{Flex, Stack, expand, flex, hstack, stack, vstack};
 pub use text::TextTheme;
-pub use text_area::{TextArea, TextAreaTheme, text_area};
 pub use window::{Window, window};

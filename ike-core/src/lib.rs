@@ -25,7 +25,7 @@ pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::BuildCx;
 pub use canvas::{BlendMode, Canvas, Clip, Paint, Shader};
 pub use color::Color;
-pub use context::{DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
+pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
 pub use curve::Curve;
 pub use event::{
     CursorIcon, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, Pointer, PointerButton,

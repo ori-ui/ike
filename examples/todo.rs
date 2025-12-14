@@ -82,7 +82,7 @@ fn todo(i: usize, todo: &Todo, is_last: bool) -> impl View<Data> + use<> {
                 1.0,
                 hstack((
                     todo_done(i, todo),
-                    expand(1.0, label(&todo.name)),
+                    expand(1.0, prose(&todo.name)),
                 ))
                 .gap(12.0),
             ),

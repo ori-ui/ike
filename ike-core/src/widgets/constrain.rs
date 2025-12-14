@@ -71,7 +71,6 @@ impl Widget for Constrain {
 
         if self.min_size.animate(dt) || self.max_size.animate(dt) {
             cx.request_animate();
-
             cx.set_pixel_perfect(false);
         } else {
             cx.set_pixel_perfect(true);

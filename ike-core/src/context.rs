@@ -1,8 +1,8 @@
 use std::mem;
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Arena, Clip, CursorIcon, Offset, Painter, Point, Rect, Size,
-    Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId, root::RootState,
+    Affine, AnyWidget, AnyWidgetId, Arena, Clip, CursorIcon, Painter, Point, Rect, RootSignal,
+    Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId, root::RootState,
     widget::WidgetState,
 };
 
@@ -40,6 +40,13 @@ pub struct UpdateCx<'a> {
 }
 
 pub struct LayoutCx<'a> {
+    pub(crate) scale: f32,
+    pub(crate) root:  &'a mut RootState,
+    pub(crate) arena: &'a mut Arena,
+    pub(crate) state: &'a mut WidgetState,
+}
+
+pub struct ComposeCx<'a> {
     pub(crate) scale: f32,
     pub(crate) root:  &'a mut RootState,
     pub(crate) arena: &'a mut Arena,
@@ -98,6 +105,16 @@ impl MutCx<'_> {
         }
     }
 
+    pub fn request_compose(&mut self) {
+        self.state.needs_compose = true;
+        self.state.needs_draw = true;
+        self.propagate_state();
+
+        if let Some(window) = self.state.window {
+            self.root.request_redraw(window);
+        }
+    }
+
     pub fn request_draw(&mut self) {
         self.state.needs_draw = true;
         self.propagate_state();
@@ -137,6 +154,17 @@ impl MutCx<'_> {
         let (root, arena, state) = self.split();
 
         LayoutCx {
+            scale,
+            root,
+            arena,
+            state,
+        }
+    }
+
+    pub(crate) fn as_compose_cx(&mut self, scale: f32) -> ComposeCx<'_> {
+        let (root, arena, state) = self.split();
+
+        ComposeCx {
             scale,
             root,
             arena,
@@ -250,6 +278,10 @@ impl EventCx<'_> {
     pub fn request_focus_previous(&mut self) {
         *self.focus = FocusUpdate::Previous;
     }
+
+    pub fn set_clipboard(&mut self, contents: String) {
+        self.root.signal(RootSignal::ClipboardSet(contents));
+    }
 }
 
 impl LayoutCx<'_> {
@@ -260,18 +292,33 @@ impl LayoutCx<'_> {
     }
 
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
-        let child = self.state.children[index];
-        let mut child = self.arena.get_mut(self.root, child).unwrap();
-        child.layout_recursive(self.scale, painter, space)
+        if let Some(child) = self.state.children.get(index)
+            && let Some(mut child) = self.arena.get_mut(self.root, *child)
+        {
+            child.layout_recursive(self.scale, painter, space)
+        } else {
+            tracing::error!("`LayoutCx::layout_child` called on widget that doesn't exist");
+
+            Size::ZERO
+        }
     }
 
-    pub fn place_child(&mut self, index: usize, offset: Offset) {
-        let child = &self.state.children[index];
+    pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
+        if let Some(child) = self.state.children.get(index)
+            && let Some(state) = self.arena.get_state_mut(child.index)
+        {
+            let mut transform = transform.into();
 
-        if let Some(state) = self.arena.get_state_mut(child.index) {
-            state.transform.offset = offset;
+            if self.state.is_pixel_perfect {
+                transform.offset = transform.offset.round_to_scale(self.scale);
+            }
+
+            if state.transform != transform {
+                state.transform = transform;
+                state.needs_compose = true;
+            }
         } else {
-            tracing::error!("`LayoutCx::place` called on widget that doesn't exist");
+            tracing::error!("`LayoutCx::place_child` called on widget that doesn't exist");
         }
     }
 
@@ -287,6 +334,24 @@ impl LayoutCx<'_> {
 
     pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
         self.state.clip = rect.into();
+    }
+}
+
+impl ComposeCx<'_> {
+    pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
+        if let Some(child) = self.state.children.get(index)
+            && let Some(state) = self.arena.get_state_mut(child.index)
+        {
+            let mut transform = transform.into();
+
+            if self.state.is_pixel_perfect {
+                transform.offset = transform.offset.round_to_scale(self.scale);
+            }
+
+            state.transform = transform;
+        } else {
+            tracing::error!("`ComposeCx::place_child` called on widget that doesn't exist");
+        }
     }
 }
 
@@ -312,6 +377,7 @@ impl_contexts! {
     EventCx<'_>,
     UpdateCx<'_>,
     LayoutCx<'_>,
+    ComposeCx<'_>,
     DrawCx<'_> {
         pub fn id(&self) -> WidgetId {
             self.state.id
@@ -325,6 +391,7 @@ impl_contexts! {
     EventCx<'_>,
     UpdateCx<'_>,
     LayoutCx<'_>,
+    ComposeCx<'_>,
     DrawCx<'_> {
         pub fn get<U>(&self, id: WidgetId<U>) -> Option<WidgetRef<'_, U>>
         where
@@ -429,6 +496,15 @@ impl_contexts! {
             }
         }
 
+        pub fn request_compose(&mut self) {
+            self.state.needs_compose = true;
+            self.state.needs_draw = true;
+
+            if let Some(window) = self.state.window {
+                self.root.request_redraw(window);
+            }
+        }
+
         pub fn request_draw(&mut self) {
             self.state.needs_draw = true;
 
@@ -455,6 +531,7 @@ impl_contexts! {
     MutCx<'_>,
     EventCx<'_>,
     UpdateCx<'_>,
+    ComposeCx<'_>,
     DrawCx<'_> {
         pub fn transform(&self) -> Affine {
             self.state.transform
