@@ -23,7 +23,9 @@ impl Root {
             return false;
         };
 
-        window.pointers.retain(|p| p.id == id);
+        if let Some(index) = window.pointers.iter().position(|p| p.id == id) {
+            window.pointers.swap_remove(index);
+        }
 
         if let Some(hovered) = find_hovered(&self.arena, window.contents)
             && let Some(mut widget) = self.get_mut(hovered)

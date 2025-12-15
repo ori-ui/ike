@@ -4,22 +4,32 @@ version = "0.1.0"
 edition.workspace = true
 
 [workspace]
-members = ["ike-core", "ike-skia"]
+members = [
+  "ike-core",
+  "ike-skia",
+  "ike-macro",
+  "examples/*",
+]
 
 [workspace.package]
 edition = "2024"
 
 [workspace.dependencies]
-ike-core = { path = "ike-core" }
-ike-skia = { path = "ike-skia" }
+ike-core  = { path = "ike-core"  }
+ike-macro = { path = "ike-macro" }
+ike-skia  = { path = "ike-skia"  }
+ike       = { path = "."         }
 
 [features]
-default = []
+default = ["winit"]
 reload = ["dep:libloading", "dep:rand", "dep:json"]
 
+winit = ["dep:copypasta", "dep:winit"]
+
 [dependencies]
-ike-core.workspace = true
-ike-skia.workspace = true
+ike-core  = { workspace = true }
+ike-macro = { workspace = true }
+ike-skia  = { workspace = true }
 
 [dependencies.ori]
 git = "https://github.com/ori-ui/ori"
@@ -28,18 +38,25 @@ git = "https://github.com/ori-ui/ori"
 version = "1"
 features = ["rt-multi-thread"]
 
-[dependencies.winit]
+[target.'cfg(any(all(target_family = "unix", not(target_os = "android")), target_os = "macos", target_os = "windows"))'.dependencies.copypasta]
+version = "0.10"
+optional = true
+
+[target.'cfg(any(all(target_family = "unix", not(target_os = "android")), target_os = "macos", target_os = "windows"))'.dependencies.winit]
 version = "0.30"
+optional = true
 default-features = false
 features = [
   "wayland",
   "wayland-dlopen",
   "x11",
-  "rwh_06",
+  "rwh_06"
 ]
 
-[target.'cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))'.dependencies.copypasta]
-version = "0.10"
+[target.'cfg(target_os = "android")'.dependencies]
+raw-window-handle = "0.6"
+ndk-sys = "0.6"
+jni = "0.21"
 
 [dependencies.libloading]
 version = "0.9"
@@ -59,4 +76,3 @@ version = "0.1"
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = ["env-filter"]
-

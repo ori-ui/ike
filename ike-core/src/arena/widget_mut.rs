@@ -275,6 +275,7 @@ where
             tracing::warn!(size = ?size, "size is not finite");
         }
 
+        self.cx.update_state();
         self.cx.state.size = size;
         self.cx.state.previous_space = Some(space);
 

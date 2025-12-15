@@ -1,13 +1,7 @@
 mod app;
 mod error;
-mod key;
 mod palette;
 mod view;
-mod winit;
-
-#[doc(hidden)]
-#[cfg(feature = "reload")]
-pub mod reload;
 
 pub mod views {
     #[allow(clippy::module_inception)]
@@ -18,13 +12,14 @@ pub mod views {
     pub use views::*;
 }
 
+pub use ike_macro::main;
+
 pub use ike_core::*;
 pub use ori::*;
 
 pub use app::App;
 pub use palette::Palette;
 pub use view::{Effect, View};
-pub use winit::Context;
 
 pub mod prelude {
     pub use ike_core::{
@@ -41,3 +36,40 @@ pub mod prelude {
 
     pub use crate::{App, Effect, Palette, View, ViewSeq, WindowSizing, views::*};
 }
+
+#[cfg(all(
+    feature = "winit",
+    any(
+        all(target_family = "unix", not(target_os = "android")),
+        target_os = "macos",
+        target_os = "windows"
+    )
+))]
+mod winit;
+
+#[doc(hidden)]
+#[cfg(all(
+    feature = "reload",
+    any(
+        all(target_family = "unix", not(target_os = "android")),
+        target_os = "macos",
+        target_os = "windows"
+    )
+))]
+pub mod reload;
+
+#[cfg(all(
+    feature = "winit",
+    any(
+        all(target_family = "unix", not(target_os = "android")),
+        target_os = "macos",
+        target_os = "windows"
+    )
+))]
+pub use winit::Context;
+
+#[cfg(target_os = "android")]
+mod android;
+
+#[cfg(target_os = "android")]
+pub use android::{Context, android_main};

@@ -1,34 +1,29 @@
-use std::{
-    any::{Any, TypeId},
-    pin::Pin,
-    sync::{
-        Arc,
-        mpsc::{Receiver, Sender},
-    },
-    time::Instant,
-};
+use std::{any::Any, pin::Pin, sync::mpsc::Receiver, time::Instant};
 
 use ike_core::{
-    AnyWidgetId, BuildCx, Modifiers, Offset, Point, PointerButton, PointerId, Root, RootSignal,
-    ScrollDelta, Size, WidgetId, WindowSizing, WindowUpdate,
+    Modifiers, Offset, Point, PointerButton, PointerId, RootSignal, ScrollDelta, Size,
+    WindowSizing, WindowUpdate,
 };
 use ike_skia::{
     SkiaPainter,
-    vulkan::{SkiaVulkanContext, SkiaVulkanWindow},
+    vulkan::{SkiaVulkanContext, SkiaVulkanSurface},
 };
 use ori::AsyncContext;
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
-    event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
+    event_loop::{ActiveEventLoop, EventLoop},
+    raw_window_handle::{HasDisplayHandle, HasWindowHandle},
     window::{Window, WindowId},
 };
 
-use crate::{
-    app::{AnyEffect, UiBuilder},
-    key::convert_winit_key,
-};
+use crate::app::{AnyEffect, UiBuilder};
+
+mod context;
+mod key;
+
+pub use context::Context;
 
 pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
     let rt;
@@ -41,11 +36,12 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
     let runtime = tokio::runtime::Handle::current();
     let event_loop = EventLoop::with_user_event().build().unwrap();
-    let vulkan = SkiaVulkanContext::new(&event_loop);
+    let display_handle = event_loop.display_handle().unwrap();
+    let vulkan = SkiaVulkanContext::new(display_handle);
 
     let mut painter = SkiaPainter::new();
     painter.load_font(
-        include_bytes!("InterVariable.ttf"),
+        include_bytes!("../InterVariable.ttf"),
         None,
     );
 
@@ -111,6 +107,13 @@ pub(crate) fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
     event_loop.run_app(&mut state).unwrap();
 }
 
+enum Event {
+    Rebuild,
+    Event(ori::Event),
+    Spawn(Pin<Box<dyn Future<Output = ()> + Send>>),
+    Signal(RootSignal),
+}
+
 struct AppState<'a, T> {
     data: &'a mut T,
 
@@ -132,7 +135,7 @@ struct AppState<'a, T> {
 struct WindowState {
     animate: Option<Instant>,
 
-    vulkan: SkiaVulkanWindow,
+    surface: SkiaVulkanSurface,
 
     id:     ike_core::WindowId,
     window: Window,
@@ -179,7 +182,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
 
                 let desc = self.context.root.get_window(window.id).unwrap();
 
-                let new_window_size = window.vulkan.draw(
+                let new_window_size = window.surface.draw(
                     &mut self.painter,
                     desc.color(),
                     window.window.scale_factor() as f32,
@@ -311,7 +314,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                 } else {
                     self.context.root.key_pressed(
                         window.id,
-                        convert_winit_key(event.logical_key),
+                        key::convert_winit_key(event.logical_key),
                         event.repeat,
                         event.text.as_deref(),
                         event.state.is_pressed(),
@@ -528,20 +531,21 @@ impl WindowState {
 
         let window = event_loop.create_window(attributes).unwrap();
 
-        let vulkan = unsafe {
+        let surface = unsafe {
             let physical = window.inner_size();
-            SkiaVulkanWindow::new(
+            SkiaVulkanSurface::new(
                 vulkan,
-                &window,
+                window.display_handle().unwrap(),
+                window.window_handle().unwrap(),
                 physical.width,
                 physical.height,
             )
         };
 
         Self {
-            animate: None,
             id: desc.id(),
-            vulkan,
+            animate: None,
+            surface,
             window,
         }
     }
@@ -549,144 +553,6 @@ impl WindowState {
     fn resize(&mut self) {
         let size = self.window.inner_size();
 
-        (self.vulkan).resize(size.width, size.height);
-    }
-}
-
-pub struct Context {
-    root:    Root,
-    proxy:   EventLoopProxy<()>,
-    entries: Vec<Entry>,
-    sender:  Sender<Event>,
-
-    use_type_names_unsafe: bool,
-}
-
-impl Context {
-    pub fn create_window(&mut self, contents: impl AnyWidgetId) -> ike_core::WindowId {
-        self.root.create_window(contents.upcast())
-    }
-
-    pub fn remove_window(&mut self, window: ike_core::WindowId) {
-        self.root.remove_window(window)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn is_using_type_names(&self) -> bool {
-        self.use_type_names_unsafe
-    }
-
-    #[allow(dead_code)]
-    pub(crate) unsafe fn use_type_names(&mut self, enabled: bool) {
-        self.use_type_names_unsafe = enabled;
-    }
-}
-
-struct Entry {
-    value:     Box<dyn Any>,
-    type_id:   TypeId,
-    type_name: &'static str,
-}
-
-#[derive(Clone)]
-pub struct Proxy {
-    sender: Sender<Event>,
-    proxy:  EventLoopProxy<()>,
-}
-
-enum Event {
-    Rebuild,
-    Event(ori::Event),
-    Spawn(Pin<Box<dyn Future<Output = ()> + Send>>),
-    Signal(RootSignal),
-}
-
-impl BuildCx for Context {
-    fn root(&self) -> &Root {
-        &self.root
-    }
-
-    fn root_mut(&mut self) -> &mut Root {
-        &mut self.root
-    }
-}
-
-impl ori::BaseElement for Context {
-    type Element = WidgetId;
-}
-
-impl ori::AsyncContext for Context {
-    type Proxy = Proxy;
-
-    fn proxy(&mut self) -> Self::Proxy {
-        Proxy {
-            sender: self.sender.clone(),
-            proxy:  self.proxy.clone(),
-        }
-    }
-}
-
-impl ori::ProviderContext for Context {
-    fn push_context<T: Any>(&mut self, context: Box<T>) {
-        self.entries.push(Entry {
-            value:     context,
-            type_id:   TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
-        })
-    }
-
-    fn pop_context<T: Any>(&mut self) -> Option<Box<T>> {
-        self.entries.pop()?.value.downcast().ok()
-    }
-
-    fn get_context<T: Any>(&self) -> Option<&T> {
-        let entry = match self.use_type_names_unsafe {
-            true => self
-                .entries
-                .iter()
-                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
-            false => self
-                .entries
-                .iter()
-                .rfind(|e| e.type_id == TypeId::of::<T>())?,
-        };
-
-        Some(unsafe { &*(entry.value.as_ref() as *const _ as *const T) })
-    }
-
-    fn get_context_mut<T: Any>(&mut self) -> Option<&mut T> {
-        let entry = match self.use_type_names_unsafe {
-            true => self
-                .entries
-                .iter_mut()
-                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
-            false => self
-                .entries
-                .iter_mut()
-                .rfind(|e| e.type_id == TypeId::of::<T>())?,
-        };
-
-        Some(unsafe { &mut *(entry.value.as_mut() as *mut _ as *mut T) })
-    }
-}
-
-impl ori::Proxy for Proxy {
-    fn clone(&self) -> Arc<dyn ori::Proxy> {
-        Arc::new(Clone::clone(self))
-    }
-
-    fn rebuild(&self) {
-        let _ = self.sender.send(Event::Rebuild);
-        let _ = self.proxy.send_event(());
-    }
-
-    fn event(&self, event: ori::Event) {
-        let _ = self.sender.send(Event::Event(event));
-        let _ = self.proxy.send_event(());
-    }
-
-    fn spawn_boxed(&self, future: Pin<Box<dyn Future<Output = ()> + Send>>) {
-        let _ = self.sender.send(Event::Spawn(future));
-        let _ = self.proxy.send_event(());
+        self.surface.resize(size.width, size.height);
     }
 }

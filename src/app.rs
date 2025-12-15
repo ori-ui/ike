@@ -31,7 +31,16 @@ impl App {
         let subscriber = tracing_subscriber::registry().with(filter);
 
         #[cfg(not(target_arch = "wasm32"))]
-        let subscriber = subscriber.with(tracing_subscriber::fmt::layer());
+        let subscriber = {
+            #[cfg(not(target_os = "android"))]
+            let fmt_layer = tracing_subscriber::fmt::layer();
+
+            #[cfg(target_os = "android")]
+            let fmt_layer =
+                tracing_subscriber::fmt::layer().with_writer(crate::android::MakeAndroidWriter);
+
+            subscriber.with(fmt_layer)
+        };
 
         let _ = tracing::subscriber::set_global_default(subscriber);
     }
@@ -44,7 +53,19 @@ impl App {
         Self::init_log();
 
         let build: UiBuilder<T> = Box::new(move |data| Box::new(ui(data)));
-        crate::winit::run(data, build)
+
+        #[cfg(all(
+            feature = "winit",
+            any(
+                all(target_family = "unix", not(target_os = "android")),
+                target_os = "macos",
+                target_os = "windows"
+            )
+        ))]
+        crate::winit::run(data, build);
+
+        #[cfg(target_os = "android")]
+        crate::android::run(data, build);
     }
 }
 

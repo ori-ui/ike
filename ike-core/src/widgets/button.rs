@@ -158,8 +158,6 @@ impl Widget for Button {
                     self.idle_color
                 };
 
-                cx.request_draw();
-
                 if self.color.begin(color) {
                     cx.request_animate();
                 }

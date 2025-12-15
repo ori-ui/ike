@@ -1,0 +1,101 @@
+plugins {
+    id 'com.android.application'
+}
+
+def rustProjectDir = file('.')
+def rustTargetDir = file("$rustProjectDir/../../target")
+def jniLibsDir = file("$buildDir/jniLibs")
+
+android {
+    namespace "org.ori_ui.example"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "org.ori_ui.example"
+        minSdk 21
+        targetSdk 35
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64'
+        }
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            jniLibs.srcDirs = ["$jniLibsDir"]
+        }
+    }
+}
+
+def rustTargets = [
+    'arm64-v8a': 'aarch64-linux-android',
+    'x86_64': 'x86_64-linux-android',
+]
+
+android.applicationVariants.all { variant ->
+    def variantName = variant.name.capitalize()
+    def buildType = variant.buildType.name
+    def cargoProfile = buildType == 'release' ? 'release' : 'debug'
+
+    def buildTaskNames = []
+
+    rustTargets.each { abi, triple ->
+        def taskName = "cargoBuild$variantName${abi.capitalize()}"
+
+        tasks.register(taskName, Exec) {
+            group = 'rust'
+            description = "Build Rust ($cargoProfile) for [$abi]"
+
+            workingDir rustProjectDir
+
+            commandLine(
+                'cargo',
+                'ndk',
+                'build',
+                '--target',
+                triple,
+                cargoProfile == "release" ? "--release" : "",
+                '--color',
+                'always',
+            )
+
+            environment 'ANDROID_SDK_ROOT', android.sdkDirectory
+            environment 'ANDROID_NDK', android.ndkDirectory
+        }
+
+        buildTaskNames << taskName
+    }
+
+    def buildTaskName = "cargoBuild$variantName"
+
+    tasks.register(buildTaskName) {
+        group = 'rust'
+        description = "Build Rust ($cargoProfile) for (all ABIs)"
+        dependsOn buildTaskNames
+    }
+
+    def copyTaskName = "copyJniLibs$variantName"
+
+    tasks.register(copyTaskName) {
+        group = 'rust'
+        description = "Copy compiled Rust ($cargoProfile) shared objects for ${variant.name}"
+        dependsOn buildTaskName
+
+        doLast {
+            rustTargets.each { abi, triple -> 
+                def fromDir = file("$rustTargetDir/$triple/$cargoProfile")
+                def toDir = file("$jniLibsDir/${variant.name}/$abi")
+
+                copy {
+                    from fromDir
+                    include '*.so'
+                    into toDir
+                }
+            }
+        }
+    }
+
+    variant.preBuildProvider.configure {
+        dependsOn copyTaskName
+    }
+}

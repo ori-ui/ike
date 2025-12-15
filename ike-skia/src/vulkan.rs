@@ -2,7 +2,7 @@ use std::slice;
 
 use ash::vk::{self, Handle};
 use ike_core::Color;
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use raw_window_handle::{DisplayHandle, WindowHandle};
 
 use crate::{SkiaCanvas, SkiaPainter};
 
@@ -25,15 +25,28 @@ impl Drop for SkiaVulkanContext {
 }
 
 impl SkiaVulkanContext {
-    pub fn new(display: impl HasDisplayHandle) -> Self {
+    pub fn new(display: DisplayHandle) -> Self {
         let entry = unsafe { ash::Entry::load().unwrap() };
+        let raw_display = display.as_raw();
 
-        let display_handle = display.display_handle().unwrap();
-        let raw_display = display_handle.as_raw();
+        let api_version = unsafe {
+            entry
+                .try_enumerate_instance_version()
+                .ok()
+                .flatten()
+                .unwrap_or(vk::API_VERSION_1_0)
+        };
+
+        tracing::debug!(
+            "initializing vulkan with API v{}.{}.{}",
+            vk::api_version_major(api_version),
+            vk::api_version_minor(api_version),
+            vk::api_version_patch(api_version),
+        );
 
         let app_info = vk::ApplicationInfo::default()
             .engine_name(c"skia")
-            .api_version(vk::make_api_version(0, 1, 4, 0));
+            .api_version(api_version);
 
         let extensions = ash_window::enumerate_required_extensions(raw_display).unwrap();
         let validation_layers = [c"VK_LAYER_KHRONOS_validation"];
@@ -72,7 +85,10 @@ impl SkiaVulkanContext {
             instance
                 .get_physical_device_queue_family_properties(physical)
                 .iter()
-                .position(|q| q.queue_flags.contains(vk::QueueFlags::GRAPHICS))
+                .position(|family| {
+                    tracing::trace!(queue_family = ?family, "found queue family");
+                    family.queue_flags.contains(vk::QueueFlags::GRAPHICS)
+                })
                 .unwrap()
         };
 
@@ -104,7 +120,7 @@ impl SkiaVulkanContext {
     }
 }
 
-pub struct SkiaVulkanWindow {
+pub struct SkiaVulkanSurface {
     entry:            ash::Entry,
     instance:         ash::Instance,
     device:           ash::Device,
@@ -129,7 +145,7 @@ pub struct SkiaVulkanWindow {
     height:           u32,
 }
 
-impl Drop for SkiaVulkanWindow {
+impl Drop for SkiaVulkanSurface {
     fn drop(&mut self) {
         unsafe {
             let _ = self.device.device_wait_idle();
@@ -159,9 +175,9 @@ impl Drop for SkiaVulkanWindow {
     }
 }
 
-impl SkiaVulkanWindow {
+impl SkiaVulkanSurface {
     const SDR_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format:      vk::Format::B8G8R8A8_UNORM,
+        format:      vk::Format::R8G8B8A8_UNORM,
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
     };
 
@@ -176,7 +192,8 @@ impl SkiaVulkanWindow {
     ///   created with.
     pub unsafe fn new(
         context: &mut SkiaVulkanContext,
-        window: impl HasDisplayHandle + HasWindowHandle,
+        display: DisplayHandle,
+        window: WindowHandle,
         width: u32,
         height: u32,
     ) -> Self {
@@ -216,8 +233,8 @@ impl SkiaVulkanWindow {
             ash_window::create_surface(
                 &context.entry,
                 &context.instance,
-                window.display_handle().unwrap().as_raw(),
-                window.window_handle().unwrap().as_raw(),
+                display.as_raw(),
+                window.as_raw(),
                 None,
             )
             .unwrap()
@@ -253,8 +270,10 @@ impl SkiaVulkanWindow {
 
         let surface_format = if surface_formats.contains(&Self::HDR_FORMAT) {
             Self::HDR_FORMAT
-        } else {
+        } else if surface_formats.contains(&Self::SDR_FORMAT) {
             Self::SDR_FORMAT
+        } else {
+            panic!("could not find appropriate surface format");
         };
 
         let composite_alpha = if capabilities
@@ -333,7 +352,7 @@ impl SkiaVulkanWindow {
                 width:  width.max(1),
                 height: height.max(1),
             })
-            .image_usage(vk::ImageUsageFlags::TRANSFER_DST)
+            .image_usage(vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::COLOR_ATTACHMENT)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
             .pre_transform(self.pre_transform)
             .composite_alpha(self.composite_alpha)
@@ -393,7 +412,7 @@ impl SkiaVulkanWindow {
                 )
             } else {
                 (
-                    skia_safe::ColorType::BGRA8888,
+                    skia_safe::ColorType::RGBA8888,
                     skia_safe::ColorSpace::new_srgb(),
                 )
             };
