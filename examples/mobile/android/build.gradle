@@ -106,7 +106,7 @@ android.applicationVariants.all { variant ->
             def json = new groovy.json.JsonSlurper().parseText(stdout.toString("UTF-8"))
             def targetDir = json.target_directory
 
-            rustTargets.each { abi, triple -> 
+            rustTargets.each { abi, triple ->
                 def fromDir = file("$targetDir/$triple/$buildType")
                 def toDir = file("$jniLibsDir/${variant.name}/$abi")
 
