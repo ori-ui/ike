@@ -3,7 +3,6 @@ plugins {
 }
 
 def rustProjectDir = file('..')
-def rustTargetDir = file("$rustProjectDir/../../../target")
 def jniLibsDir = file("$buildDir/jniLibs")
 
 android {
@@ -35,7 +34,6 @@ def rustTargets = [
 android.applicationVariants.all { variant ->
     def variantName = variant.name.capitalize()
     def buildType = variant.buildType.name
-    def cargoProfile = buildType == 'release' ? 'release' : 'debug'
 
     def buildTaskNames = []
 
@@ -44,26 +42,33 @@ android.applicationVariants.all { variant ->
 
         tasks.register(taskName, Exec) {
             group = 'rust'
-            description = "Build Rust ($cargoProfile) for [$abi]"
+            description = "Build Rust ($buildType) for [$abi]"
 
             workingDir rustProjectDir
 
             commandLine(
-                'cargo',
-                'ndk',
-                'build',
-                '--target',
-                triple,
-                '--profile',
-                cargoProfile == 'release'
+                'cargo', 'build',
+                '--target', triple,
+                '--profile', buildType == 'release'
                     ? 'release'
                     : 'dev',
-                '--color',
-                'always',
+                '--color', 'always',
             )
+
+            def os = org.gradle.internal.os.OperatingSystem.current()
+            def host =
+                os.isMacOsX() ? "darwin-x86_64" :
+                os.isWindows() ? "windows-x86_64" :
+                "linux-x86_64"
+
+            def envTriple = triple.toUpperCase().replace('-', '_')
+            def llvmDir = "${android.ndkDirectory}/toolchains/llvm/prebuilt/${host}/bin"
+            def clang = "$triple${android.defaultConfig.minSdk}-clang"
 
             environment 'ANDROID_SDK_ROOT', android.sdkDirectory
             environment 'ANDROID_NDK', android.ndkDirectory
+            environment "CARGO_TARGET_${envTriple}_LINKER", "$llvmDir/$clang"
+            environment "CARGO_TARGET_${envTriple}_AR", "$llvmDir/llvm-ar"
         }
 
         buildTaskNames << taskName
@@ -73,7 +78,7 @@ android.applicationVariants.all { variant ->
 
     tasks.register(buildTaskName) {
         group = 'rust'
-        description = "Build Rust ($cargoProfile) for (all ABIs)"
+        description = "Build Rust ($buildType) for (all ABIs)"
         dependsOn buildTaskNames
     }
 
@@ -81,7 +86,7 @@ android.applicationVariants.all { variant ->
 
     tasks.register(copyTaskName) {
         group = 'rust'
-        description = "Copy compiled Rust ($cargoProfile) shared objects for ${variant.name}"
+        description = "Copy compiled Rust ($buildType) shared objects for ${variant.name}"
         dependsOn buildTaskName
 
         doLast {
@@ -92,15 +97,17 @@ android.applicationVariants.all { variant ->
                 commandLine(
                     'cargo',
                     'metadata',
-                    '--format-version',
-                    '1',
+                    '--format-version', '1',
                     '--no-deps',
                 )
                 standardOutput = stdout
             }
 
+            def json = new groovy.json.JsonSlurper().parseText(stdout.toString("UTF-8"))
+            def targetDir = json.target_directory
+
             rustTargets.each { abi, triple -> 
-                def fromDir = file("$rustTargetDir/$triple/$cargoProfile")
+                def fromDir = file("$targetDir/$triple/$buildType")
                 def toDir = file("$jniLibsDir/${variant.name}/$abi")
 
                 copy {
