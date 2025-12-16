@@ -8,6 +8,7 @@ pub fn register_callbacks(activity: &mut ndk_sys::ANativeActivity) {
     callbacks.onNativeWindowResized = Some(on_window_resized);
     callbacks.onInputQueueCreated = Some(on_input_queue_created);
     callbacks.onInputQueueDestroyed = Some(on_input_queue_destroyed);
+    callbacks.onWindowFocusChanged = Some(on_window_focus_changed);
 }
 
 fn get_proxy(activity: &ndk_sys::ANativeActivity) -> &Proxy {
@@ -55,6 +56,16 @@ unsafe extern "C" fn on_window_resized(
     unsafe {
         let proxy = get_proxy(&*activity);
         proxy.send(Event::WindowResized);
+    };
+}
+
+unsafe extern "C" fn on_window_focus_changed(
+    activity: *mut ndk_sys::ANativeActivity,
+    focused: i32,
+) {
+    unsafe {
+        let proxy = get_proxy(&*activity);
+        proxy.send(Event::WindowFocusChanged(focused > 0));
     };
 }
 

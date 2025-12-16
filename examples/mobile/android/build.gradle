@@ -3,14 +3,13 @@ plugins {
 }
 
 def rustProjectDir = file('..')
-def jniLibsDir = file("$buildDir/jniLibs")
 
 android {
-    namespace "org.ori_ui.example"
+    namespace "org.ori.example"
     compileSdk 35
 
     defaultConfig {
-        applicationId "org.ori_ui.example"
+        applicationId "org.ori.example"
         minSdk 21
         targetSdk 35
         ndk {
@@ -20,8 +19,8 @@ android {
 
     sourceSets {
         main {
-            manifest.srcFile 'src/AndroidManifest.xml'
-            jniLibs.srcDirs = ["$jniLibsDir"]
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            jniLibs.srcDirs = ["$buildDir/jniLibs"]
         }
     }
 }
@@ -37,7 +36,7 @@ tasks.register('run', Exec) {
     dependsOn 'installDebug'
 
     def appId = android.defaultConfig.applicationId
-    def activity = "$appId/android.app.NativeActivity"
+    def activity = "$appId/org.ori.RustActivity"
 
     doFirst {
         // clear old logs
@@ -144,7 +143,7 @@ android.applicationVariants.all { variant ->
 
             rustTargets.each { abi, triple ->
                 def fromDir = file("$targetDir/$triple/$buildType")
-                def toDir = file("$jniLibsDir/${variant.name}/$abi")
+                def toDir = file("$buildDir/jniLibs/${variant.name}/$abi")
 
                 copy {
                     from fromDir

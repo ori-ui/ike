@@ -12,9 +12,15 @@ mod context;
 mod log;
 
 pub use context::Context;
+use jni::{
+    JNIEnv, JavaVM,
+    objects::{JObject, JValue},
+};
 pub(crate) use log::MakeAndroidWriter;
 
-use ike_core::{Point, PointerButton, PointerId, RootSignal, Size, WindowId, WindowUpdate};
+use ike_core::{
+    ImeSignal, Point, PointerButton, PointerId, RootSignal, Size, WindowId, WindowUpdate,
+};
 use ori::AsyncContext;
 use raw_window_handle::{AndroidNdkWindowHandle, DisplayHandle, RawWindowHandle, WindowHandle};
 
@@ -80,6 +86,7 @@ struct EventLoop<'a, T> {
     native_activity: NonNull<ndk_sys::ANativeActivity>,
     looper:          *mut ndk_sys::ALooper,
     receiver:        Receiver<Event>,
+    jvm:             JavaVM,
 
     choreographer: Option<NonNull<ndk_sys::AChoreographer>>,
     is_rendering:  bool,
@@ -115,6 +122,7 @@ enum Event {
     WindowDestroyed,
     WindowRedraw,
     WindowResized,
+    WindowFocusChanged(bool),
 
     RenderFinished,
 
@@ -171,6 +179,8 @@ impl<'a, T> EventLoop<'a, T> {
         let mut view = build(data);
         let (_, state) = view.any_build(&mut context, data);
 
+        let jvm = unsafe { JavaVM::from_raw(native_activity.as_ref().vm).unwrap() };
+
         Self {
             data,
             build,
@@ -183,6 +193,7 @@ impl<'a, T> EventLoop<'a, T> {
             native_activity,
             looper,
             receiver,
+            jvm,
 
             choreographer: None,
             is_rendering: false,
@@ -345,6 +356,12 @@ impl<'a, T> EventLoop<'a, T> {
                     );
 
                     (self.context.root).window_scaled(window.id, self.scale_factor, size);
+                }
+            }
+
+            Event::WindowFocusChanged(focused) => {
+                if let WindowState::Open(ref mut window) = self.window {
+                    (self.context.root).window_focused(window.id, focused);
                 }
             }
 
@@ -551,7 +568,59 @@ impl<'a, T> EventLoop<'a, T> {
                     window.handle_update(update);
                 }
             }
+
+            RootSignal::Ime(ime) => match ime {
+                ImeSignal::Start => {
+                    if let Ok(mut env) = self.jvm.attach_current_thread() {
+                        let _ = self.show_soft_input(&mut env);
+                        tracing::debug!("show soft input");
+                    }
+                }
+
+                ImeSignal::End => {
+                    tracing::info!("end ime");
+                }
+
+                ImeSignal::Moved(_) => {}
+            },
         }
+    }
+
+    fn show_soft_input(&self, env: &mut JNIEnv<'_>) -> jni::errors::Result<bool> {
+        let view = self.rust_view(env)?;
+        let imm = self.input_method_manager(env, &view)?;
+
+        env.call_method(
+            &imm,
+            "showSoftInput",
+            "(Landroid/view/View;I)Z",
+            &[(&view).into(), 0.into()],
+        )?
+        .z()
+    }
+
+    fn input_method_manager<'local>(
+        &self,
+        env: &mut JNIEnv<'local>,
+        rust_view: &JObject<'local>,
+    ) -> jni::errors::Result<JObject<'local>> {
+        env.get_field(
+            rust_view,
+            "inputMethodManager",
+            "Landroid/view/inputmethod/InputMethodManager;",
+        )?
+        .l()
+    }
+
+    fn rust_view<'local>(&self, env: &mut JNIEnv<'local>) -> jni::errors::Result<JObject<'local>> {
+        let activity = unsafe { JObject::from_raw(self.native_activity.as_ref().clazz) };
+
+        env.get_field(
+            activity,
+            "rustView",
+            "Lorg/ori/RustView;",
+        )?
+        .l()
     }
 }
 

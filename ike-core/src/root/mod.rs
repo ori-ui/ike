@@ -17,7 +17,7 @@ mod scroll;
 mod signal;
 mod text;
 
-pub use signal::{RootSignal, WindowUpdate};
+pub use signal::{ImeSignal, RootSignal, WindowUpdate};
 
 pub struct Root {
     pub(crate) arena: Arena,

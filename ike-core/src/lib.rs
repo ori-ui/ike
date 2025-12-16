@@ -28,13 +28,13 @@ pub use color::Color;
 pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
 pub use curve::Curve;
 pub use event::{
-    CursorIcon, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, Pointer, PointerButton,
-    PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent, PointerPropagate,
+    CursorIcon, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, Pointer,
+    PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent, PointerPropagate,
     PointerScrollEvent, Propagate, ScrollDelta,
 };
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
-pub use root::{Root, RootSignal, WindowUpdate};
+pub use root::{ImeSignal, Root, RootSignal, WindowUpdate};
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{
     FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,

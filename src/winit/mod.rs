@@ -477,6 +477,8 @@ impl<T> AppState<'_, T> {
                     }
                 }
             }
+
+            RootSignal::Ime(..) => {}
         }
     }
 }

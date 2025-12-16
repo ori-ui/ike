@@ -64,19 +64,18 @@ fn send_key_event(
 
     let _span = tracing::info_span!("key_event");
 
-    while let Some(id) = current {
-        let widget = root.get_mut(id).unwrap();
+    while let Some(id) = current
+        && let Some(widget) = root.get_mut(id)
+        && let Propagate::Bubble = propagate
+    {
+        let mut cx = EventCx {
+            root:  widget.cx.root,
+            arena: widget.cx.arena,
+            state: widget.cx.state,
+            focus: &mut focus,
+        };
 
-        if let Propagate::Bubble = propagate {
-            let mut cx = EventCx {
-                root:  widget.cx.root,
-                arena: widget.cx.arena,
-                state: widget.cx.state,
-                focus: &mut focus,
-            };
-
-            propagate = widget.widget.on_key_event(&mut cx, event);
-        }
+        propagate = widget.widget.on_key_event(&mut cx, event);
 
         current = widget.cx.parent();
     }

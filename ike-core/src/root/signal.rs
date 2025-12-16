@@ -1,6 +1,6 @@
 use cursor_icon::CursorIcon;
 
-use crate::{WindowId, WindowSizing};
+use crate::{Rect, WindowId, WindowSizing};
 
 #[derive(Clone, Debug)]
 pub enum RootSignal {
@@ -12,6 +12,8 @@ pub enum RootSignal {
     CreateWindow(WindowId),
     RemoveWindow(WindowId),
     UpdateWindow(WindowId, WindowUpdate),
+
+    Ime(ImeSignal),
 }
 
 #[derive(Clone, Debug)]
@@ -21,4 +23,11 @@ pub enum WindowUpdate {
     Visible(bool),
     Decorated(bool),
     Cursor(CursorIcon),
+}
+
+#[derive(Clone, Debug)]
+pub enum ImeSignal {
+    Start,
+    End,
+    Moved(Rect),
 }

@@ -5,10 +5,16 @@ struct Data {
 }
 
 fn counter(data: &mut Data) -> impl View<Data> + use<> {
-    center(button(
-        label(format!("Count {}", data.count)),
-        |data: &mut Data| data.count += 1,
-    ))
+    center(
+        vstack((
+            entry().font_size(20.0),
+            button(
+                label(format!("Count {}", data.count)),
+                |data: &mut Data| data.count += 1,
+            ),
+        ))
+        .gap(40.0),
+    )
 }
 
 fn ui(data: &mut Data) -> impl Effect<Data> + use<> {

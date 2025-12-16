@@ -150,6 +150,8 @@ impl Widget for Button {
     fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
         match update {
             Update::Hovered(..) | Update::Active(..) | Update::Focused(..) => {
+                cx.request_draw();
+
                 let color = if cx.is_active() {
                     self.active_color
                 } else if cx.is_hovered() {

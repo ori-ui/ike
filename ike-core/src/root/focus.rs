@@ -1,4 +1,7 @@
-use crate::{Arena, BuildCx, Point, Rect, Root, WidgetId, context::FocusUpdate, root::scroll};
+use crate::{
+    Arena, BuildCx, ImeSignal, Point, Rect, Root, RootSignal, WidgetId, context::FocusUpdate,
+    root::scroll,
+};
 
 /// Find the currently focused widget.
 pub(super) fn find_focused(arena: &Arena, root: WidgetId) -> Option<WidgetId> {
@@ -24,15 +27,11 @@ pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: Focus
         FocusUpdate::None => {}
 
         FocusUpdate::Unfocus => {
-            if let Some(focused) = find_focused(&root.arena, root_widget)
-                && let Some(mut widget) = root.get_mut(focused)
-            {
-                widget.set_focused(false);
-            }
+            set_focused(root, root_widget, None);
         }
 
         FocusUpdate::Target(target) => {
-            give_focus(root, root_widget, target);
+            set_focused(root, root_widget, Some(target));
         }
 
         FocusUpdate::Next => {
@@ -45,42 +44,57 @@ pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: Focus
     }
 }
 
-pub(super) fn focus_next(root: &mut Root, id: WidgetId, forward: bool) -> Option<WidgetId> {
-    let current = find_focused(&root.arena, id);
-    let focused = find_next_focusable(&root.arena, id, forward);
+pub(super) fn focus_next(root: &mut Root, root_widget: WidgetId, forward: bool) {
+    let focused = find_next_focusable(&root.arena, root_widget, forward);
+    set_focused(root, root_widget, focused);
+}
 
-    if current != focused {
-        if let Some(current) = current
-            && let Some(mut widget) = root.get_mut(current)
-        {
-            widget.set_focused(false);
-        }
-        if let Some(focused) = focused {
-            let rect = if let Some(mut widget) = root.get_mut(focused) {
-                widget.set_focused(true);
+pub(super) fn set_focused(
+    root: &mut Root,
+    root_widget: WidgetId,
+    target: Option<WidgetId>,
+) -> bool {
+    let current = find_focused(&root.arena, root_widget);
 
-                Some(Rect::min_size(
-                    Point::ORIGIN,
-                    widget.cx.size(),
-                ))
-            } else {
-                None
-            };
+    if current == target {
+        return false;
+    }
 
-            if let Some(rect) = rect {
-                scroll::scroll_to(root, focused, rect);
+    if let Some(current) = current
+        && let Some(mut widget) = root.get_mut(current)
+    {
+        widget.set_focused(false);
+    }
+
+    if let Some(target) = target {
+        let rect = if let Some(mut widget) = root.get_mut(target) {
+            widget.set_focused(true);
+
+            if widget.cx.state.accepts_focus {
+                widget.cx.root.signal(RootSignal::Ime(ImeSignal::Start));
             }
+
+            Some(Rect::min_size(
+                Point::ORIGIN,
+                widget.cx.size(),
+            ))
+        } else {
+            None
+        };
+
+        if let Some(rect) = rect {
+            scroll::scroll_to(root, target, rect);
         }
     }
 
-    focused
+    true
 }
 
-fn find_first_focusable(arena: &Arena, id: WidgetId, forward: bool) -> Option<WidgetId> {
-    let state = arena.get_state(id.index)?;
+fn find_first_focusable(arena: &Arena, current: WidgetId, forward: bool) -> Option<WidgetId> {
+    let state = arena.get_state(current.index)?;
 
     if state.accepts_focus {
-        return Some(id);
+        return Some(current);
     }
 
     if forward {
@@ -150,31 +164,4 @@ fn find_next_focusable(arena: &Arena, id: WidgetId, forward: bool) -> Option<Wid
     }
 
     None
-}
-
-fn give_focus(root: &mut Root, root_widget: WidgetId, target: WidgetId) {
-    let current = find_focused(&root.arena, root_widget);
-
-    if current != Some(target) {
-        if let Some(current) = current
-            && let Some(mut widget) = root.get_mut(current)
-        {
-            widget.set_focused(false);
-        }
-
-        let rect = if let Some(mut widget) = root.get_mut(target) {
-            widget.set_focused(true);
-
-            Some(Rect::min_size(
-                Point::ORIGIN,
-                widget.cx.size(),
-            ))
-        } else {
-            None
-        };
-
-        if let Some(rect) = rect {
-            scroll::scroll_to(root, target, rect);
-        }
-    }
 }

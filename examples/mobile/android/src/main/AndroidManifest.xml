@@ -4,19 +4,16 @@
         android:required="true"
         android:version="1"/>
 
-    <application
-        android:label="Ike Example"
-        android:hasCode="false">
-
+    <application android:label="Ike Example">
         <activity
-            android:name="android.app.NativeActivity"
+            android:name="org.ori.RustActivity"
             android:exported="true"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="android" />
+                android:value="mobile" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

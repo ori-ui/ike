@@ -177,6 +177,7 @@ pub struct WidgetState {
 
     pub(crate) accepts_pointer: bool,
     pub(crate) accepts_focus:   bool,
+    pub(crate) accepts_text:    bool,
 
     pub(crate) tracing_span: tracing::Span,
     #[allow(dead_code, reason = "used for debug purposes")]
@@ -219,8 +220,9 @@ impl WidgetState {
             needs_layout:  true,
             needs_draw:    true,
 
-            accepts_focus:   T::accepts_focus(),
             accepts_pointer: T::accepts_pointer(),
+            accepts_focus:   T::accepts_focus(),
+            accepts_text:    T::accepts_text(),
 
             tracing_span: tracing::error_span!(
                 "Widget",

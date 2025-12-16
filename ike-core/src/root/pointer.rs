@@ -347,18 +347,16 @@ fn send_pointer_event(
 
     while let Some(id) = current
         && let Some(widget) = root.get_mut(id)
+        && let PointerPropagate::Bubble = propagate
     {
-        if let PointerPropagate::Bubble = propagate {
-            let mut cx = EventCx {
-                root:  widget.cx.root,
-                arena: widget.cx.arena,
-                state: widget.cx.state,
-                focus: &mut focus,
-            };
+        let mut cx = EventCx {
+            root:  widget.cx.root,
+            arena: widget.cx.arena,
+            state: widget.cx.state,
+            focus: &mut focus,
+        };
 
-            propagate = widget.widget.on_pointer_event(&mut cx, event);
-        }
-
+        propagate = widget.widget.on_pointer_event(&mut cx, event);
         current = widget.cx.parent();
     }
 
