@@ -13,6 +13,7 @@ pub(super) enum ImeEvent {
     DeleteSurrounding(usize, usize),
     DeleteSurroundingInCodePoints(usize, usize),
     SendKeyEvent { key: Key, pressed: bool },
+    SetSelection(usize, usize),
 }
 
 pub(super) struct Ime {
@@ -131,6 +132,15 @@ impl<'a, T> EventLoop<'a, T> {
 
                 if let WindowState::Open(ref window) = self.window {
                     (self.context.root).key_pressed(window.id, key, false, None, pressed);
+                }
+            }
+
+            ImeEvent::SetSelection(start, end) => {
+                tracing::trace!(start, end, "set selection");
+
+                if let WindowState::Open(ref window) = self.window {
+                    self.ime.set_selection(start..end);
+                    (self.context.root).ime_select(window.id, start..end);
                 }
             }
         }
@@ -385,6 +395,11 @@ impl<'a, T> EventLoop<'a, T> {
                     sig:    "(Landroid/view/KeyEvent;)Z".into(),
                     fn_ptr: send_key_event as *mut ffi::c_void,
                 },
+                jni::NativeMethod {
+                    name:   "setSelectionNative".into(),
+                    sig:    "(II)Z".into(),
+                    fn_ptr: set_selection as *mut ffi::c_void,
+                },
             ],
         )?;
 
@@ -576,6 +591,24 @@ unsafe extern "C" fn send_key_event<'local>(
             key,
             pressed,
         }));
+
+        true
+    } else {
+        false
+    }
+}
+
+unsafe extern "C" fn set_selection<'local>(
+    mut env: JNIEnv<'local>,
+    rust_view: JObject<'local>,
+    start: i32,
+    end: i32,
+) -> bool {
+    if let Ok(proxy) = unsafe { get_proxy(&mut env, &rust_view) } {
+        proxy.send(Event::Ime(ImeEvent::SetSelection(
+            start as usize,
+            end as usize,
+        )));
 
         true
     } else {

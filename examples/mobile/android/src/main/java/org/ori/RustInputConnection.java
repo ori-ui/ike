@@ -52,4 +52,9 @@ public final class RustInputConnection extends BaseInputConnection {
     public boolean sendKeyEvent(KeyEvent event) {
         return view.sendKeyEventNative(event);
     }
+
+    @Override
+    public boolean setSelection(int start, int end) {
+        return view.setSelectionNative(start, end);
+    }
 }

@@ -43,4 +43,6 @@ public final class RustView extends View {
     public native boolean setComposingTextNative(String text, int newCursorPosition);
 
     public native boolean sendKeyEventNative(KeyEvent event);
+
+    public native boolean setSelectionNative(int start, int end);
 }
