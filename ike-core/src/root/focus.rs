@@ -64,13 +64,17 @@ pub(super) fn set_focused(
         && let Some(mut widget) = root.get_mut(current)
     {
         widget.set_focused(false);
+
+        if widget.cx.state.accepts_text {
+            widget.cx.root.signal(RootSignal::Ime(ImeSignal::End));
+        }
     }
 
     if let Some(target) = target {
         let rect = if let Some(mut widget) = root.get_mut(target) {
             widget.set_focused(true);
 
-            if widget.cx.state.accepts_focus {
+            if widget.cx.state.accepts_text {
                 widget.cx.root.signal(RootSignal::Ime(ImeSignal::Start));
             }
 

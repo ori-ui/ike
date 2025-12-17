@@ -1,9 +1,9 @@
-use std::mem;
+use std::{mem, ops::Range};
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Arena, Clip, CursorIcon, Painter, Point, Rect, RootSignal,
-    Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId, root::RootState,
-    widget::WidgetState,
+    Affine, AnyWidget, AnyWidgetId, Arena, Clip, CursorIcon, ImeSignal, Painter, Point, Rect,
+    RootSignal, Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId,
+    root::RootState, widget::WidgetState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -522,6 +522,27 @@ impl_contexts! {
 
         pub fn set_cursor(&mut self, cursor: CursorIcon) {
             self.state.cursor = cursor;
+        }
+    }
+}
+
+impl_contexts! {
+    MutCx<'_>,
+    EventCx<'_>,
+    UpdateCx<'_> {
+        pub fn set_ime_text(&mut self, text: String) {
+            self.root.signal(RootSignal::Ime(ImeSignal::Text(text)));
+        }
+
+        pub fn set_ime_selection(
+            &mut self,
+            selection: Range<usize>,
+            compose: Option<Range<usize>>,
+        ) {
+            self.root.signal(RootSignal::Ime(ImeSignal::Selection {
+                selection,
+                compose,
+            }));
         }
     }
 }

@@ -168,16 +168,15 @@ impl Root {
             false
         };
 
-        if let Some(focused) = focus::find_focused(&self.arena, window_contents)
-            && let Some(mut widget) = self.get_mut(focused)
-            && button == PointerButton::Primary
+        if button == PointerButton::Primary
             && pressed
+            && let Some(focused) = focus::find_focused(&self.arena, window_contents)
+            && self.get(focused).is_some_and(|widget| {
+                let local = widget.cx.global_transform().inverse() * pointer_position;
+                !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
+            })
         {
-            let local = widget.cx.global_transform().inverse() * pointer_position;
-
-            if !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local) {
-                widget.set_focused(false);
-            }
+            focus::set_focused(self, window_contents, None);
         }
 
         handled

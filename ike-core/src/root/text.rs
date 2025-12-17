@@ -1,5 +1,7 @@
+use std::ops::Range;
+
 use crate::{
-    BuildCx, EventCx, Propagate, Root, WidgetId, WindowId,
+    BuildCx, EventCx, ImeEvent, Propagate, Root, WidgetId, WindowId,
     context::FocusUpdate,
     event::{TextEvent, TextPasteEvent},
     root::focus,
@@ -12,6 +14,36 @@ impl Root {
         };
 
         let event = TextEvent::Paste(TextPasteEvent { contents });
+
+        let contents = window.contents;
+
+        match focus::find_focused(&self.arena, contents) {
+            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Stop,
+            None => false,
+        }
+    }
+
+    pub fn ime_commit_text(&mut self, window: WindowId, text: String) -> bool {
+        let Some(window) = self.get_window(window) else {
+            return false;
+        };
+
+        let event = TextEvent::Ime(ImeEvent::Commit(text));
+
+        let contents = window.contents;
+
+        match focus::find_focused(&self.arena, contents) {
+            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Stop,
+            None => false,
+        }
+    }
+
+    pub fn ime_select(&mut self, window: WindowId, selection: Range<usize>) -> bool {
+        let Some(window) = self.get_window(window) else {
+            return false;
+        };
+
+        let event = TextEvent::Ime(ImeEvent::Select(selection));
 
         let contents = window.contents;
 

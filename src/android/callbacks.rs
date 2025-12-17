@@ -1,14 +1,15 @@
-use crate::android::{Event, context::Proxy};
+use crate::android::{Event, InputQueueEvent, WindowEvent, context::Proxy};
 
 pub fn register_callbacks(activity: &mut ndk_sys::ANativeActivity) {
     let callbacks = unsafe { &mut *activity.callbacks };
+    callbacks.onResume = Some(on_resume);
     callbacks.onNativeWindowCreated = Some(on_window_created);
     callbacks.onNativeWindowDestroyed = Some(on_window_destroyed);
     callbacks.onNativeWindowRedrawNeeded = Some(on_window_redraw_needed);
     callbacks.onNativeWindowResized = Some(on_window_resized);
+    callbacks.onWindowFocusChanged = Some(on_window_focus_changed);
     callbacks.onInputQueueCreated = Some(on_input_queue_created);
     callbacks.onInputQueueDestroyed = Some(on_input_queue_destroyed);
-    callbacks.onWindowFocusChanged = Some(on_window_focus_changed);
 }
 
 fn get_proxy(activity: &ndk_sys::ANativeActivity) -> &Proxy {
@@ -19,13 +20,22 @@ fn get_proxy(activity: &ndk_sys::ANativeActivity) -> &Proxy {
     unsafe { &*activity.instance.cast() }
 }
 
+unsafe extern "C" fn on_resume(activity: *mut ndk_sys::ANativeActivity) {
+    unsafe {
+        let proxy = get_proxy(&*activity);
+        proxy.send(Event::Resumed);
+    };
+}
+
 unsafe extern "C" fn on_window_created(
     activity: *mut ndk_sys::ANativeActivity,
     window: *mut ndk_sys::ANativeWindow,
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::WindowCreated(window));
+        proxy.send(Event::Window(WindowEvent::Created(
+            window,
+        )));
     };
 }
 
@@ -35,7 +45,7 @@ unsafe extern "C" fn on_window_destroyed(
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::WindowDestroyed);
+        proxy.send(Event::Window(WindowEvent::Destroyed));
     };
 }
 
@@ -45,7 +55,7 @@ unsafe extern "C" fn on_window_redraw_needed(
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::WindowRedraw);
+        proxy.send(Event::Window(WindowEvent::Redraw));
     };
 }
 
@@ -55,7 +65,7 @@ unsafe extern "C" fn on_window_resized(
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::WindowResized);
+        proxy.send(Event::Window(WindowEvent::Resized));
     };
 }
 
@@ -65,7 +75,9 @@ unsafe extern "C" fn on_window_focus_changed(
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::WindowFocusChanged(focused > 0));
+        proxy.send(Event::Window(
+            WindowEvent::FocusChanged(focused > 0),
+        ));
     };
 }
 
@@ -75,7 +87,9 @@ unsafe extern "C" fn on_input_queue_created(
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::InputQueueCreated(queue));
+        proxy.send(Event::InputQueue(
+            InputQueueEvent::Created(queue),
+        ));
     }
 }
 
@@ -85,6 +99,8 @@ unsafe extern "C" fn on_input_queue_destroyed(
 ) {
     unsafe {
         let proxy = get_proxy(&*activity);
-        proxy.send(Event::InputQueueDestroyed(queue));
+        proxy.send(Event::InputQueue(
+            InputQueueEvent::Destroyed(queue),
+        ));
     }
 }

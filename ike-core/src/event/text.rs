@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextEvent {
     Paste(TextPasteEvent),
@@ -12,7 +14,7 @@ pub struct TextPasteEvent {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ImeEvent {
     Enabled,
-    Preedit(String, Option<(usize, usize)>),
+    Select(Range<usize>),
     Commit(String),
     Disabled,
 }

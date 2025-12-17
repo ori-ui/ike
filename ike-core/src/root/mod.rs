@@ -335,6 +335,15 @@ impl Root {
                 "`window_focused` called on a window that doesn't exist",
             );
         }
+
+        // if the window was left in an ime session, we need start it again
+        if let Some(focused) = focus::find_focused(&self.arena, contents)
+            && let Some(widget) = self.get(focused)
+            && widget.cx.state.accepts_text
+            && is_focused
+        {
+            widget.cx.root.signal(RootSignal::Ime(ImeSignal::Start));
+        }
     }
 
     pub fn window_resized(&mut self, window: WindowId, new_size: Size) {

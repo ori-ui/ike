@@ -3,9 +3,10 @@ use std::time::Duration;
 use keyboard_types::NamedKey;
 
 use crate::{
-    BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Key, KeyEvent, LayoutCx,
-    Offset, Paint, Painter, Paragraph, Point, PointerEvent, PointerPropagate, Propagate, Rect,
-    Size, Space, TextLayoutLine, Update, UpdateCx, Widget, WidgetMut, event::TextEvent,
+    BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, ImeEvent, Key, KeyEvent,
+    LayoutCx, MutCx, Offset, Paint, Painter, Paragraph, Point, PointerEvent, PointerPropagate,
+    Propagate, Rect, Size, Space, TextLayoutLine, Update, UpdateCx, Widget, WidgetMut,
+    event::TextEvent,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -101,6 +102,12 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         }
 
         this.widget.paragraph = paragraph;
+
+        if this.cx.is_focused() {
+            this.cx.set_ime_text(this.widget.text().to_owned());
+            this.widget.set_selection_mut(&mut this.cx);
+        }
+
         this.cx.request_layout();
     }
 
@@ -417,7 +424,45 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         );
     }
 
-    fn changed(&mut self) {
+    fn set_selection_event(&self, cx: &mut EventCx<'_>) {
+        let (start, end) = match self.selection {
+            Some(selection) => (
+                self.cursor.min(selection),
+                self.cursor.max(selection),
+            ),
+            None => (self.cursor, self.cursor),
+        };
+
+        cx.set_ime_selection(start..end, None);
+    }
+
+    fn set_selection_update(&self, cx: &mut UpdateCx<'_>) {
+        let (start, end) = match self.selection {
+            Some(selection) => (
+                self.cursor.min(selection),
+                self.cursor.max(selection),
+            ),
+            None => (self.cursor, self.cursor),
+        };
+
+        cx.set_ime_selection(start..end, None);
+    }
+
+    fn set_selection_mut(&self, cx: &mut MutCx<'_>) {
+        let (start, end) = match self.selection {
+            Some(selection) => (
+                self.cursor.min(selection),
+                self.cursor.max(selection),
+            ),
+            None => (self.cursor, self.cursor),
+        };
+
+        cx.set_ime_selection(start..end, None);
+    }
+
+    fn text_changed(&mut self, cx: &mut EventCx<'_>) {
+        cx.set_ime_text(self.text().to_owned());
+
         if let Some(ref mut on_change) = self.on_change {
             on_change(&self.paragraph.text);
         }
@@ -425,14 +470,10 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
 }
 
 impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, _cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
         self.lines = painter.layout_text(&self.paragraph, space.max.width);
         let size = painter.measure_text(&self.paragraph, space.max.width);
-
-        let size = space.constrain(size);
-        cx.set_clip(Rect::min_size(Point::ORIGIN, size));
-
-        size
+        space.constrain(size)
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
@@ -456,6 +497,11 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
     fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
         match update {
             Update::Focused(..) | Update::WindowFocused(..) => {
+                if let Update::Focused(true) = update {
+                    cx.set_ime_text(self.text().to_owned());
+                    self.set_selection_update(cx);
+                }
+
                 cx.request_draw();
 
                 if cx.is_focused() {
@@ -498,6 +544,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                 let local = cx.global_transform().inverse() * event.position;
                 let cursor = self.find_point(local);
                 self.set_cursor(cursor, true);
+                self.set_selection_event(cx);
 
                 cx.request_draw();
                 cx.request_animate();
@@ -531,6 +578,10 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         }
 
                         self.remove_selection();
+
+                        self.text_changed(cx);
+                        self.set_selection_event(cx);
+
                         cx.request_layout();
 
                         Propagate::Stop
@@ -541,13 +592,18 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                     {
                         self.insert_text(event.text.as_ref().unwrap());
 
-                        self.changed();
+                        self.text_changed(cx);
+                        self.set_selection_event(cx);
+
                         cx.request_layout();
+
                         Propagate::Stop
                     }
 
                     Key::Named(NamedKey::ArrowRight) => {
                         self.move_forward(event.modifiers.shift());
+                        self.set_selection_event(cx);
+
                         cx.request_draw();
                         cx.request_animate();
 
@@ -556,6 +612,8 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                     Key::Named(NamedKey::ArrowLeft) => {
                         self.move_backward(event.modifiers.shift());
+                        self.set_selection_event(cx);
+
                         cx.request_draw();
                         cx.request_animate();
 
@@ -564,6 +622,8 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                     Key::Named(NamedKey::ArrowUp) => {
                         self.move_upward(event.modifiers.shift());
+                        self.set_selection_event(cx);
+
                         cx.request_draw();
                         cx.request_animate();
 
@@ -572,6 +632,8 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                     Key::Named(NamedKey::ArrowDown) => {
                         self.move_downward(event.modifiers.shift());
+                        self.set_selection_event(cx);
+
                         cx.request_draw();
                         cx.request_animate();
 
@@ -582,13 +644,17 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         if self.selection.is_some() {
                             self.remove_selection();
 
-                            self.changed();
+                            self.text_changed(cx);
+                            self.set_selection_event(cx);
+
                             cx.request_layout();
                             cx.request_animate();
                         } else if self.cursor < self.paragraph.text.len() {
                             self.paragraph.text.remove(self.cursor);
 
-                            self.changed();
+                            self.text_changed(cx);
+                            self.set_selection_event(cx);
+
                             cx.request_layout();
                             cx.request_animate();
                         }
@@ -600,14 +666,18 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         if self.selection.is_some() {
                             self.remove_selection();
 
-                            self.changed();
+                            self.text_changed(cx);
+                            self.set_selection_event(cx);
+
                             cx.request_layout();
                             cx.request_animate();
                         } else if self.cursor > 0 {
                             self.move_backward(false);
                             self.paragraph.text.remove(self.cursor);
 
-                            self.changed();
+                            self.text_changed(cx);
+                            self.set_selection_event(cx);
+
                             cx.request_layout();
                             cx.request_animate();
                         }
@@ -623,7 +693,9 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                     {
                         self.insert_text("\n");
 
-                        self.changed();
+                        self.text_changed(cx);
+                        self.set_selection_event(cx);
+
                         cx.request_layout();
                         cx.request_animate();
 
@@ -665,10 +737,44 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
         match event {
             TextEvent::Paste(event) if EDITABLE => {
                 self.insert_text(&event.contents);
+
+                self.text_changed(cx);
+                self.set_selection_event(cx);
+
                 cx.request_layout();
 
                 Propagate::Stop
             }
+
+            TextEvent::Ime(ime) => match ime {
+                ImeEvent::Enabled => Propagate::Stop,
+
+                ImeEvent::Select(selection) => {
+                    if selection.start == selection.end {
+                        self.cursor = selection.start;
+                    } else {
+                        self.selection = Some(selection.start);
+                        self.cursor = selection.end;
+
+                        cx.request_draw();
+                    }
+
+                    Propagate::Stop
+                }
+
+                ImeEvent::Commit(text) => {
+                    self.insert_text(text);
+
+                    self.text_changed(cx);
+                    self.set_selection_event(cx);
+
+                    cx.request_layout();
+
+                    Propagate::Stop
+                }
+
+                ImeEvent::Disabled => Propagate::Stop,
+            },
 
             _ => Propagate::Bubble,
         }
@@ -676,6 +782,10 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
     fn accepts_pointer() -> bool {
         true
+    }
+
+    fn accepts_text() -> bool {
+        EDITABLE
     }
 
     fn accepts_focus() -> bool {

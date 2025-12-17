@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use cursor_icon::CursorIcon;
 
 use crate::{Rect, WindowId, WindowSizing};
@@ -29,5 +31,10 @@ pub enum WindowUpdate {
 pub enum ImeSignal {
     Start,
     End,
-    Moved(Rect),
+    Area(Rect),
+    Text(String),
+    Selection {
+        selection: Range<usize>,
+        compose:   Option<Range<usize>>,
+    },
 }
