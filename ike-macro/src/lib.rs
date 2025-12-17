@@ -13,6 +13,7 @@ pub fn main(
 
         const _: () = {
             #[unsafe(no_mangle)]
+            #[cfg(target_os = "android")]
             extern "C" fn ANativeActivity_onCreate(
                 activity: *mut std::ffi::c_void,
                 _saved_state: *mut std::ffi::c_void,
