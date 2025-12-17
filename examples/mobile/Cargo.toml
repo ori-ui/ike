@@ -5,7 +5,7 @@ edition.workspace = true
 publish = false
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 ike.workspace = true
