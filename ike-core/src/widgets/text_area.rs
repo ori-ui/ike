@@ -532,7 +532,9 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
             PointerEvent::Down(event) => {
                 let local = cx.global_transform().inverse() * event.position;
                 let cursor = self.find_point(local);
+
                 self.set_cursor(cursor, false);
+                self.set_selection_event(cx);
 
                 cx.request_draw();
                 cx.request_focus();
@@ -543,6 +545,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
             PointerEvent::Move(event) if cx.is_active() => {
                 let local = cx.global_transform().inverse() * event.position;
                 let cursor = self.find_point(local);
+
                 self.set_cursor(cursor, true);
                 self.set_selection_event(cx);
 

@@ -87,15 +87,15 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     }
 
-                    if after != 0 {
-                        let end = selection.end + after;
-                        (self.context.root).ime_select(window.id, selection.end..end);
-                        self.context.root.ime_commit_text(window.id, String::new());
-                    }
-
                     if before != 0 {
                         let start = selection.start.saturating_sub(before);
                         (self.context.root).ime_select(window.id, start..selection.start);
+                        self.context.root.ime_commit_text(window.id, String::new());
+                    }
+
+                    if after != 0 {
+                        let end = selection.end + after;
+                        (self.context.root).ime_select(window.id, selection.end..end);
                         self.context.root.ime_commit_text(window.id, String::new());
                     }
                 }
@@ -194,7 +194,7 @@ impl<'a, T> EventLoop<'a, T> {
                         compose.as_ref().map_or(-1, |range| range.end as i32),
                     );
 
-                    tracing::trace!("update selection");
+                    tracing::trace!(?selection, "update selection");
                 }
             }
         }
@@ -442,7 +442,7 @@ unsafe extern "C" fn get_text_after_cursor<'local>(
     n: i32,
     flags: i32,
 ) -> JString<'local> {
-    tracing::trace!(n, flags, "get text before cursor");
+    tracing::trace!(n, flags, "get text after cursor");
 
     if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) }
         && let Ok(state) = context.state.lock()
