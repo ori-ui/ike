@@ -43,15 +43,15 @@ if (androidMetadata.package == null) {
     throw new GradleException("`package.metadata.android.package` should be set in Cargo.toml")
 }
 
-android.namespace                   = androidMetadata.package
-android.defaultConfig.applicationId = androidMetadata.package
-android.compileSdk                  = androidMetadata.compile_sdk ?: 35
+android.namespace                   = androidMetadata.'package'
+android.defaultConfig.applicationId = androidMetadata.'package'
+android.compileSdk                  = androidMetadata.'compile-sdk' ?: 35
 
 android.defaultConfig {
-    targetSdk = androidMetadata.target_sdk ?: 35
-    minSdk = androidMetadata.min_sdk ?: 21
-    versionName = cargoPackage.version
-    versionCode = androidMetadata.version_code ?: 1
+    targetSdk   = androidMetadata.'target-sdk' ?: 35
+    minSdk      = androidMetadata.'min-sdk' ?: 21
+    versionName = androidMetadata.'version' ?: cargoPackage.version
+    versionCode = androidMetadata.'version-code' ?: 1
 
     manifestPlaceholders.appName = androidMetadata.name ?: cargoPackage.name
 }
@@ -128,6 +128,8 @@ android.applicationVariants.all { variant ->
             environment 'ANDROID_NDK', android.ndkDirectory
             environment "CARGO_TARGET_${envTriple}_LINKER", "$llvmDir/$clang"
             environment "CARGO_TARGET_${envTriple}_AR", "$llvmDir/llvm-ar"
+            environment "CC_${triple}", "$llvmDir/$clang"
+            environment "CXX_${triple}", "$llvmDir/$clang++"
         }
 
         buildTaskNames << taskName

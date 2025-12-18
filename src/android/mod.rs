@@ -69,12 +69,85 @@ pub fn android_main(native_activity: *mut ffi::c_void, main: fn()) {
     std::thread::spawn(main);
 }
 
-pub fn run<T>(data: &mut T, build: UiBuilder<T>) {
+pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
     let native_activity = NonNull::new(NATIVE_ACTIVITY.load(Ordering::SeqCst))
         .expect("native activity should be set");
 
-    let mut event_loop = EventLoop::new(native_activity, data, build);
-    event_loop.run();
+    let rt;
+    let _rt_guard = if tokio::runtime::Handle::try_current().is_err() {
+        rt = Some(tokio::runtime::Runtime::new().unwrap());
+        Some(rt.as_ref().unwrap().enter())
+    } else {
+        None
+    };
+
+    let runtime = tokio::runtime::Handle::current();
+    let display_handle = DisplayHandle::android();
+    let vulkan_context = ike_skia::vulkan::SkiaVulkanContext::new(display_handle);
+    let painter = ike_skia::SkiaPainter::new();
+
+    let scale_factor = unsafe {
+        let config = ndk_sys::AConfiguration_new();
+
+        ndk_sys::AConfiguration_fromAssetManager(
+            config,
+            native_activity.as_ref().assetManager,
+        );
+
+        ndk_sys::AConfiguration_getDensity(config) as f32 / 160.0
+    };
+
+    let (sender, receiver) = std::sync::mpsc::channel::<Event>();
+
+    let looper =
+        unsafe { ndk_sys::ALooper_prepare(ndk_sys::ALOOPER_PREPARE_ALLOW_NON_CALLBACKS as i32) };
+
+    let proxy = Proxy::new(sender, looper);
+    let mut context = Context::new(proxy.clone());
+
+    let mut view = build(data);
+    let (_, state) = view.any_build(&mut context, data);
+
+    let (jvm, ime) = unsafe {
+        let jvm = JavaVM::from_raw(native_activity.as_ref().vm).unwrap();
+        let ime = ime::init(&jvm, native_activity, proxy).unwrap();
+
+        (jvm, ime)
+    };
+
+    let mut event_loop = EventLoop {
+        data,
+        build,
+        view,
+        state,
+
+        runtime,
+        context,
+        ime,
+
+        native_activity,
+        looper,
+        receiver,
+        jvm,
+
+        choreographer: None,
+        is_rendering: false,
+        wants_render: false,
+        vulkan: vulkan_context,
+        painter,
+
+        scale_factor,
+
+        input_queue: None,
+
+        animate: None,
+        window: WindowState::Pending {
+            id:      None,
+            updates: Vec::new(),
+        },
+    };
+
+    event_loop.run()
 }
 
 struct EventLoop<'a, T> {
@@ -148,87 +221,6 @@ impl fmt::Debug for Event {
 }
 
 impl<'a, T> EventLoop<'a, T> {
-    fn new(
-        native_activity: NonNull<ndk_sys::ANativeActivity>,
-        data: &'a mut T,
-        mut build: UiBuilder<T>,
-    ) -> Self {
-        let rt;
-        let _rt_guard = if tokio::runtime::Handle::try_current().is_err() {
-            rt = Some(tokio::runtime::Runtime::new().unwrap());
-            Some(rt.as_ref().unwrap().enter())
-        } else {
-            None
-        };
-
-        let runtime = tokio::runtime::Handle::current();
-        let display_handle = DisplayHandle::android();
-        let vulkan_context = ike_skia::vulkan::SkiaVulkanContext::new(display_handle);
-        let painter = ike_skia::SkiaPainter::new();
-
-        let scale_factor = unsafe {
-            let config = ndk_sys::AConfiguration_new();
-
-            ndk_sys::AConfiguration_fromAssetManager(
-                config,
-                native_activity.as_ref().assetManager,
-            );
-
-            ndk_sys::AConfiguration_getDensity(config) as f32 / 160.0
-        };
-
-        let (sender, receiver) = std::sync::mpsc::channel::<Event>();
-
-        let looper = unsafe {
-            ndk_sys::ALooper_prepare(ndk_sys::ALOOPER_PREPARE_ALLOW_NON_CALLBACKS as i32)
-        };
-
-        let proxy = Proxy::new(sender, looper);
-        let mut context = Context::new(proxy.clone());
-
-        let mut view = build(data);
-        let (_, state) = view.any_build(&mut context, data);
-
-        let (jvm, ime) = unsafe {
-            let jvm = JavaVM::from_raw(native_activity.as_ref().vm).unwrap();
-            let ime = Self::prepare_ime(&jvm, native_activity, proxy).unwrap();
-
-            (jvm, ime)
-        };
-
-        Self {
-            data,
-            build,
-            view,
-            state,
-
-            runtime,
-            context,
-            ime,
-
-            native_activity,
-            looper,
-            receiver,
-            jvm,
-
-            choreographer: None,
-            is_rendering: false,
-            wants_render: false,
-            vulkan: vulkan_context,
-            painter,
-
-            scale_factor,
-
-            input_queue: None,
-
-            animate: None,
-            window: WindowState::Pending {
-                id:      None,
-                updates: Vec::new(),
-            },
-        }
-    }
-
     fn run(&mut self) {
         unsafe {
             let proxy = Box::new(self.context.proxy.clone());

@@ -216,7 +216,7 @@ impl<'a, T> EventLoop<'a, T> {
 
     fn show_soft_input(&self, env: &mut JNIEnv<'_>, flags: i32) -> jni::errors::Result<bool> {
         let activity = unsafe { native_activity(self.native_activity) };
-        let view = Self::rust_view(env, &activity)?;
+        let view = rust_view(env, &activity)?;
         let imm = self.input_method_manager(env, &view)?;
 
         env.call_method(
@@ -230,7 +230,7 @@ impl<'a, T> EventLoop<'a, T> {
 
     fn hide_soft_input(&self, env: &mut JNIEnv<'_>, flags: i32) -> jni::errors::Result<bool> {
         let activity = unsafe { native_activity(self.native_activity) };
-        let view = Self::rust_view(env, &activity)?;
+        let view = rust_view(env, &activity)?;
         let window = self.window_token(env, &view)?;
         let imm = self.input_method_manager(env, &view)?;
 
@@ -252,7 +252,7 @@ impl<'a, T> EventLoop<'a, T> {
         compose_end: i32,
     ) -> jni::errors::Result<()> {
         let activity = unsafe { native_activity(self.native_activity) };
-        let view = Self::rust_view(env, &activity)?;
+        let view = rust_view(env, &activity)?;
         let imm = self.input_method_manager(env, &view)?;
 
         env.call_method(
@@ -296,119 +296,119 @@ impl<'a, T> EventLoop<'a, T> {
         )?
         .l()
     }
+}
 
-    fn rust_view<'local>(
-        env: &mut JNIEnv<'local>,
-        activity: &JObject<'local>,
-    ) -> jni::errors::Result<JObject<'local>> {
-        env.get_field(
+pub unsafe fn init(
+    jvm: &JavaVM,
+    activity: NonNull<ndk_sys::ANativeActivity>,
+    proxy: Proxy,
+) -> jni::errors::Result<&'static Ime> {
+    let activity = unsafe { native_activity(activity) };
+
+    let mut env = jvm.attach_current_thread()?;
+    let rust_view = rust_view(&mut env, &activity)?;
+
+    let context = Ime {
+        proxy,
+        state: Mutex::new(ImeState {
+            text:      String::new(),
+            selection: 0..0,
+            composing: None,
+        }),
+    };
+
+    let context: &Ime = Box::leak(Box::new(context));
+
+    env.set_field(
+        &rust_view,
+        "context",
+        "J",
+        (context as *const Ime as i64).into(),
+    )?;
+
+    let class_name = env.new_string("org.ori.RustView")?;
+    let class_loader = env
+        .call_method(
             activity,
-            "rustView",
-            "Lorg/ori/RustView;",
+            "getClassLoader",
+            "()Ljava/lang/ClassLoader;",
+            &[],
         )?
-        .l()
-    }
+        .l()?;
 
-    pub unsafe fn prepare_ime(
-        jvm: &JavaVM,
-        activity: NonNull<ndk_sys::ANativeActivity>,
-        proxy: Proxy,
-    ) -> jni::errors::Result<&'static Ime> {
-        let activity = unsafe { native_activity(activity) };
+    let class = env
+        .call_method(
+            class_loader,
+            "loadClass",
+            "(Ljava/lang/String;)Ljava/lang/Class;",
+            &[(&class_name).into()],
+        )?
+        .l()?;
 
-        let mut env = jvm.attach_current_thread()?;
-        let rust_view = Self::rust_view(&mut env, &activity)?;
+    env.register_native_methods(
+        JClass::from(class),
+        &[
+            jni::NativeMethod {
+                name:   "getTextBeforeCursorNative".into(),
+                sig:    "(II)Ljava/lang/String;".into(),
+                fn_ptr: get_text_before_cursor as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "getTextAfterCursorNative".into(),
+                sig:    "(II)Ljava/lang/String;".into(),
+                fn_ptr: get_text_after_cursor as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "getSelectedTextNative".into(),
+                sig:    "(I)Ljava/lang/String;".into(),
+                fn_ptr: get_selected_text as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "commitTextNative".into(),
+                sig:    "(Ljava/lang/String;I)Z".into(),
+                fn_ptr: commit_text as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "deleteSurroundingTextNative".into(),
+                sig:    "(II)Z".into(),
+                fn_ptr: delete_surrounding_text as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "deleteSurroundingTextInCodePointsNative".into(),
+                sig:    "(II)Z".into(),
+                fn_ptr: delete_surrounding_in_code_points_text as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "setComposingTextNative".into(),
+                sig:    "(Ljava/lang/String;I)Z".into(),
+                fn_ptr: set_composing_text as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "sendKeyEventNative".into(),
+                sig:    "(Landroid/view/KeyEvent;)Z".into(),
+                fn_ptr: send_key_event as *mut ffi::c_void,
+            },
+            jni::NativeMethod {
+                name:   "setSelectionNative".into(),
+                sig:    "(II)Z".into(),
+                fn_ptr: set_selection as *mut ffi::c_void,
+            },
+        ],
+    )?;
 
-        let context = Ime {
-            proxy,
-            state: Mutex::new(ImeState {
-                text:      String::new(),
-                selection: 0..0,
-                composing: None,
-            }),
-        };
+    Ok(context)
+}
 
-        let context: &Ime = Box::leak(Box::new(context));
-
-        env.set_field(
-            &rust_view,
-            "context",
-            "J",
-            (context as *const Ime as i64).into(),
-        )?;
-
-        let class_name = env.new_string("org.ori.RustView")?;
-        let class_loader = env
-            .call_method(
-                activity,
-                "getClassLoader",
-                "()Ljava/lang/ClassLoader;",
-                &[],
-            )?
-            .l()?;
-
-        let class = env
-            .call_method(
-                class_loader,
-                "loadClass",
-                "(Ljava/lang/String;)Ljava/lang/Class;",
-                &[(&class_name).into()],
-            )?
-            .l()?;
-
-        env.register_native_methods(
-            JClass::from(class),
-            &[
-                jni::NativeMethod {
-                    name:   "getTextBeforeCursorNative".into(),
-                    sig:    "(II)Ljava/lang/String;".into(),
-                    fn_ptr: get_text_before_cursor as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "getTextAfterCursorNative".into(),
-                    sig:    "(II)Ljava/lang/String;".into(),
-                    fn_ptr: get_text_after_cursor as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "getSelectedTextNative".into(),
-                    sig:    "(I)Ljava/lang/String;".into(),
-                    fn_ptr: get_selected_text as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "commitTextNative".into(),
-                    sig:    "(Ljava/lang/String;I)Z".into(),
-                    fn_ptr: commit_text as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "deleteSurroundingTextNative".into(),
-                    sig:    "(II)Z".into(),
-                    fn_ptr: delete_surrounding_text as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "deleteSurroundingTextInCodePointsNative".into(),
-                    sig:    "(II)Z".into(),
-                    fn_ptr: delete_surrounding_in_code_points_text as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "setComposingTextNative".into(),
-                    sig:    "(Ljava/lang/String;I)Z".into(),
-                    fn_ptr: set_composing_text as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "sendKeyEventNative".into(),
-                    sig:    "(Landroid/view/KeyEvent;)Z".into(),
-                    fn_ptr: send_key_event as *mut ffi::c_void,
-                },
-                jni::NativeMethod {
-                    name:   "setSelectionNative".into(),
-                    sig:    "(II)Z".into(),
-                    fn_ptr: set_selection as *mut ffi::c_void,
-                },
-            ],
-        )?;
-
-        Ok(context)
-    }
+fn rust_view<'local>(
+    env: &mut JNIEnv<'local>,
+    activity: &JObject<'local>,
+) -> jni::errors::Result<JObject<'local>> {
+    env.get_field(
+        activity,
+        "rustView",
+        "Lorg/ori/RustView;",
+    )?
+    .l()
 }
 
 unsafe fn native_activity<'local>(
