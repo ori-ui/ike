@@ -41,7 +41,7 @@ static NATIVE_ACTIVITY: AtomicPtr<ndk_sys::ANativeActivity> = AtomicPtr::new(ptr
 #[doc(hidden)]
 pub fn android_main<T>(native_activity: *mut ffi::c_void, main: fn() -> T)
 where
-    T: std::process::Termination,
+    T: std::process::Termination + 'static,
 {
     std::panic::set_hook(Box::new(|info| {
         if let Ok(message) = CString::new(info.to_string()) {
@@ -69,7 +69,7 @@ where
         Ordering::SeqCst,
     );
 
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
         let _ = main().report();
     });
 }
