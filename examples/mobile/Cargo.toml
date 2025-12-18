@@ -9,3 +9,6 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 ike.workspace = true
+
+[package.metadata.android]
+package = "org.ori.example"

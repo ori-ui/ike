@@ -1,0 +1,10 @@
+[package]
+name = "cargo-ike"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+cargo_metadata = "0.23"
+clap = { version = "4", features = ["derive"] }
+eyre = "0.6"
+color-eyre = "0.6"

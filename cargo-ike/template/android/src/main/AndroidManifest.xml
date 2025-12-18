@@ -4,7 +4,7 @@
         android:required="true"
         android:version="1"/>
 
-    <application android:label="Ike Example">
+    <application android:label="${appName}">
         <activity
             android:name="org.ori.RustActivity"
             android:exported="true"
