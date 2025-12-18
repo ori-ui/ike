@@ -2,7 +2,8 @@ use keyboard_types::{Key, Modifiers, NamedKey};
 
 use crate::{
     BuildCx, EventCx, KeyEvent, KeyPressEvent, Propagate, Root, WidgetId, WindowId,
-    context::FocusUpdate, root::focus,
+    context::FocusUpdate,
+    root::{focus, query},
 };
 
 impl Root {
@@ -39,8 +40,8 @@ impl Root {
         let contents = window.contents;
         let modifiers = window.modifiers;
 
-        let handled = match focus::find_focused(&self.arena, contents) {
-            Some(target) => send_key_event(self, contents, target, &event) == Propagate::Stop,
+        let handled = match query::find_focused(&self.arena, contents) {
+            Some(target) => send_key_event(self, contents, target, &event) == Propagate::Handled,
             None => false,
         };
 

@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use crate::{
-    AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Key, KeyEvent,
-    LayoutCx, NamedKey, Padding, Paint, Painter, PointerEvent, PointerPropagate, Propagate, Size,
-    Space, Transition, Transitioned, Widget, WidgetMut, context::UpdateCx, widget::Update,
+    AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Gesture, Key,
+    KeyEvent, LayoutCx, NamedKey, Padding, Paint, Painter, PointerEvent, PointerPropagate,
+    Propagate, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget,
+    WidgetMut, context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
@@ -190,6 +191,17 @@ impl Widget for Button {
         }
     }
 
+    fn on_touch_event(&mut self, _cx: &mut EventCx<'_>, event: &TouchEvent) -> TouchPropagate {
+        match event {
+            TouchEvent::Gesture(Gesture::Tap(..)) => {
+                (self.on_click)();
+                TouchPropagate::Handled
+            }
+
+            _ => TouchPropagate::Bubble,
+        }
+    }
+
     fn on_key_event(&mut self, _cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {
         match event {
             KeyEvent::Up(event)
@@ -198,7 +210,7 @@ impl Widget for Button {
             {
                 (self.on_click)();
 
-                Propagate::Stop
+                Propagate::Handled
             }
 
             _ => Propagate::Bubble,

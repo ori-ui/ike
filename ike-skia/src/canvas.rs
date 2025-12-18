@@ -1,10 +1,12 @@
 use ike_core::{
-    Affine, BorderWidth, Canvas, Clip, CornerRadius, Offset, Paint, Painter, Paragraph, Rect, Svg,
+    Affine, BorderWidth, Canvas, Clip, CornerRadius, Offset, Paint, Painter, Paragraph, Recording,
+    Rect, Size, Svg,
 };
 
-use crate::painter::SkiaPainter;
+use crate::{painter::SkiaPainter, vulkan::SkiaVulkanSurface};
 
 pub struct SkiaCanvas<'a> {
+    pub(crate) surface: &'a mut SkiaVulkanSurface,
     pub(crate) painter: &'a mut SkiaPainter,
     pub(crate) canvas:  &'a skia_safe::Canvas,
 }
@@ -41,26 +43,70 @@ impl Canvas for SkiaCanvas<'_> {
         self.canvas.restore();
     }
 
+    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording {
+        let matrix = self.canvas.local_to_device_as_3x3();
+        let scale_x = matrix.scale_x();
+        let scale_y = matrix.scale_y();
+
+        let mut surface = self.surface.create_render_target(
+            (size.width * scale_x).ceil() as u32,
+            (size.height * scale_y).ceil() as u32,
+            false,
+        );
+
+        let mut canvas = SkiaCanvas {
+            surface: self.surface,
+            painter: self.painter,
+            canvas:  surface.canvas(),
+        };
+
+        canvas.canvas.clear(skia_safe::Color::TRANSPARENT);
+        canvas.canvas.scale((scale_x, scale_y));
+
+        f(&mut canvas);
+
+        let image = surface.image_snapshot();
+
+        let recording = Recording::new();
+        let weak = Recording::downgrade(&recording);
+
+        self.painter.recordings.insert(weak, (image, size));
+
+        recording
+    }
+
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas)) {
         self.canvas.save();
 
         match clip {
             Clip::Rect(rect, radius) => {
-                let rect = skia_safe::RRect::new_nine_patch(
-                    skia_safe::Rect::new(
-                        rect.min.x, rect.min.y, rect.max.x, rect.max.y,
-                    ),
-                    radius.top_left,
-                    radius.top_right,
-                    radius.bottom_right,
-                    radius.bottom_left,
-                );
+                if *radius != CornerRadius::all(0.0) {
+                    let rect = skia_safe::RRect::new_nine_patch(
+                        skia_safe::Rect::new(
+                            rect.min.x, rect.min.y, rect.max.x, rect.max.y,
+                        ),
+                        radius.top_left,
+                        radius.top_right,
+                        radius.bottom_right,
+                        radius.bottom_left,
+                    );
 
-                self.canvas.clip_rrect(
-                    rect,
-                    skia_safe::ClipOp::Intersect,
-                    true, // enable anti aliasing
-                );
+                    self.canvas.clip_rrect(
+                        rect,
+                        skia_safe::ClipOp::Intersect,
+                        true, // enable anti aliasing
+                    );
+                } else {
+                    let rect = skia_safe::Rect::new(
+                        rect.min.x, rect.min.y, rect.max.x, rect.max.y,
+                    );
+
+                    self.canvas.clip_rect(
+                        rect,
+                        skia_safe::ClipOp::Intersect,
+                        true, // enable anti aliasing
+                    );
+                }
             }
         }
 
@@ -129,6 +175,23 @@ impl Canvas for SkiaCanvas<'_> {
     fn draw_svg(&mut self, svg: &Svg) {
         if let Some(skia_dom) = self.painter.create_svg(svg) {
             skia_dom.render(self.canvas);
+        }
+    }
+
+    fn draw_recording(&mut self, recoding: &Recording) {
+        let weak = Recording::downgrade(recoding);
+
+        if let Some((image, size)) = self.painter.recordings.get(&weak) {
+            self.canvas.draw_image_rect_with_sampling_options(
+                image,
+                None,
+                skia_safe::Rect::new(0.0, 0.0, size.width, size.height),
+                skia_safe::SamplingOptions::new(
+                    skia_safe::FilterMode::Linear,
+                    skia_safe::MipmapMode::None,
+                ),
+                &skia_safe::Paint::default(),
+            );
         }
     }
 }

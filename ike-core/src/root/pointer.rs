@@ -1,33 +1,35 @@
 use crate::{
     Arena, BuildCx, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent,
     PointerEvent, PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, Root,
-    ScrollDelta, WidgetId, WindowId, context::FocusUpdate, root::focus,
+    ScrollDelta, WidgetId, WindowId,
+    context::FocusUpdate,
+    root::{focus, query},
 };
 
 impl Root {
-    pub fn pointer_entered(&mut self, window: WindowId, id: PointerId) -> bool {
+    pub fn pointer_entered(&mut self, window: WindowId, pointer_id: PointerId) -> bool {
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
 
         window.pointers.push(Pointer {
-            id,
+            id:       pointer_id,
             position: Point::all(0.0),
         });
 
         false
     }
 
-    pub fn pointer_left(&mut self, window: WindowId, id: PointerId) -> bool {
+    pub fn pointer_left(&mut self, window: WindowId, pointer_id: PointerId) -> bool {
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
 
-        if let Some(index) = window.pointers.iter().position(|p| p.id == id) {
+        if let Some(index) = window.pointers.iter().position(|p| p.id == pointer_id) {
             window.pointers.swap_remove(index);
         }
 
-        if let Some(hovered) = find_hovered(&self.arena, window.contents)
+        if let Some(hovered) = query::find_hovered(&self.arena, window.contents)
             && let Some(mut widget) = self.get_mut(hovered)
         {
             widget.set_hovered(false);
@@ -36,15 +38,22 @@ impl Root {
         false
     }
 
-    pub fn pointer_moved(&mut self, window: WindowId, id: PointerId, position: Point) -> bool {
+    pub fn pointer_moved(
+        &mut self,
+        window: WindowId,
+        pointer_id: PointerId,
+        position: Point,
+    ) -> bool {
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
 
-        if let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == id) {
-            pointer.position = position;
-        }
+        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == pointer_id) else {
+            return false;
+        };
+
+        pointer.position = position;
 
         let window_contents = window.contents;
         let hovered = update_hovered(
@@ -55,19 +64,19 @@ impl Root {
         );
 
         // if there is an active widget, target it with the event
-        if let Some(target) = find_active(&self.arena, window_contents) {
+        if let Some(target) = query::find_active(&self.arena, window_contents) {
             let event = PointerMoveEvent {
-                pointer: id,
+                pointer: pointer_id,
                 position,
             };
             let event = PointerEvent::Move(event);
 
             match send_pointer_event(self, window_contents, target, &event) {
                 PointerPropagate::Bubble => false,
-                PointerPropagate::Stop => true,
+                PointerPropagate::Handled => true,
 
                 PointerPropagate::Capture => {
-                    tracing::warn!(
+                    tracing::error!(
                         "pointer capture is only valid in response to PointerEvent::Down(..)"
                     );
 
@@ -76,17 +85,17 @@ impl Root {
             }
         } else if let Some(target) = hovered {
             let event = PointerMoveEvent {
-                pointer: id,
+                pointer: pointer_id,
                 position,
             };
             let event = PointerEvent::Move(event);
 
             match send_pointer_event(self, window_contents, target, &event) {
                 PointerPropagate::Bubble => false,
-                PointerPropagate::Stop => true,
+                PointerPropagate::Handled => true,
 
                 PointerPropagate::Capture => {
-                    tracing::warn!(
+                    tracing::error!(
                         "pointer capture is only valid in response to PointerEvent::Down(..)"
                     );
 
@@ -101,7 +110,7 @@ impl Root {
     pub fn pointer_pressed(
         &mut self,
         window: WindowId,
-        id: PointerId,
+        pointer_id: PointerId,
         button: PointerButton,
         pressed: bool,
     ) -> bool {
@@ -110,18 +119,29 @@ impl Root {
             return false;
         };
 
-        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == id) else {
+        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == pointer_id) else {
             return false;
         };
 
         let window_contents = window.contents;
         let pointer_position = pointer.position;
 
-        let handled = if let Some(target) = find_pointer_target(&self.arena, window_contents) {
+        if button == PointerButton::Primary
+            && pressed
+            && let Some(focused) = query::find_focused(&self.arena, window_contents)
+            && self.get(focused).is_some_and(|widget| {
+                let local = widget.cx.global_transform().inverse() * pointer_position;
+                !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
+            })
+        {
+            focus::set_focused(self, window_contents, None);
+        }
+
+        if let Some(target) = find_pointer_target(&self.arena, window_contents) {
             let event = PointerButtonEvent {
                 button,
-                position: pointer.position,
-                pointer: id,
+                position: pointer_position,
+                pointer: pointer_id,
             };
             let event = match pressed {
                 true => PointerEvent::Down(event),
@@ -130,7 +150,7 @@ impl Root {
 
             let handled = match send_pointer_event(self, window_contents, target, &event) {
                 PointerPropagate::Bubble => false,
-                PointerPropagate::Stop => true,
+                PointerPropagate::Handled => true,
 
                 PointerPropagate::Capture if pressed => {
                     if let Some(mut widget) = self.get_mut(target) {
@@ -141,7 +161,11 @@ impl Root {
                 }
 
                 PointerPropagate::Capture => {
-                    panic!("pointer capture is only valid in response to PointerEvent::Down(..)");
+                    tracing::error!(
+                        "pointer capture is only valid in response to PointerEvent::Down(..)"
+                    );
+
+                    true
                 }
             };
 
@@ -166,33 +190,20 @@ impl Root {
             handled
         } else {
             false
-        };
-
-        if button == PointerButton::Primary
-            && pressed
-            && let Some(focused) = focus::find_focused(&self.arena, window_contents)
-            && self.get(focused).is_some_and(|widget| {
-                let local = widget.cx.global_transform().inverse() * pointer_position;
-                !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
-            })
-        {
-            focus::set_focused(self, window_contents, None);
         }
-
-        handled
     }
 
     pub fn pointer_scrolled(
         &mut self,
         window: WindowId,
+        pointer_id: PointerId,
         delta: ScrollDelta,
-        id: PointerId,
     ) -> bool {
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
 
-        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == id) else {
+        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == pointer_id) else {
             return false;
         };
 
@@ -202,64 +213,32 @@ impl Root {
 
         let event = PointerEvent::Scroll(PointerScrollEvent {
             position: pointer.position,
-            pointer: id,
+            pointer: pointer_id,
             delta,
         });
 
         let window_contents = window.contents;
         match send_pointer_event(self, window_contents, target, &event) {
             PointerPropagate::Bubble => false,
-            PointerPropagate::Stop => true,
+            PointerPropagate::Handled => true,
 
             PointerPropagate::Capture => {
-                panic!("pointer capture is only valid in response to PointerEvent::Down(..)");
+                tracing::error!(
+                    "pointer capture is only valid in response to PointerEvent::Down(..)"
+                );
+
+                true
             }
         }
     }
 }
 
-fn find_pointer_target(arena: &Arena, root: WidgetId) -> Option<WidgetId> {
-    if let Some(target) = find_active(arena, root) {
+fn find_pointer_target(arena: &Arena, root_widget: WidgetId) -> Option<WidgetId> {
+    if let Some(target) = query::find_active(arena, root_widget) {
         Some(target)
     } else {
-        find_hovered(arena, root)
+        query::find_hovered(arena, root_widget)
     }
-}
-
-fn find_active(arena: &Arena, id: WidgetId) -> Option<WidgetId> {
-    let state = arena.get_state(id.index)?;
-
-    if state.is_active {
-        return Some(id);
-    }
-
-    for &child in &state.children {
-        if let Some(child_state) = arena.get_state(child.index)
-            && child_state.has_active
-        {
-            return find_active(arena, child);
-        }
-    }
-
-    None
-}
-
-fn find_hovered(arena: &Arena, id: WidgetId) -> Option<WidgetId> {
-    let state = arena.get_state(id.index)?;
-
-    if state.is_hovered {
-        return Some(id);
-    }
-
-    for &child in &state.children {
-        if let Some(child_state) = arena.get_state(child.index)
-            && child_state.has_hovered
-        {
-            return find_hovered(arena, child);
-        }
-    }
-
-    None
 }
 
 pub fn update_hovered(
@@ -268,7 +247,7 @@ pub fn update_hovered(
     id: WidgetId,
     point: Point,
 ) -> Option<WidgetId> {
-    if let Some(active) = find_active(&root.arena, id)
+    if let Some(active) = query::find_active(&root.arena, id)
         && let Some(mut widget) = root.arena.get_mut(&mut root.state, active)
     {
         widget.cx.root.set_window_cursor(window, widget.cx.cursor());
@@ -283,8 +262,8 @@ pub fn update_hovered(
         return is_hovered.then_some(active);
     }
 
-    let current = find_hovered(&root.arena, id);
-    let hovered = find_widget_at(&root.arena, id, point);
+    let current = query::find_hovered(&root.arena, id);
+    let hovered = query::find_widget_at(&root.arena, id, point);
 
     if current != hovered {
         if let Some(current) = current
@@ -309,27 +288,6 @@ pub fn update_hovered(
     }
 
     hovered
-}
-
-fn find_widget_at(arena: &Arena, id: WidgetId, point: Point) -> Option<WidgetId> {
-    let state = arena.get_state(id.index)?;
-    let local = state.global_transform.inverse() * point;
-
-    if !Rect::min_size(Point::ORIGIN, state.size).contains(local) {
-        return None;
-    }
-
-    for &child in &state.children {
-        if let Some(id) = find_widget_at(arena, child, point) {
-            return Some(id);
-        }
-    }
-
-    if state.accepts_pointer {
-        Some(id)
-    } else {
-        None
-    }
 }
 
 fn send_pointer_event(

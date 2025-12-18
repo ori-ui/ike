@@ -1,6 +1,6 @@
 use crate::{
-    Affine, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Painter, Shader, Size, Space,
-    Svg, SvgData, Widget, WidgetMut, canvas::BlendMode,
+    Affine, BlendMode, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Painter, Recording,
+    Shader, Size, Space, Svg, SvgData, Widget, WidgetMut,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -30,9 +30,10 @@ pub enum Fit {
 }
 
 pub struct Picture {
-    contents: Picturable,
-    fit:      Fit,
-    color:    Option<Color>,
+    contents:  Picturable,
+    fit:       Fit,
+    color:     Option<Color>,
+    recording: Option<Recording>,
 }
 
 impl Picture {
@@ -41,11 +42,13 @@ impl Picture {
             contents,
             fit: Fit::None,
             color: None,
+            recording: None,
         })
     }
 
     pub fn set_contents(this: &mut WidgetMut<Self>, contents: Picturable) {
         this.widget.contents = contents;
+        this.widget.recording = None;
         this.cx.request_layout();
     }
 
@@ -56,6 +59,7 @@ impl Picture {
 
     pub fn set_color(this: &mut WidgetMut<Self>, color: Option<Color>) {
         this.widget.color = color;
+        this.widget.recording = None;
         this.cx.request_draw();
     }
 }
@@ -69,6 +73,8 @@ impl Widget for Picture {
         if size.has_zero_area() {
             return space.min;
         }
+
+        self.recording = None;
 
         match self.fit {
             Fit::Contain => scale_to_fit(size, space),
@@ -104,25 +110,34 @@ impl Widget for Picture {
             y: (cx.size().height - size.height * sy) / 2.0,
         };
 
-        let transform = Affine::scale_translate(sx, sy, offset);
-        canvas.transform(transform, &mut |canvas| {
-            if let Some(color) = self.color {
-                canvas.layer(&mut |canvas| {
-                    match self.contents {
-                        Picturable::Svg(ref svg) => canvas.draw_svg(svg),
-                    }
-
-                    canvas.fill(&Paint {
-                        shader: Shader::Solid(color),
-                        blend:  BlendMode::SrcIn,
-                    });
-                });
-            } else {
-                match self.contents {
-                    Picturable::Svg(ref svg) => canvas.draw_svg(svg),
+        match self.contents {
+            Picturable::Svg(ref svg) => match self.recording {
+                Some(ref recording) => {
+                    canvas.draw_recording(recording);
                 }
-            }
-        });
+
+                None => {
+                    let recording = canvas.record(cx.size(), &mut |canvas| {
+                        let transform = Affine::scale_translate(sx, sy, offset);
+                        canvas.transform(transform, &mut |canvas| {
+                            canvas.draw_svg(svg)
+                        });
+
+                        if let Some(color) = self.color {
+                            let paint = Paint {
+                                shader: Shader::Solid(color),
+                                blend:  BlendMode::SrcIn,
+                            };
+
+                            canvas.fill(&paint);
+                        }
+                    });
+
+                    canvas.draw_recording(&recording);
+                    self.recording = Some(recording);
+                }
+            },
+        }
     }
 }
 

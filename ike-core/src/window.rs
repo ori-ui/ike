@@ -1,6 +1,6 @@
 use std::{any::Any, fmt};
 
-use crate::{Color, CursorIcon, Modifiers, Pointer, Size, WidgetId};
+use crate::{Color, CursorIcon, Modifiers, Pointer, Size, Touch, WidgetId};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WindowId {
@@ -29,6 +29,7 @@ pub struct Window {
     pub(crate) anchor:       Option<WindowId>,
     pub(crate) scale:        f32,
     pub(crate) pointers:     Vec<Pointer>,
+    pub(crate) touches:      Vec<Touch>,
     pub(crate) modifiers:    Modifiers,
     pub(crate) size:         Size,
     pub(crate) properties:   Vec<Box<dyn Any>>,

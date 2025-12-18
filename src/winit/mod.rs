@@ -225,32 +225,30 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             }
 
             WindowEvent::CursorEntered { device_id } => {
-                let id = PointerId::from_hash(device_id);
-                self.context.root.pointer_entered(window.id, id);
+                let pointer_id = PointerId::from_hash(device_id);
+                self.context.root.pointer_entered(window.id, pointer_id);
             }
 
             WindowEvent::CursorLeft { device_id } => {
-                let id = PointerId::from_hash(device_id);
-                self.context.root.pointer_left(window.id, id);
+                let pointer_id = PointerId::from_hash(device_id);
+                self.context.root.pointer_left(window.id, pointer_id);
             }
 
             WindowEvent::CursorMoved {
                 device_id,
                 position,
             } => {
+                let pointer_id = PointerId::from_hash(device_id);
                 let position = position.to_logical(window.window.scale_factor());
                 let position = Point::new(position.x, position.y);
 
-                self.context.root.pointer_moved(
-                    window.id,
-                    PointerId::from_hash(device_id),
-                    position,
-                );
+                (self.context.root).pointer_moved(window.id, pointer_id, position);
             }
 
             WindowEvent::MouseWheel {
                 device_id, delta, ..
             } => {
+                let pointer_id = PointerId::from_hash(device_id);
                 let delta = match delta {
                     MouseScrollDelta::LineDelta(x, y) => ScrollDelta::Line(Offset::new(x, y)),
                     MouseScrollDelta::PixelDelta(delta) => ScrollDelta::Pixel(
@@ -259,11 +257,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                     ),
                 };
 
-                self.context.root.pointer_scrolled(
-                    window.id,
-                    delta,
-                    PointerId::from_hash(device_id),
-                );
+                (self.context.root).pointer_scrolled(window.id, pointer_id, delta);
             }
 
             WindowEvent::MouseInput {
@@ -271,6 +265,8 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                 state,
                 button,
             } => {
+                let pointer_id = PointerId::from_hash(device_id);
+                let pressed = matches!(state, ElementState::Pressed);
                 let button = match button {
                     MouseButton::Left => PointerButton::Primary,
                     MouseButton::Right => PointerButton::Secondary,
@@ -280,14 +276,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                     MouseButton::Other(i) => PointerButton::Other(i),
                 };
 
-                let pressed = matches!(state, ElementState::Pressed);
-
-                self.context.root.pointer_pressed(
-                    window.id,
-                    PointerId::from_hash(device_id),
-                    button,
-                    pressed,
-                );
+                (self.context.root).pointer_pressed(window.id, pointer_id, button, pressed);
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
@@ -417,9 +406,11 @@ impl<T> AppState<'_, T> {
                 }
             }
 
-            RootSignal::RequestAnimate(id) => {
-                if let Some(window) = self.windows.iter_mut().find(|w| w.id == id) {
-                    window.animate = Some(Instant::now());
+            RootSignal::RequestAnimate(id, last_frame) => {
+                if let Some(window) = self.windows.iter_mut().find(|w| w.id == id)
+                    && window.animate.is_none()
+                {
+                    window.animate = Some(last_frame);
                     window.window.request_redraw();
                 }
             }

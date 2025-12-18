@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, time::Instant};
 
 use cursor_icon::CursorIcon;
 
@@ -7,7 +7,7 @@ use crate::{Rect, WindowId, WindowSizing};
 #[derive(Clone, Debug)]
 pub enum RootSignal {
     RequestRedraw(WindowId),
-    RequestAnimate(WindowId),
+    RequestAnimate(WindowId, Instant),
 
     ClipboardSet(String),
 
@@ -35,6 +35,6 @@ pub enum ImeSignal {
     Text(String),
     Selection {
         selection: Range<usize>,
-        compose:   Option<Range<usize>>,
+        composing: Option<Range<usize>>,
     },
 }

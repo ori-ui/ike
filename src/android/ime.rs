@@ -8,6 +8,7 @@ use jni::{
 
 use crate::android::{Event, EventLoop, WindowState, context::Proxy};
 
+#[derive(Debug)]
 pub(super) enum ImeEvent {
     CommitText(String, usize),
     DeleteSurrounding(usize, usize),
@@ -33,8 +34,8 @@ impl Ime {
         self.state.lock().unwrap().selection.clone()
     }
 
-    pub fn compose(&self) -> Option<Range<usize>> {
-        self.state.lock().unwrap().compose.clone()
+    pub fn composing(&self) -> Option<Range<usize>> {
+        self.state.lock().unwrap().composing.clone()
     }
 
     pub fn set_text(&self, text: String) {
@@ -49,9 +50,9 @@ impl Ime {
         }
     }
 
-    pub fn set_compose(&self, compose: Option<Range<usize>>) {
+    pub fn set_composing(&self, composing: Option<Range<usize>>) {
         if let Ok(mut state) = self.state.lock() {
-            state.compose = compose;
+            state.composing = composing;
         }
     }
 }
@@ -59,7 +60,7 @@ impl Ime {
 struct ImeState {
     text:      String,
     selection: Range<usize>,
-    compose:   Option<Range<usize>>,
+    composing: Option<Range<usize>>,
 }
 
 impl<'a, T> EventLoop<'a, T> {
@@ -175,7 +176,7 @@ impl<'a, T> EventLoop<'a, T> {
 
                 if let Ok(mut env) = self.jvm.attach_current_thread() {
                     let selection = self.ime.selection();
-                    let compose = self.ime.compose();
+                    let compose = self.ime.composing();
 
                     let _ = self.update_selection(
                         &mut env,
@@ -187,14 +188,17 @@ impl<'a, T> EventLoop<'a, T> {
                 }
             }
 
-            ImeSignal::Selection { selection, compose } => {
-                if self.ime.selection() == selection && self.ime.compose() == compose {
+            ImeSignal::Selection {
+                selection,
+                composing: compose,
+            } => {
+                if self.ime.selection() == selection && self.ime.composing() == compose {
                     return;
                 }
 
                 if let Ok(mut env) = self.jvm.attach_current_thread() {
                     self.ime.set_selection(selection.clone());
-                    self.ime.set_compose(compose.clone());
+                    self.ime.set_composing(compose.clone());
 
                     let _ = self.update_selection(
                         &mut env,
@@ -320,7 +324,7 @@ impl<'a, T> EventLoop<'a, T> {
             state: Mutex::new(ImeState {
                 text:      String::new(),
                 selection: 0..0,
-                compose:   None,
+                composing: None,
             }),
         };
 

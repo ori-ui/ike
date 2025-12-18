@@ -177,8 +177,8 @@ impl MutCx<'_> {
         DrawCx { root, arena, state }
     }
 
-    pub(crate) fn enter_span(&self) -> tracing::span::EnteredSpan {
-        self.state.tracing_span.clone().entered()
+    pub(crate) fn enter_span(&self) -> Option<tracing::span::EnteredSpan> {
+        (self.root.trace).then(|| self.state.tracing_span.clone().entered())
     }
 
     pub(crate) fn update_state(&mut self) {
@@ -537,11 +537,11 @@ impl_contexts! {
         pub fn set_ime_selection(
             &mut self,
             selection: Range<usize>,
-            compose: Option<Range<usize>>,
+            composing: Option<Range<usize>>,
         ) {
             self.root.signal(RootSignal::Ime(ImeSignal::Selection {
                 selection,
-                compose,
+                composing,
             }));
         }
     }

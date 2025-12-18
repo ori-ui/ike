@@ -5,12 +5,6 @@ pub use cursor_icon::CursorIcon;
 use crate::{Offset, Point};
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Pointer {
-    pub(crate) id:       PointerId,
-    pub(crate) position: Point,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub enum PointerEvent {
     Down(PointerButtonEvent),
     Up(PointerButtonEvent),
@@ -22,15 +16,15 @@ pub enum PointerEvent {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointerButtonEvent {
+    pub pointer:  PointerId,
     pub button:   PointerButton,
     pub position: Point,
-    pub pointer:  PointerId,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointerMoveEvent {
-    pub position: Point,
     pub pointer:  PointerId,
+    pub position: Point,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -41,9 +35,9 @@ pub enum ScrollDelta {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PointerScrollEvent {
+    pub pointer:  PointerId,
     pub position: Point,
     pub delta:    ScrollDelta,
-    pub pointer:  PointerId,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,8 +53,14 @@ pub enum PointerButton {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PointerPropagate {
     Bubble,
-    Stop,
+    Handled,
     Capture,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pointer {
+    pub(crate) id:       PointerId,
+    pub(crate) position: Point,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

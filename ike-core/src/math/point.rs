@@ -21,6 +21,12 @@ impl Point {
     pub const fn all(point: f32) -> Self {
         Self { x: point, y: point }
     }
+
+    pub fn distance(self, other: Self) -> f32 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        (dx * dx + dy * dy).sqrt()
+    }
 }
 
 impl fmt::Debug for Point {

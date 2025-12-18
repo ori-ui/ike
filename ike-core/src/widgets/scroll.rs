@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use crate::{
     AnyWidgetId, Axis, BorderWidth, BuildCx, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
-    EventCx, LayoutCx, Padding, Paint, Painter, Point, PointerEvent, PointerPropagate, Rect,
-    ScrollDelta, Size, Space, Transition, Transitioned, Update, UpdateCx, Widget, WidgetMut,
+    EventCx, Gesture, LayoutCx, Padding, Paint, Painter, Point, PointerEvent, PointerPropagate,
+    Rect, ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Update,
+    UpdateCx, Widget, WidgetMut,
 };
 
 pub struct Scroll {
@@ -337,10 +338,27 @@ impl Widget for Scroll {
                     }
                 }
 
-                PointerPropagate::Stop
+                PointerPropagate::Handled
             }
 
             _ => PointerPropagate::Bubble,
+        }
+    }
+
+    fn on_touch_event(&mut self, cx: &mut EventCx<'_>, event: &TouchEvent) -> TouchPropagate {
+        match event {
+            TouchEvent::Gesture(Gesture::Pan(event)) => {
+                let (delta, _) = self.axis.unpack_offset(event.delta);
+                let mut scroll = self.scroll.to() - delta;
+                scroll = scroll.clamp(0.0, self.overflow());
+
+                self.scroll.set(scroll);
+                cx.request_compose();
+
+                TouchPropagate::Handled
+            }
+
+            _ => TouchPropagate::Bubble,
         }
     }
 

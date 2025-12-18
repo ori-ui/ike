@@ -143,6 +143,7 @@ pub struct SkiaVulkanSurface {
     current_frame:    u32,
     width:            u32,
     height:           u32,
+    msaa:             bool,
 }
 
 impl Drop for SkiaVulkanSurface {
@@ -326,11 +327,68 @@ impl SkiaVulkanSurface {
             current_frame: 0,
             width,
             height,
+            msaa: !cfg!(any(
+                target_os = "android",
+                target_os = "ios",
+            )),
         };
 
         this.resize(width, height);
 
         this
+    }
+
+    pub(crate) fn create_render_target(
+        &mut self,
+        width: u32,
+        height: u32,
+        is_primary: bool,
+    ) -> skia_safe::Surface {
+        let (color_type, color_space) = if self.surface_format == Self::HDR_FORMAT {
+            if is_primary {
+                (
+                    skia_safe::ColorType::RGBA1010102,
+                    skia_safe::ColorSpace::new_cicp(
+                        skia_safe::named_primaries::CicpId::Rec2020,
+                        skia_safe::named_transfer_fn::CicpId::PQ,
+                    )
+                    .unwrap(),
+                )
+            } else {
+                (
+                    skia_safe::ColorType::RGBAF16Norm,
+                    skia_safe::ColorSpace::new_srgb_linear(),
+                )
+            }
+        } else {
+            (
+                skia_safe::ColorType::RGBA8888,
+                skia_safe::ColorSpace::new_srgb(),
+            )
+        };
+
+        let image_info = skia_safe::ImageInfo::new(
+            skia_safe::ISize::new(
+                width.max(1) as i32,
+                height.max(1) as i32,
+            ),
+            color_type,
+            skia_safe::AlphaType::Premul,
+            color_space,
+        );
+
+        let samples = if self.msaa { 4 } else { 1 };
+        skia_safe::gpu::surfaces::render_target(
+            &mut self.skia_context,
+            skia_safe::gpu::Budgeted::Yes,
+            &image_info,
+            Some(samples),
+            skia_safe::gpu::SurfaceOrigin::TopLeft,
+            None,
+            false,
+            None,
+        )
+        .unwrap()
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -401,47 +459,7 @@ impl SkiaVulkanSurface {
         }
 
         while self.skia_surfaces.len() < self.swapchain_images.len() {
-            let (color_type, color_space) = if self.surface_format == Self::HDR_FORMAT {
-                (
-                    skia_safe::ColorType::RGBA1010102,
-                    skia_safe::ColorSpace::new_cicp(
-                        skia_safe::named_primaries::CicpId::Rec2020,
-                        skia_safe::named_transfer_fn::CicpId::PQ,
-                    )
-                    .unwrap(),
-                )
-            } else {
-                (
-                    skia_safe::ColorType::RGBA8888,
-                    skia_safe::ColorSpace::new_srgb(),
-                )
-            };
-
-            let image_info = skia_safe::ImageInfo::new(
-                skia_safe::ISize::new(
-                    width.max(1) as i32,
-                    height.max(1) as i32,
-                ),
-                color_type,
-                skia_safe::AlphaType::Premul,
-                color_space,
-            );
-
-            let mut surface = skia_safe::gpu::surfaces::render_target(
-                &mut self.skia_context,
-                skia_safe::gpu::Budgeted::Yes,
-                &image_info,
-                Some(4),
-                skia_safe::gpu::SurfaceOrigin::TopLeft,
-                Some(&skia_safe::SurfaceProps::new(
-                    skia_safe::SurfacePropsFlags::DYNAMIC_MSAA,
-                    skia_safe::PixelGeometry::RGBH,
-                )),
-                false,
-                None,
-            )
-            .unwrap();
-
+            let mut surface = self.create_render_target(width, height, true);
             let target = skia_safe::gpu::surfaces::get_backend_render_target(
                 &mut surface,
                 skia_safe::surface::BackendHandleAccess::FlushRead,
@@ -501,7 +519,7 @@ impl SkiaVulkanSurface {
             let render_finished = self.render_finished[image_index as usize];
 
             // do rendering
-            let (surface, skia_image) = &mut self.skia_surfaces[image_index as usize];
+            let (mut surface, skia_image) = self.skia_surfaces[image_index as usize].clone();
             let canvas = surface.canvas();
 
             canvas.reset_matrix();
@@ -513,11 +531,20 @@ impl SkiaVulkanSurface {
                 clear_color.a,
             ));
 
-            let mut canvas = SkiaCanvas { painter, canvas };
-            let output = f(&mut canvas);
+            let output = {
+                let mut canvas = SkiaCanvas {
+                    surface: self,
+                    painter,
+                    canvas,
+                };
+                f(&mut canvas)
+            };
 
-            // IMPORTANT: resolve skia msaa
-            skia_safe::gpu::surfaces::resolve_msaa(surface);
+            if self.msaa {
+                // IMPORTANT: resolve skia msaa
+                skia_safe::gpu::surfaces::resolve_msaa(&mut surface);
+            }
+
             self.skia_context.flush_and_submit();
 
             // record command buffer
@@ -534,7 +561,7 @@ impl SkiaVulkanSurface {
                 .level_count(1);
 
             let skia_to_transfer_src = vk::ImageMemoryBarrier::default()
-                .image(*skia_image)
+                .image(skia_image)
                 .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
                 .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
                 .src_access_mask(vk::AccessFlags::NONE)
@@ -561,7 +588,7 @@ impl SkiaVulkanSurface {
 
             self.device.cmd_copy_image(
                 command_buffer,
-                *skia_image,
+                skia_image,
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 swapchain_image,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
@@ -587,7 +614,7 @@ impl SkiaVulkanSurface {
             );
 
             let skia_to_transfer_dst = vk::ImageMemoryBarrier::default()
-                .image(*skia_image)
+                .image(skia_image)
                 .old_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
                 .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
                 .src_access_mask(vk::AccessFlags::TRANSFER_READ)

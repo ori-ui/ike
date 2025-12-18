@@ -4,7 +4,7 @@ use crate::{
     BuildCx, EventCx, ImeEvent, Propagate, Root, WidgetId, WindowId,
     context::FocusUpdate,
     event::{TextEvent, TextPasteEvent},
-    root::focus,
+    root::{focus, query},
 };
 
 impl Root {
@@ -17,8 +17,8 @@ impl Root {
 
         let contents = window.contents;
 
-        match focus::find_focused(&self.arena, contents) {
-            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Stop,
+        match query::find_focused(&self.arena, contents) {
+            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Handled,
             None => false,
         }
     }
@@ -32,8 +32,8 @@ impl Root {
 
         let contents = window.contents;
 
-        match focus::find_focused(&self.arena, contents) {
-            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Stop,
+        match query::find_focused(&self.arena, contents) {
+            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Handled,
             None => false,
         }
     }
@@ -47,8 +47,8 @@ impl Root {
 
         let contents = window.contents;
 
-        match focus::find_focused(&self.arena, contents) {
-            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Stop,
+        match query::find_focused(&self.arena, contents) {
+            Some(target) => send_text_event(self, contents, target, &event) == Propagate::Handled,
             None => false,
         }
     }

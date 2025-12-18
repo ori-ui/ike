@@ -3,10 +3,10 @@ use std::time::Duration;
 use keyboard_types::NamedKey;
 
 use crate::{
-    BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, ImeEvent, Key, KeyEvent,
-    LayoutCx, MutCx, Offset, Paint, Painter, Paragraph, Point, PointerEvent, PointerPropagate,
-    Propagate, Rect, Size, Space, TextLayoutLine, Update, UpdateCx, Widget, WidgetMut,
-    event::TextEvent,
+    BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Gesture, ImeEvent, Key,
+    KeyEvent, LayoutCx, MutCx, Offset, Paint, Painter, Paragraph, Point, PointerEvent,
+    PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine, TouchEvent, TouchPropagate,
+    Update, UpdateCx, Widget, WidgetMut, event::TextEvent,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -539,6 +539,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                 cx.request_draw();
                 cx.request_focus();
                 cx.request_animate();
+
                 PointerPropagate::Capture
             }
 
@@ -551,10 +552,31 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                 cx.request_draw();
                 cx.request_animate();
+
                 PointerPropagate::Bubble
             }
 
             _ => PointerPropagate::Bubble,
+        }
+    }
+
+    fn on_touch_event(&mut self, cx: &mut EventCx<'_>, event: &TouchEvent) -> TouchPropagate {
+        match event {
+            TouchEvent::Gesture(Gesture::Tap(event)) => {
+                let local = cx.global_transform().inverse() * event.position;
+                let cursor = self.find_point(local);
+
+                self.set_cursor(cursor, false);
+                self.set_selection_event(cx);
+
+                cx.request_draw();
+                cx.request_focus();
+                cx.request_animate();
+
+                TouchPropagate::Handled
+            }
+
+            _ => TouchPropagate::Bubble,
         }
     }
 
@@ -572,7 +594,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                             cx.set_clipboard(selection.to_owned());
                         }
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Character(ref c) if c == "x" && action_mod => {
@@ -587,7 +609,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         cx.request_layout();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     _ if matches!(event.text, Some(ref text) if !text.chars().any(|c| c.is_ascii_control()))
@@ -600,7 +622,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         cx.request_layout();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::ArrowRight) => {
@@ -610,7 +632,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         cx.request_draw();
                         cx.request_animate();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::ArrowLeft) => {
@@ -620,7 +642,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         cx.request_draw();
                         cx.request_animate();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::ArrowUp) => {
@@ -630,7 +652,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         cx.request_draw();
                         cx.request_animate();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::ArrowDown) => {
@@ -640,7 +662,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         cx.request_draw();
                         cx.request_animate();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::Delete) if EDITABLE => {
@@ -662,7 +684,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                             cx.request_animate();
                         }
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::Backspace) if EDITABLE => {
@@ -685,7 +707,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                             cx.request_animate();
                         }
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::Enter)
@@ -702,7 +724,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         cx.request_layout();
                         cx.request_animate();
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     Key::Named(NamedKey::Enter)
@@ -725,7 +747,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                             cx.request_layout();
                         }
 
-                        Propagate::Stop
+                        Propagate::Handled
                     }
 
                     _ => Propagate::Bubble,
@@ -746,11 +768,11 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                 cx.request_layout();
 
-                Propagate::Stop
+                Propagate::Handled
             }
 
             TextEvent::Ime(ime) => match ime {
-                ImeEvent::Enabled => Propagate::Stop,
+                ImeEvent::Enabled => Propagate::Handled,
 
                 ImeEvent::Select(selection) => {
                     if selection.start == selection.end {
@@ -762,7 +784,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         cx.request_draw();
                     }
 
-                    Propagate::Stop
+                    Propagate::Handled
                 }
 
                 ImeEvent::Commit(text) => {
@@ -773,10 +795,10 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                     cx.request_layout();
 
-                    Propagate::Stop
+                    Propagate::Handled
                 }
 
-                ImeEvent::Disabled => Propagate::Stop,
+                ImeEvent::Disabled => Propagate::Handled,
             },
 
             _ => Propagate::Bubble,

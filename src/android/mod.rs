@@ -1,6 +1,7 @@
 use std::{
     any::Any,
     ffi::{self, CString},
+    fmt,
     pin::Pin,
     ptr::{self, NonNull},
     sync::{OnceLock, mpsc::Receiver},
@@ -132,6 +133,21 @@ enum Event {
     Future(Pin<Box<dyn Future<Output = ()> + Send>>),
 }
 
+impl fmt::Debug for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Resumed => write!(f, "Resumed"),
+            Self::InputQueue(arg0) => f.debug_tuple("InputQueue").field(arg0).finish(),
+            Self::Window(arg0) => f.debug_tuple("Window").field(arg0).finish(),
+            Self::Ime(arg0) => f.debug_tuple("Ime").field(arg0).finish(),
+            Self::Signal(arg0) => f.debug_tuple("Signal").field(arg0).finish(),
+            Self::Rebuild => write!(f, "Rebuild"),
+            Self::Event(arg0) => f.debug_tuple("Event").field(arg0).finish(),
+            Self::Future(_) => f.debug_tuple("Future").finish(),
+        }
+    }
+}
+
 impl<'a, T> EventLoop<'a, T> {
     fn new(
         native_activity: NonNull<ndk_sys::ANativeActivity>,
@@ -244,9 +260,7 @@ impl<'a, T> EventLoop<'a, T> {
 
     fn handle_event(&mut self, event: Event) {
         match event {
-            Event::Resumed => {
-                tracing::debug!("resumed");
-            }
+            Event::Resumed => {}
 
             Event::InputQueue(event) => self.handle_input_queue_event(event),
             Event::Window(event) => self.handle_window_event(event),
@@ -291,9 +305,11 @@ impl<'a, T> EventLoop<'a, T> {
                 self.context.proxy.send(Event::Window(WindowEvent::Redraw));
             }
 
-            RootSignal::RequestAnimate(..) => {
-                self.animate = Some(Instant::now());
-                self.context.proxy.send(Event::Window(WindowEvent::Redraw));
+            RootSignal::RequestAnimate(_, last_frame) => {
+                if self.animate.is_none() {
+                    self.animate = Some(last_frame);
+                    self.context.proxy.send(Event::Window(WindowEvent::Redraw));
+                }
             }
 
             RootSignal::ClipboardSet(..) => {}

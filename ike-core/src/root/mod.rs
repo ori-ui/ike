@@ -1,21 +1,23 @@
 use std::{
     mem,
     sync::atomic::{AtomicU64, Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
     Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Size, Update, WidgetId, Window, WindowId,
-    WindowSizing,
+    WindowSizing, event::TouchSettings,
 };
 
 mod focus;
 mod key;
 mod layout;
 mod pointer;
+mod query;
 mod scroll;
 mod signal;
 mod text;
+mod touch;
 
 pub use signal::{ImeSignal, RootSignal, WindowUpdate};
 
@@ -25,8 +27,10 @@ pub struct Root {
 }
 
 pub struct RootState {
-    pub(crate) windows: Vec<Window>,
-    pub(crate) sink:    Box<dyn Fn(RootSignal)>,
+    pub(crate) windows:        Vec<Window>,
+    pub(crate) sink:           Box<dyn Fn(RootSignal)>,
+    pub(crate) trace:          bool,
+    pub(crate) touch_settings: TouchSettings,
 }
 
 impl RootState {
@@ -56,7 +60,10 @@ impl RootState {
     }
 
     pub(crate) fn request_animate(&self, window: WindowId) {
-        self.signal(RootSignal::RequestAnimate(window));
+        self.signal(RootSignal::RequestAnimate(
+            window,
+            Instant::now(),
+        ));
     }
 
     pub(crate) fn set_window_cursor(&mut self, window: WindowId, cursor: CursorIcon) {
@@ -127,8 +134,10 @@ impl Root {
         Self {
             arena: Arena::new(),
             state: RootState {
-                windows: Vec::new(),
-                sink:    Box::new(sink),
+                windows:        Vec::new(),
+                sink:           Box::new(sink),
+                trace:          false,
+                touch_settings: TouchSettings::default(),
             },
         }
     }
@@ -145,6 +154,7 @@ impl Root {
             anchor: None,
             scale: 1.0,
             pointers: Vec::new(),
+            touches: Vec::new(),
             modifiers: Modifiers::empty(),
             size: Size::new(800.0, 600.0),
             properties: Vec::new(),
@@ -259,6 +269,7 @@ impl Root {
             let needs_layout = widget.cx.state.needs_layout;
             let new_window_size = layout::layout_window(&mut widget, window_id, canvas.painter());
             let needs_compose = widget.cx.state.needs_compose;
+
             layout::compose_window(&mut widget, window_id);
 
             (
@@ -337,7 +348,7 @@ impl Root {
         }
 
         // if the window was left in an ime session, we need start it again
-        if let Some(focused) = focus::find_focused(&self.arena, contents)
+        if let Some(focused) = query::find_focused(&self.arena, contents)
             && let Some(widget) = self.get(focused)
             && widget.cx.state.accepts_text
             && is_focused

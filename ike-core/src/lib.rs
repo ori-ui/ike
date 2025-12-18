@@ -23,14 +23,15 @@ pub use arena::{Arena, WidgetMut, WidgetRef};
 pub use axis::Axis;
 pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::BuildCx;
-pub use canvas::{BlendMode, Canvas, Clip, Paint, Shader};
+pub use canvas::{BlendMode, Canvas, Clip, Paint, Recording, Shader, WeakRecording};
 pub use color::Color;
 pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
 pub use curve::Curve;
 pub use event::{
-    CursorIcon, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, Pointer,
-    PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent, PointerPropagate,
-    PointerScrollEvent, Propagate, ScrollDelta,
+    CursorIcon, Gesture, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, PanGesture,
+    Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,
+    PointerPropagate, PointerScrollEvent, Propagate, ScrollDelta, TapGesture, Touch, TouchEvent,
+    TouchId, TouchMoveEvent, TouchPressEvent, TouchPropagate,
 };
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;

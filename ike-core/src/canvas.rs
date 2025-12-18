@@ -1,4 +1,11 @@
-use crate::{Affine, BorderWidth, Color, CornerRadius, Offset, Painter, Paragraph, Rect, Svg};
+use std::{
+    hash::{Hash, Hasher},
+    sync::{Arc, Weak},
+};
+
+use crate::{
+    Affine, BorderWidth, Color, CornerRadius, Offset, Painter, Paragraph, Rect, Size, Svg,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub enum Shader {
@@ -50,12 +57,68 @@ impl From<Rect> for Option<Clip> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Recording {
+    data: Arc<()>,
+}
+
+impl Default for Recording {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Recording {
+    pub fn new() -> Self {
+        Self { data: Arc::new(()) }
+    }
+
+    pub fn downgrade(this: &Self) -> WeakRecording {
+        WeakRecording {
+            data: Arc::downgrade(&this.data),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WeakRecording {
+    data: Weak<()>,
+}
+
+impl WeakRecording {
+    pub fn upgrade(&self) -> Option<Recording> {
+        Some(Recording {
+            data: self.data.upgrade()?,
+        })
+    }
+
+    pub fn strong_count(&self) -> usize {
+        self.data.strong_count()
+    }
+}
+
+impl PartialEq for WeakRecording {
+    fn eq(&self, other: &Self) -> bool {
+        Weak::ptr_eq(&self.data, &other.data)
+    }
+}
+
+impl Eq for WeakRecording {}
+
+impl Hash for WeakRecording {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.data.as_ptr().hash(state);
+    }
+}
+
 pub trait Canvas {
     fn painter(&mut self) -> &mut dyn Painter;
 
     fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas));
 
     fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas));
+
+    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording;
 
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas));
 
@@ -68,4 +131,6 @@ pub trait Canvas {
     fn draw_text(&mut self, paragraph: &Paragraph, max_width: f32, offset: Offset);
 
     fn draw_svg(&mut self, svg: &Svg);
+
+    fn draw_recording(&mut self, recording: &Recording);
 }

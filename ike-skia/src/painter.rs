@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::BuildHasherDefault};
 
 use ike_core::{
     FontStretch, FontStyle, GlyphCluster, Paint, Painter, Paragraph, Point, Rect, Shader, Size,
-    Svg, TextDirection, TextLayoutLine, TextStyle, TextWrap, WeakParagraph, WeakSvg,
+    Svg, TextDirection, TextLayoutLine, TextStyle, TextWrap, WeakParagraph, WeakRecording, WeakSvg,
 };
 
 type FastHasher = BuildHasherDefault<seahash::SeaHasher>;
@@ -14,6 +14,7 @@ pub struct SkiaPainter {
     pub(crate) fonts:      skia_safe::textlayout::FontCollection,
     pub(crate) svgs:       HashMap<WeakSvg, Option<skia_safe::svg::Dom>, FastHasher>,
     pub(crate) paragraphs: HashMap<WeakParagraph, CachedParagraph, FastHasher>,
+    pub(crate) recordings: HashMap<WeakRecording, (skia_safe::Image, Size), FastHasher>,
     pub(crate) paints:     HashMap<Paint, skia_safe::Paint, FastHasher>,
 }
 
@@ -37,6 +38,7 @@ impl SkiaPainter {
             fonts,
             svgs: HashMap::default(),
             paragraphs: HashMap::default(),
+            recordings: HashMap::default(),
             paints: HashMap::default(),
         }
     }
@@ -44,6 +46,7 @@ impl SkiaPainter {
     pub fn cleanup(&mut self) {
         self.svgs.retain(|k, _| k.strong_count() > 0);
         self.paragraphs.retain(|k, _| k.strong_count() > 0);
+        self.recordings.retain(|k, _| k.strong_count() > 0);
         self.paints.clear();
     }
 

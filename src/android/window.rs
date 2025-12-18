@@ -5,6 +5,7 @@ use raw_window_handle::{AndroidNdkWindowHandle, DisplayHandle, RawWindowHandle, 
 
 use crate::android::{Event, EventLoop, Window, WindowState, context::Proxy};
 
+#[derive(Debug)]
 pub(super) enum WindowEvent {
     Created(*mut ndk_sys::ANativeWindow),
     Destroyed,

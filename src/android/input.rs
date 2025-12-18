@@ -1,9 +1,10 @@
 use std::ptr;
 
-use ike_core::{Point, PointerButton, PointerId, WindowId};
+use ike_core::{Point, TouchId, WindowId};
 
 use crate::android::{EventLoop, WindowState};
 
+#[derive(Debug)]
 pub(super) enum InputQueueEvent {
     Created(*mut ndk_sys::AInputQueue),
     Destroyed(*mut ndk_sys::AInputQueue),
@@ -81,7 +82,7 @@ impl<'a, T> EventLoop<'a, T> {
         let action = action & ndk_sys::AMOTION_EVENT_ACTION_MASK;
 
         match action {
-            ndk_sys::AMOTION_EVENT_ACTION_DOWN | ndk_sys::AMOTION_EVENT_ACTION_POINTER_DOWN => {
+            ndk_sys::AMOTION_EVENT_ACTION_DOWN => {
                 let x = unsafe { ndk_sys::AMotionEvent_getX(event, index) };
                 let y = unsafe { ndk_sys::AMotionEvent_getY(event, index) };
                 let point = Point::new(
@@ -90,24 +91,23 @@ impl<'a, T> EventLoop<'a, T> {
                 );
 
                 let id = unsafe { ndk_sys::AMotionEvent_getPointerId(event, index) };
-                let id = PointerId::from_u64(id as u64);
+                let touch_id = TouchId::from_u64(id as u64);
 
-                tracing::trace!(
-                    index,
-                    point = ?point,
-                    "down event",
+                (self.context.root).touch_down(window_id, touch_id, point)
+            }
+
+            ndk_sys::AMOTION_EVENT_ACTION_UP => {
+                let x = unsafe { ndk_sys::AMotionEvent_getX(event, index) };
+                let y = unsafe { ndk_sys::AMotionEvent_getY(event, index) };
+                let point = Point::new(
+                    x / self.scale_factor,
+                    y / self.scale_factor,
                 );
 
-                let entered = self.context.root.pointer_entered(window_id, id);
-                let moved = self.context.root.pointer_moved(window_id, id, point);
-                let pressed = self.context.root.pointer_pressed(
-                    window_id,
-                    id,
-                    PointerButton::Primary,
-                    true,
-                );
+                let id = unsafe { ndk_sys::AMotionEvent_getPointerId(event, index) };
+                let touch_id = TouchId::from_u64(id as u64);
 
-                entered || moved || pressed
+                (self.context.root).touch_up(window_id, touch_id, point)
             }
 
             ndk_sys::AMOTION_EVENT_ACTION_MOVE => {
@@ -123,35 +123,15 @@ impl<'a, T> EventLoop<'a, T> {
                     );
 
                     let id = unsafe { ndk_sys::AMotionEvent_getPointerId(event, i) };
-                    let id = PointerId::from_u64(id as u64);
+                    let tool = unsafe { ndk_sys::AMotionEvent_getToolType(event, i) };
+                    let touch_id = TouchId::from_u64(id as u64);
 
-                    tracing::trace!(
-                        index,
-                        point = ?point,
-                        "move event",
-                    );
+                    tracing::trace!(index, ?point, tool, "move event");
 
-                    handled |= self.context.root.pointer_moved(window_id, id, point);
+                    handled |= self.context.root.touch_moved(window_id, touch_id, point);
                 }
 
                 handled
-            }
-
-            ndk_sys::AMOTION_EVENT_ACTION_UP | ndk_sys::AMOTION_EVENT_ACTION_POINTER_UP => {
-                let id = unsafe { ndk_sys::AMotionEvent_getPointerId(event, index) };
-                let id = PointerId::from_u64(id as u64);
-
-                tracing::trace!(index, "up event");
-
-                let pressed = self.context.root.pointer_pressed(
-                    window_id,
-                    id,
-                    PointerButton::Primary,
-                    false,
-                );
-                let left = self.context.root.pointer_left(window_id, id);
-
-                pressed || left
             }
 
             _ => false,

@@ -8,8 +8,8 @@ use std::{
 
 use crate::{
     Affine, Canvas, Clip, ComposeCx, CursorIcon, DrawCx, EventCx, KeyEvent, LayoutCx, Painter,
-    PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, UpdateCx, WindowId,
-    event::TextEvent,
+    PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, TouchEvent, TouchPropagate,
+    UpdateCx, WindowId, event::TextEvent,
 };
 
 pub trait Widget: Any {
@@ -44,6 +44,13 @@ pub trait Widget: Any {
         let _ = event;
 
         PointerPropagate::Bubble
+    }
+
+    fn on_touch_event(&mut self, cx: &mut EventCx<'_>, event: &TouchEvent) -> TouchPropagate {
+        let _ = cx;
+        let _ = event;
+
+        TouchPropagate::Bubble
     }
 
     fn on_key_event(&mut self, cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {

@@ -1,28 +1,10 @@
 use crate::{
-    Arena, BuildCx, ImeSignal, Point, Rect, Root, RootSignal, WidgetId, context::FocusUpdate,
-    root::scroll,
+    Arena, BuildCx, ImeSignal, Point, Rect, Root, RootSignal, WidgetId,
+    context::FocusUpdate,
+    root::{query, scroll},
 };
 
-/// Find the currently focused widget.
-pub(super) fn find_focused(arena: &Arena, root: WidgetId) -> Option<WidgetId> {
-    let state = arena.get_state(root.index)?;
-
-    if state.is_focused {
-        return Some(root);
-    }
-
-    for &child in &state.children {
-        let child_state = arena.get_state(child.index)?;
-
-        if child_state.has_focused {
-            return find_focused(arena, child);
-        }
-    }
-
-    None
-}
-
-pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: FocusUpdate) {
+pub fn update_focus(root: &mut Root, root_widget: WidgetId, update: FocusUpdate) {
     match update {
         FocusUpdate::None => {}
 
@@ -44,17 +26,13 @@ pub(super) fn update_focus(root: &mut Root, root_widget: WidgetId, update: Focus
     }
 }
 
-pub(super) fn focus_next(root: &mut Root, root_widget: WidgetId, forward: bool) {
+pub fn focus_next(root: &mut Root, root_widget: WidgetId, forward: bool) {
     let focused = find_next_focusable(&root.arena, root_widget, forward);
     set_focused(root, root_widget, focused);
 }
 
-pub(super) fn set_focused(
-    root: &mut Root,
-    root_widget: WidgetId,
-    target: Option<WidgetId>,
-) -> bool {
-    let current = find_focused(&root.arena, root_widget);
+pub fn set_focused(root: &mut Root, root_widget: WidgetId, target: Option<WidgetId>) -> bool {
+    let current = query::find_focused(&root.arena, root_widget);
 
     if current == target {
         return false;

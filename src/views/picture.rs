@@ -1,9 +1,8 @@
+use crate::Context;
 use ike_core::{
     BuildCx, Color, WidgetId,
     widgets::{self, Fit, Picturable},
 };
-
-use crate::Context;
 
 pub fn picture(fit: Fit, content: impl Into<Picturable>) -> Picture {
     Picture::new(fit, content)
