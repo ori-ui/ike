@@ -12,7 +12,6 @@ use crate::android::{Event, EventLoop, WindowState, context::Proxy};
 pub(super) enum ImeEvent {
     CommitText(String, usize),
     DeleteSurrounding(usize, usize),
-    DeleteSurroundingInCodePoints(usize, usize),
     SendKeyEvent { key: Key, pressed: bool },
     SetSelection(usize, usize),
 }
@@ -39,21 +38,49 @@ impl Ime {
     }
 
     pub fn set_text(&self, text: String) {
-        if let Ok(mut state) = self.state.lock() {
-            state.text = text;
-        }
+        let mut state = self.state.lock().unwrap();
+
+        state.selection.start = state.selection.start.min(text.len());
+        state.selection.end = state.selection.end.min(text.len());
+        state.text = text;
     }
 
-    pub fn set_selection(&self, selection: Range<usize>) {
-        if let Ok(mut state) = self.state.lock() {
-            state.selection = selection;
-        }
+    pub fn set_selection(&self, mut selection: Range<usize>) {
+        let mut state = self.state.lock().unwrap();
+
+        selection.start = selection.start.min(state.text.len());
+        selection.end = selection.end.min(state.text.len());
+        state.selection = selection;
     }
 
     pub fn set_composing(&self, composing: Option<Range<usize>>) {
-        if let Ok(mut state) = self.state.lock() {
-            state.composing = composing;
+        let mut state = self.state.lock().unwrap();
+
+        state.composing = composing;
+    }
+
+    pub fn index_n_chars_before(&self, n: usize) -> usize {
+        let state = self.state.lock().unwrap();
+
+        let mut index = state.selection.start;
+
+        for c in state.text[..index].chars().rev().take(n) {
+            index -= c.len_utf8();
         }
+
+        index
+    }
+
+    pub fn index_n_chars_after(&self, n: usize) -> usize {
+        let state = self.state.lock().unwrap();
+
+        let mut index = state.selection.end;
+
+        for c in state.text[index..].chars().take(n) {
+            index += c.len_utf8();
+        }
+
+        index
     }
 }
 
@@ -90,39 +117,14 @@ impl<'a, T> EventLoop<'a, T> {
                     }
 
                     if before != 0 {
-                        let start = selection.start.saturating_sub(before);
+                        let start = self.ime.index_n_chars_before(before);
                         (self.context.root).ime_select(window.id, start..selection.start);
                         self.context.root.ime_commit_text(window.id, String::new());
                     }
 
                     if after != 0 {
-                        let end = selection.end + after;
+                        let end = self.ime.index_n_chars_after(after);
                         (self.context.root).ime_select(window.id, selection.end..end);
-                        self.context.root.ime_commit_text(window.id, String::new());
-                    }
-                }
-            }
-
-            ImeEvent::DeleteSurroundingInCodePoints(before, after) => {
-                tracing::trace!(
-                    before,
-                    after,
-                    "delete surrounding in code points",
-                );
-
-                if let WindowState::Open(ref window) = self.window {
-                    let selection = self.ime.selection();
-
-                    if selection.start != selection.end {
-                        self.context.root.ime_commit_text(window.id, String::new());
-                        return;
-                    }
-
-                    let start = selection.start.saturating_sub(before);
-                    let end = selection.end + after;
-
-                    if start != end {
-                        (self.context.root).ime_select(window.id, start..end);
                         self.context.root.ime_commit_text(window.id, String::new());
                     }
                 }
@@ -441,12 +443,10 @@ unsafe extern "C" fn get_text_before_cursor<'local>(
 ) -> JString<'local> {
     tracing::trace!(n, flags, "get text before cursor");
 
-    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) }
-        && let Ok(state) = context.state.lock()
-    {
-        let start = state.selection.start.saturating_sub(n as usize);
-        let end = state.selection.start.min(state.text.len());
-        let text = &state.text[start..end];
+    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
+        let start = context.index_n_chars_before(n as usize);
+        let state = context.state.lock().unwrap();
+        let text = &state.text[start..state.selection.start];
 
         env.new_string(text)
             .unwrap_or_else(|_| JObject::null().into())
@@ -463,15 +463,10 @@ unsafe extern "C" fn get_text_after_cursor<'local>(
 ) -> JString<'local> {
     tracing::trace!(n, flags, "get text after cursor");
 
-    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) }
-        && let Ok(state) = context.state.lock()
-    {
-        let start = state.selection.end.min(state.text.len());
-        let end = usize::min(
-            state.selection.end + n as usize,
-            state.text.len(),
-        );
-        let text = &state.text[start..end];
+    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
+        let end = context.index_n_chars_after(n as usize);
+        let state = context.state.lock().unwrap();
+        let text = &state.text[state.selection.end..end];
 
         env.new_string(text)
             .unwrap_or_else(|_| JObject::null().into())
@@ -540,20 +535,12 @@ unsafe extern "C" fn delete_surrounding_text<'local>(
 }
 
 unsafe extern "C" fn delete_surrounding_in_code_points_text<'local>(
-    mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
-    before: i32,
-    after: i32,
+    _env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
+    _before: i32,
+    _after: i32,
 ) -> bool {
-    if let Ok(proxy) = unsafe { get_proxy(&mut env, &rust_view) } {
-        proxy.send(Event::Ime(
-            ImeEvent::DeleteSurroundingInCodePoints(before as usize, after as usize),
-        ));
-
-        true
-    } else {
-        false
-    }
+    false
 }
 
 unsafe extern "C" fn set_composing_text<'local>(
