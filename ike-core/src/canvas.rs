@@ -134,3 +134,104 @@ pub trait Canvas {
 
     fn draw_recording(&mut self, recording: &Recording);
 }
+
+pub struct TrackedCanvas<'a> {
+    pub canvas:     &'a mut dyn Canvas,
+    pub layers:     u32,
+    pub clips:      u32,
+    pub fills:      u32,
+    pub rects:      u32,
+    pub borders:    u32,
+    pub texts:      u32,
+    pub svgs:       u32,
+    pub recordings: u32,
+}
+
+impl<'a> TrackedCanvas<'a> {
+    pub fn new(canvas: &'a mut dyn Canvas) -> Self {
+        Self {
+            canvas,
+            layers: 0,
+            clips: 0,
+            fills: 0,
+            rects: 0,
+            borders: 0,
+            texts: 0,
+            svgs: 0,
+            recordings: 0,
+        }
+    }
+
+    fn wrap(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn Canvas),
+        g: impl FnOnce(&mut dyn Canvas, &mut dyn FnMut(&mut dyn Canvas)),
+    ) {
+        g(self.canvas, &mut |canvas| {
+            let mut tracked = TrackedCanvas::new(canvas);
+            f(&mut tracked);
+            self.layers += tracked.layers;
+            self.clips += tracked.clips;
+            self.fills += tracked.fills;
+            self.rects += tracked.rects;
+            self.borders += tracked.borders;
+            self.texts += tracked.texts;
+            self.svgs += tracked.svgs;
+            self.recordings += tracked.recordings;
+        })
+    }
+}
+
+impl Canvas for TrackedCanvas<'_> {
+    fn painter(&mut self) -> &mut dyn Painter {
+        self.canvas.painter()
+    }
+
+    fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas)) {
+        self.wrap(f, |canvas, f| {
+            canvas.transform(affine, f)
+        })
+    }
+
+    fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas)) {
+        self.wrap(f, |canvas, f| canvas.layer(f))
+    }
+
+    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording {
+        self.canvas.record(size, f)
+    }
+
+    fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas)) {
+        self.wrap(f, |canvas, f| canvas.clip(clip, f))
+    }
+
+    fn fill(&mut self, paint: &Paint) {
+        self.fills += 1;
+        self.canvas.fill(paint);
+    }
+
+    fn draw_rect(&mut self, rect: Rect, corners: CornerRadius, paint: &Paint) {
+        self.rects += 1;
+        self.canvas.draw_rect(rect, corners, paint);
+    }
+
+    fn draw_border(&mut self, rect: Rect, width: BorderWidth, radius: CornerRadius, paint: &Paint) {
+        self.borders += 1;
+        self.canvas.draw_border(rect, width, radius, paint);
+    }
+
+    fn draw_text(&mut self, paragraph: &Paragraph, max_width: f32, offset: Offset) {
+        self.texts += 1;
+        self.canvas.draw_text(paragraph, max_width, offset);
+    }
+
+    fn draw_svg(&mut self, svg: &Svg) {
+        self.svgs += 1;
+        self.canvas.draw_svg(svg);
+    }
+
+    fn draw_recording(&mut self, recording: &Recording) {
+        self.recordings += 1;
+        self.canvas.draw_recording(recording);
+    }
+}

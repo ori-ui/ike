@@ -304,6 +304,10 @@ impl Widget for Scroll {
             }
 
             PointerEvent::Move(event) if cx.is_active() => {
+                if self.knob_space() <= 0.0 {
+                    return PointerPropagate::Bubble;
+                }
+
                 let local = cx.global_transform().inverse() * event.position;
 
                 let (major, _) = self.axis.unpack_point(local);

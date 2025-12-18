@@ -92,23 +92,45 @@ impl Root {
 
             touch.state = TouchState::None;
 
-            let event = TouchEvent::Gesture(Gesture::DoubleTap(TapGesture {
+            let tap_event = TouchEvent::Gesture(Gesture::Tap(TapGesture {
                 touch: touch_id,
                 position,
             }));
 
-            handled |= send_touch_event_at(self, window_contents, position, &event);
+            let double_tap_event = TouchEvent::Gesture(Gesture::DoubleTap(TapGesture {
+                touch: touch_id,
+                position,
+            }));
+
+            handled |= send_touch_event_at(
+                self,
+                window_contents,
+                position,
+                &tap_event,
+            );
+
+            handled |= send_touch_event_at(
+                self,
+                window_contents,
+                position,
+                &double_tap_event,
+            );
         } else if touch.distance() < tap_slop && touch.duration() < tap_time {
             tracing::trace!(?touch_id, ?position, "touch tap");
 
             touch.state = TouchState::Tapped(position, Instant::now());
 
-            let event = TouchEvent::Gesture(Gesture::Tap(TapGesture {
+            let tap_event = TouchEvent::Gesture(Gesture::Tap(TapGesture {
                 touch: touch_id,
                 position,
             }));
 
-            handled |= send_touch_event_at(self, window_contents, position, &event);
+            handled |= send_touch_event_at(
+                self,
+                window_contents,
+                position,
+                &tap_event,
+            );
         }
 
         let event = TouchEvent::Up(TouchPressEvent {
@@ -150,14 +172,22 @@ impl Root {
 
             touch.state = TouchState::Panning;
 
-            let event = TouchEvent::Gesture(Gesture::Pan(PanGesture {
+            let start_position = touch.start_position;
+            let pan_evnet = TouchEvent::Gesture(Gesture::Pan(PanGesture {
                 touch: touch_id,
-                start: touch.start_position,
+                start: start_position,
                 position,
                 delta,
             }));
 
-            handled |= send_touch_event_at(self, window_contents, position, &event);
+            // NOTE: touch event is sent to the widget at the start of the pan, not the current
+            // position
+            handled |= send_touch_event_at(
+                self,
+                window_contents,
+                start_position,
+                &pan_evnet,
+            );
         }
 
         let event = TouchEvent::Move(TouchMoveEvent {

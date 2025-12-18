@@ -2,7 +2,7 @@ use std::{marker::PhantomData, mem, time::Duration};
 
 use crate::{
     Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, MutCx, Painter, RefCx, Size, Space,
-    Update, Widget, WidgetId, WidgetRef,
+    Update, Widget, WidgetId, WidgetRef, canvas::TrackedCanvas,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -64,6 +64,11 @@ where
 
     pub fn set_stashed(&mut self, is_stashed: bool) {
         self.set_stashed_without_propagate(is_stashed);
+        self.cx.propagate_state();
+    }
+
+    pub fn set_disabled(&mut self, is_disabled: bool) {
+        self.set_disabled_without_propagate(is_disabled);
         self.cx.propagate_state();
     }
 
@@ -161,7 +166,6 @@ where
             return;
         }
 
-        self.cx.state.is_stashing = is_stashed;
         self.set_stashed_recursive(is_stashed);
     }
 
@@ -184,6 +188,39 @@ where
         }
 
         self.update_without_propagate(Update::Stashed(is_stashed));
+        self.cx.update_state();
+    }
+
+    pub(crate) fn set_disabled_without_propagate(&mut self, is_disabled: bool) {
+        if self.cx.is_disabled() == is_disabled {
+            return;
+        }
+
+        if !is_disabled && self.cx.get_parent().is_some_and(|p| p.cx.is_disabled()) {
+            return;
+        }
+
+        self.set_disabled_recursive(is_disabled);
+    }
+
+    fn set_disabled_recursive(&mut self, is_disabled: bool) {
+        self.cx.for_each_child(|child| {
+            child.set_disabled_recursive(is_disabled);
+        });
+
+        self.cx.state.is_disabled = is_disabled;
+
+        if !is_disabled {
+            self.cx.state.is_focused = false;
+            self.cx.state.is_hovered = false;
+            self.cx.state.is_active = false;
+
+            self.update_without_propagate(Update::Focused(false));
+            self.update_without_propagate(Update::Hovered(false));
+            self.update_without_propagate(Update::Active(false));
+        }
+
+        self.update_without_propagate(Update::Disabled(is_disabled));
         self.cx.update_state();
     }
 
@@ -222,6 +259,7 @@ where
             && self.cx.is_pixel_perfect()
         {
             self.cx.state.needs_layout = true;
+            self.cx.state.recording = None;
         }
 
         self.update_without_propagate(update);
@@ -248,7 +286,7 @@ where
         painter: &mut dyn Painter,
         space: Space,
     ) -> Size {
-        if self.cx.state.is_stashing {
+        if self.cx.state.is_stashed {
             self.cx.state.transform = Affine::IDENTITY;
             self.cx.state.size = space.min;
             return space.min;
@@ -312,26 +350,107 @@ where
             return;
         }
 
+        self.cx.state.stable_draws += 1;
+
+        if self.cx.state.needs_draw {
+            self.cx.state.stable_draws = 0;
+        }
+
+        if let Some(ref recording) = self.cx.state.recording
+            && !self.cx.state.needs_draw
+        {
+            canvas.transform(self.cx.transform(), &mut |canvas| {
+                canvas.draw_recording(recording);
+            });
+
+            return;
+        }
+
         let _span = self.cx.enter_span();
 
+        if self.cx.state.is_recording_draw {
+            let recording = canvas.record(self.cx.size(), &mut |canvas| {
+                self.draw_update_recording_heuristic(canvas, |this, canvas| {
+                    this.draw_recursive_impl(canvas);
+                });
+            });
+
+            canvas.transform(self.cx.transform(), &mut |canvas| {
+                canvas.draw_recording(&recording);
+            });
+
+            self.cx.state.recording = Some(recording);
+        } else {
+            self.draw_update_recording_heuristic(canvas, |this, canvas| {
+                this.draw_recursive_transformed(canvas);
+            })
+        }
+    }
+
+    fn draw_update_recording_heuristic(
+        &mut self,
+        canvas: &mut dyn Canvas,
+        f: impl FnOnce(&mut Self, &mut dyn Canvas),
+    ) {
+        if self.cx.state.stable_draws < 10 {
+            self.cx.state.is_recording_draw = false;
+            self.cx.state.recording = None;
+            f(self, canvas);
+            return;
+        }
+
+        let mut tracked = TrackedCanvas::new(canvas);
+        f(self, &mut tracked);
+
+        let mut record_cost = self.cx.size().area() / 400.0;
+
+        if self.cx.state.is_recording_draw {
+            record_cost *= 0.8;
+        } else {
+            record_cost *= 1.2;
+        }
+
+        let draw_cost = tracked.layers as f32 * 16.0
+            + tracked.clips as f32 * 2.0
+            + tracked.fills as f32
+            + tracked.rects as f32
+            + tracked.borders as f32
+            + tracked.texts as f32 * 8.0
+            + tracked.svgs as f32 * 8.0
+            + tracked.recordings as f32;
+
+        let should_record = record_cost < draw_cost;
+
+        if self.cx.state.is_recording_draw != should_record {
+            tracing::trace!(
+                widget = ?self.cx.state.id,
+                record = ?should_record,
+                "draw recording changed",
+            );
+
+            self.cx.state.is_recording_draw = should_record;
+            self.cx.state.recording = None;
+        }
+    }
+
+    fn draw_recursive_transformed(&mut self, canvas: &mut dyn Canvas) {
         canvas.transform(self.cx.transform(), &mut |canvas| {
             if let Some(ref clip) = self.cx.state.clip {
                 canvas.clip(&clip.clone(), &mut |canvas| {
-                    let mut cx = self.cx.as_draw_cx();
-                    self.widget.draw(&mut cx, canvas);
-
-                    self.cx.for_each_child(|child| {
-                        child.draw_recursive(canvas);
-                    });
+                    self.draw_recursive_impl(canvas);
                 });
             } else {
-                let mut cx = self.cx.as_draw_cx();
-                self.widget.draw(&mut cx, canvas);
-
-                self.cx.for_each_child(|child| {
-                    child.draw_recursive(canvas);
-                });
+                self.draw_recursive_impl(canvas);
             }
+        });
+    }
+
+    fn draw_recursive_impl(&mut self, canvas: &mut dyn Canvas) {
+        let mut cx = self.cx.as_draw_cx();
+        self.widget.draw(&mut cx, canvas);
+
+        self.cx.for_each_child(|child| {
+            child.draw_recursive(canvas);
         });
     }
 

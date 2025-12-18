@@ -357,7 +357,7 @@ impl SkiaVulkanSurface {
             } else {
                 (
                     skia_safe::ColorType::RGBAF16Norm,
-                    skia_safe::ColorSpace::new_srgb_linear(),
+                    skia_safe::ColorSpace::new_srgb(),
                 )
             }
         } else {

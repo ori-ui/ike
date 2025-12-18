@@ -30,8 +30,8 @@ pub use curve::Curve;
 pub use event::{
     CursorIcon, Gesture, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, PanGesture,
     Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,
-    PointerPropagate, PointerScrollEvent, Propagate, ScrollDelta, TapGesture, Touch, TouchEvent,
-    TouchId, TouchMoveEvent, TouchPressEvent, TouchPropagate,
+    PointerPropagate, PointerScrollEvent, Propagate, ScrollDelta, TapGesture, TextEvent,
+    TextPasteEvent, Touch, TouchEvent, TouchId, TouchMoveEvent, TouchPressEvent, TouchPropagate,
 };
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
