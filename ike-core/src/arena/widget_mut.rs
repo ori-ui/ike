@@ -1,8 +1,9 @@
 use std::{marker::PhantomData, mem, time::Duration};
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, MutCx, Painter, RefCx, Size, Space,
-    Update, Widget, WidgetId, WidgetRef, canvas::TrackedCanvas,
+    Affine, AnyWidget, AnyWidgetId, BorderWidth, Canvas, ChildUpdate, Clip, CornerRadius, MutCx,
+    Offset, Paint, Painter, Paragraph, Recording, Rect, RefCx, Size, Space, Svg, Update, Widget,
+    WidgetId, WidgetRef,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -402,7 +403,8 @@ where
         let mut tracked = TrackedCanvas::new(canvas);
         f(self, &mut tracked);
 
-        let mut record_cost = self.cx.size().area() / 400.0;
+        let scale = self.cx.get_window().map_or(1.0, |w| w.scale());
+        let mut record_cost = self.cx.size().area() * scale * scale / 400.0;
 
         if self.cx.state.is_recording_draw {
             record_cost *= 0.8;
@@ -410,15 +412,7 @@ where
             record_cost *= 1.2;
         }
 
-        let draw_cost = tracked.layers as f32 * 16.0
-            + tracked.clips as f32 * 2.0
-            + tracked.fills as f32
-            + tracked.rects as f32
-            + tracked.borders as f32
-            + tracked.texts as f32 * 8.0
-            + tracked.svgs as f32 * 8.0
-            + tracked.recordings as f32;
-
+        let draw_cost = tracked.cost_heuristic;
         let should_record = record_cost < draw_cost;
 
         if self.cx.state.is_recording_draw != should_record {
@@ -482,5 +476,101 @@ where
                 });
             }
         });
+    }
+}
+
+/// [`Canvas`] tracking a heuristic of the cost drawing.
+struct TrackedCanvas<'a> {
+    canvas:         &'a mut dyn Canvas,
+    cost_heuristic: f32,
+}
+
+impl<'a> TrackedCanvas<'a> {
+    const TRANSFORM_COST: f32 = 0.0;
+    const LAYER_COST: f32 = 16.0;
+    const CLIP_COST: f32 = 2.0;
+    const FILL_COST: f32 = 1.0;
+    const RECT_COST: f32 = 1.0;
+    const BORDER_COST: f32 = 1.0;
+    const TEXT_COST: f32 = 8.0;
+    const SVG_COST: f32 = 8.0;
+    const RECORDING_COST: f32 = 1.0;
+
+    fn new(canvas: &'a mut dyn Canvas) -> Self {
+        Self {
+            canvas,
+            cost_heuristic: 0.0,
+        }
+    }
+
+    fn wrap(
+        &mut self,
+        f: &mut dyn FnMut(&mut dyn Canvas),
+        g: impl FnOnce(&mut dyn Canvas, &mut dyn FnMut(&mut dyn Canvas)),
+    ) {
+        g(self.canvas, &mut |canvas| {
+            let mut tracked = TrackedCanvas::new(canvas);
+            f(&mut tracked);
+            self.cost_heuristic += tracked.cost_heuristic;
+        })
+    }
+}
+
+impl Canvas for TrackedCanvas<'_> {
+    fn painter(&mut self) -> &mut dyn Painter {
+        self.canvas.painter()
+    }
+
+    fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas)) {
+        self.wrap(f, |canvas, f| {
+            canvas.transform(affine, f)
+        });
+
+        self.cost_heuristic += Self::TRANSFORM_COST;
+    }
+
+    fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas)) {
+        self.wrap(f, |canvas, f| canvas.layer(f));
+        self.cost_heuristic += Self::LAYER_COST;
+    }
+
+    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording {
+        // NOTE: we intentionally don't track the cost of the record call
+        self.canvas.record(size, f)
+    }
+
+    fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas)) {
+        self.wrap(f, |canvas, f| canvas.clip(clip, f));
+        self.cost_heuristic += Self::CLIP_COST;
+    }
+
+    fn fill(&mut self, paint: &Paint) {
+        self.canvas.fill(paint);
+        self.cost_heuristic += Self::FILL_COST;
+    }
+
+    fn draw_rect(&mut self, rect: Rect, corners: CornerRadius, paint: &Paint) {
+        self.canvas.draw_rect(rect, corners, paint);
+        self.cost_heuristic += Self::RECT_COST;
+    }
+
+    fn draw_border(&mut self, rect: Rect, width: BorderWidth, radius: CornerRadius, paint: &Paint) {
+        self.canvas.draw_border(rect, width, radius, paint);
+        self.cost_heuristic += Self::BORDER_COST;
+    }
+
+    fn draw_text(&mut self, paragraph: &Paragraph, max_width: f32, offset: Offset) {
+        self.canvas.draw_text(paragraph, max_width, offset);
+        self.cost_heuristic += Self::TEXT_COST;
+    }
+
+    fn draw_svg(&mut self, svg: &Svg) {
+        self.canvas.draw_svg(svg);
+        self.cost_heuristic += Self::SVG_COST;
+    }
+
+    fn draw_recording(&mut self, recording: &Recording) {
+        self.canvas.draw_recording(recording);
+        self.cost_heuristic += Self::RECORDING_COST;
     }
 }
