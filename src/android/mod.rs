@@ -39,7 +39,10 @@ use crate::{
 static NATIVE_ACTIVITY: AtomicPtr<ndk_sys::ANativeActivity> = AtomicPtr::new(ptr::null_mut());
 
 #[doc(hidden)]
-pub fn android_main(native_activity: *mut ffi::c_void, main: fn()) {
+pub fn android_main<T>(native_activity: *mut ffi::c_void, main: fn() -> T)
+where
+    T: std::process::Termination,
+{
     std::panic::set_hook(Box::new(|info| {
         if let Ok(message) = CString::new(info.to_string()) {
             unsafe {
@@ -66,7 +69,9 @@ pub fn android_main(native_activity: *mut ffi::c_void, main: fn()) {
         Ordering::SeqCst,
     );
 
-    std::thread::spawn(main);
+    std::thread::spawn(|| {
+        let _ = main().report();
+    });
 }
 
 pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
