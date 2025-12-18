@@ -8,8 +8,24 @@
         <activity
             android:name="org.ori.RustActivity"
             android:exported="true"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+            android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:hardwareAccelerated="true"
+            android:theme="@android:style/Theme.DeviceDefault"
+            android:configChanges="
+                orientation
+                |keyboardHidden
+                |keyboard
+                |screenSize
+                |smallestScreenSize
+                |locale
+                |layoutDirection
+                |fontScale
+                |screenLayout
+                |density
+                |uiMode
+            ">
 
             <meta-data android:name="android.app.lib_name" android:value="rust" />
 

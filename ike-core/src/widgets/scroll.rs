@@ -228,9 +228,7 @@ impl Widget for Scroll {
             self.knob_corner_radius,
             &self.knob_paint,
         );
-    }
 
-    fn draw_over(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         canvas.draw_border(
             self.bar_rect(cx.size()),
             self.bar_border_width,

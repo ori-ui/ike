@@ -74,9 +74,7 @@ impl Widget for Container {
             self.corner_radius,
             &Paint::from(self.background_color),
         );
-    }
 
-    fn draw_over(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         canvas.draw_border(
             cx.rect(),
             self.border_width,
