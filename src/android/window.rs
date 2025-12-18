@@ -59,6 +59,13 @@ impl<'a, T> EventLoop<'a, T> {
                     }
 
                     self.window = WindowState::Open(window);
+
+                    let size = Size::new(
+                        width as f32 / self.scale_factor,
+                        height as f32 / self.scale_factor,
+                    );
+
+                    self.context.root.window_scaled(id, self.scale_factor, size);
                 } else {
                     tracing::error!("android must have at least one window!");
                 }
@@ -126,7 +133,7 @@ impl<'a, T> EventLoop<'a, T> {
                         height as f32 / self.scale_factor,
                     );
 
-                    (self.context.root).window_scaled(window.id, self.scale_factor, size);
+                    self.context.root.window_resized(window.id, size);
                 }
             }
 
