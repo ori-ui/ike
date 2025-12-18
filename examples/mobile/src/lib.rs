@@ -87,10 +87,9 @@ fn todo(i: usize, todo: &Todo, is_last: bool) -> impl View<Data> + use<> {
     container(
         hstack((
             expand(
-                1.0,
                 hstack((
                     todo_done(i, todo),
-                    expand(1.0, prose(&todo.name)),
+                    expand(prose(&todo.name)),
                 ))
                 .gap(12.0),
             ),
@@ -123,7 +122,6 @@ fn todos(data: &Data) -> Option<Flex<impl View<Data> + use<>>> {
     }
 
     Some(expand(
-        1.0,
         container(max_height(
             400.0,
             vscroll(vstack(todos)).bar_border_width(0.0),
@@ -135,28 +133,25 @@ fn todos(data: &Data) -> Option<Flex<impl View<Data> + use<>>> {
 }
 
 fn filter(kind: Filter, name: &'static str) -> Flex<impl View<Data> + use<>> {
-    expand(
-        1.0,
-        using_or_default(
-            move |data: &mut Data, palette: &Palette| {
-                button(
-                    center(
-                        label(name).color(if data.filter == kind {
-                            palette.success
-                        } else {
-                            palette.contrast
-                        }),
-                    ),
-                    move |data: &mut Data| {
-                        data.filter = kind;
-                    },
-                )
-                .color(palette.surface(0))
-                .border_width([0.0, 0.0, 0.0, 1.0])
-                .corner_radius(0.0)
-            },
-        ),
-    )
+    expand(using_or_default(
+        move |data: &mut Data, palette: &Palette| {
+            button(
+                center(
+                    label(name).color(if data.filter == kind {
+                        palette.success
+                    } else {
+                        palette.contrast
+                    }),
+                ),
+                move |data: &mut Data| {
+                    data.filter = kind;
+                },
+            )
+            .color(palette.surface(0))
+            .border_width([0.0, 0.0, 0.0, 1.0])
+            .corner_radius(0.0)
+        },
+    ))
 }
 
 fn filters() -> impl View<Data> + use<> {

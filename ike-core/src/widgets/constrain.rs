@@ -24,7 +24,8 @@ impl Constrain {
     }
 
     pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        this.replace_child(0, child);
+        let child = this.replace_child(0, child);
+        this.cx.remove(child);
     }
 
     pub fn set_min_size(this: &mut WidgetMut<Self>, min_size: Size) {
@@ -59,7 +60,14 @@ impl Widget for Constrain {
         painter: &mut dyn Painter,
         mut space: Space,
     ) -> Size {
-        space.min = space.min.max(*self.min_size);
+        if self.min_size.width.is_finite() || space.max.width.is_finite() {
+            space.min.width = space.min.width.max(self.min_size.width);
+        }
+
+        if self.min_size.height.is_finite() || space.max.height.is_finite() {
+            space.min.height = space.min.height.max(self.min_size.height);
+        }
+
         space.max = space.max.min(*self.max_size);
         space.min = space.min.min(space.max);
 

@@ -120,7 +120,7 @@ impl Arena {
         if let Some(mut parent) = widget.cx.get_parent_mut()
             && let Some(index) = parent.cx.state.children.iter().position(|x| *x == id)
         {
-            parent.cx.state.children.remove(index);
+            let _ = parent.cx.state.children.remove(index);
             parent.update_without_propagate(Update::Children(ChildUpdate::Removed(
                 index,
             )));

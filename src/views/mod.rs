@@ -4,6 +4,7 @@ mod constrain;
 mod container;
 mod entry;
 mod label;
+mod pad;
 mod picture;
 mod prose;
 mod scroll;
@@ -23,6 +24,7 @@ pub use constrain::{
 pub use container::{Container, ContainerTheme, container};
 pub use entry::{Entry, EntryTheme, entry};
 pub use label::{Label, label};
+pub use pad::{Pad, pad};
 pub use picture::{Picture, picture};
 pub use prose::{Prose, ProseTheme, prose};
 pub use scroll::{Scroll, hscroll, vscroll};

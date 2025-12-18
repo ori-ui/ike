@@ -18,7 +18,8 @@ impl Aligned {
     }
 
     pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        this.replace_child(0, child);
+        let child = this.replace_child(0, child);
+        this.cx.remove(child);
     }
 
     pub fn set_alignment(this: &mut WidgetMut<Self>, x: f32, y: f32) {

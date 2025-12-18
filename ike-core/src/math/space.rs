@@ -25,18 +25,10 @@ impl Space {
             && size.height <= self.max.height
     }
 
-    pub const fn constrain(self, mut size: Size) -> Size {
-        if self.min.width.is_finite() {
-            size.width = size.width.max(self.min.width);
-        }
-
-        if self.min.height.is_finite() {
-            size.height = size.height.max(self.min.height);
-        }
-
+    pub const fn constrain(self, size: Size) -> Size {
         Size {
-            width:  size.width.min(self.max.width),
-            height: size.height.min(self.max.height),
+            width:  size.width.max(self.min.width).min(self.max.width),
+            height: size.height.max(self.min.height).min(self.max.height),
         }
     }
 }

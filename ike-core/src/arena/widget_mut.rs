@@ -106,6 +106,7 @@ where
     }
 
     /// Replace the child of a widget with another returning the previous child.
+    #[must_use = "the previous child is not destroyed, see `MutCx::remove`"]
     pub fn replace_child(&mut self, index: usize, child: impl AnyWidgetId) -> WidgetId {
         let child = child.upcast();
         self.cx.arena.debug_validate_id(child);

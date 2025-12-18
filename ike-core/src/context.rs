@@ -60,6 +60,10 @@ pub struct DrawCx<'a> {
 }
 
 impl MutCx<'_> {
+    pub fn remove(&mut self, id: impl AnyWidgetId) {
+        self.arena.remove(self.root, id.upcast());
+    }
+
     pub fn get_mut<U>(&mut self, id: WidgetId<U>) -> Option<WidgetMut<'_, U>>
     where
         U: ?Sized + AnyWidget,

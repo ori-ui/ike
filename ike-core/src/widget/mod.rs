@@ -154,7 +154,8 @@ where
     }
 }
 
-#[repr(C)] // we want to be able to cast by reference, so a stable layout is required
+// we want to be able to cast by reference, so a stable layout is required
+#[repr(C)]
 pub struct WidgetId<T: ?Sized = dyn Widget> {
     pub(crate) index:      u32,
     pub(crate) generation: u32,

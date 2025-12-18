@@ -53,7 +53,8 @@ impl Scroll {
     }
 
     pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        this.replace_child(0, child);
+        let child = this.replace_child(0, child);
+        this.cx.remove(child);
     }
 
     pub fn set_axis(this: &mut WidgetMut<Self>, axis: Axis) {

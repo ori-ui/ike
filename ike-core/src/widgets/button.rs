@@ -41,7 +41,8 @@ impl Button {
     }
 
     pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        this.replace_child(0, child);
+        let child = this.replace_child(0, child);
+        this.cx.remove(child);
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {

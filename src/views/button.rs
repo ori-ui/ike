@@ -1,6 +1,4 @@
-use ike_core::{
-    AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
-};
+use ike_core::{BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets};
 use ori::{AsyncContext, ProviderContext, Proxy};
 
 use crate::{Context, Palette, View};
@@ -192,7 +190,7 @@ where
         let proxy = cx.proxy();
         let id = ori::ViewId::next();
 
-        let mut widget = widgets::Button::new(cx, contents.upcast());
+        let mut widget = widgets::Button::new(cx, contents);
 
         let padding = self.get_padding(&theme);
         let border_width = self.get_border_width(&theme);
