@@ -42,6 +42,18 @@ pub fn height<V>(height: f32, contents: V) -> Constrain<V> {
     Constrain::new(contents).height(height)
 }
 
+pub fn fill<V>(contents: V) -> Constrain<V> {
+    Constrain::new(contents).size(Size::all(f32::INFINITY))
+}
+
+pub fn fill_width<V>(contents: V) -> Constrain<V> {
+    Constrain::new(contents).width(f32::INFINITY)
+}
+
+pub fn fill_height<V>(contents: V) -> Constrain<V> {
+    Constrain::new(contents).height(f32::INFINITY)
+}
+
 pub struct Constrain<V> {
     contents:            V,
     min_size:            Size,

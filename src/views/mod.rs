@@ -17,8 +17,8 @@ pub use aligned::{
 };
 pub use button::{Button, ButtonTheme, button};
 pub use constrain::{
-    Constrain, constrain, height, max_height, max_size, max_width, min_height, min_size, min_width,
-    size, width,
+    Constrain, constrain, fill, fill_height, fill_width, height, max_height, max_size, max_width,
+    min_height, min_size, min_width, size, width,
 };
 pub use container::{Container, ContainerTheme, container};
 pub use entry::{Entry, EntryTheme, entry};
