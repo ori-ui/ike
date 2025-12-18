@@ -176,12 +176,12 @@ fn update_children(
     }
 }
 
-pub fn flex<V>(flex: f32, contents: V) -> Flex<V> {
-    Flex::new(flex, true, contents)
+pub fn flex<V>(contents: V) -> Flex<V> {
+    Flex::new(true, contents)
 }
 
-pub fn expand<V>(flex: f32, contents: V) -> Flex<V> {
-    Flex::new(flex, false, contents)
+pub fn expand<V>(contents: V) -> Flex<V> {
+    Flex::new(false, contents)
 }
 
 #[derive(Clone, Copy)]
@@ -192,12 +192,17 @@ pub struct Flex<V> {
 }
 
 impl<V> Flex<V> {
-    pub fn new(flex: f32, tight: bool, contents: V) -> Self {
+    pub fn new(tight: bool, contents: V) -> Self {
         Self {
             contents,
-            flex,
+            flex: 1.0,
             tight,
         }
+    }
+
+    pub fn amount(mut self, amount: f32) -> Self {
+        self.flex = amount;
+        self
     }
 }
 
@@ -211,7 +216,11 @@ where
 
     fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
-        let element = Flex::new(self.flex, self.tight, element);
+        let element = Flex {
+            contents: element,
+            flex:     self.flex,
+            tight:    self.tight,
+        };
 
         (element, state)
     }
