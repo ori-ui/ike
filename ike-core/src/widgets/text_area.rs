@@ -412,12 +412,18 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             return;
         }
 
+        let font_size = self
+            .paragraph
+            .sections()
+            .next()
+            .map_or(16.0, |(_, s)| s.font_size);
+
         // there are no layout lines yet we still want to draw the cursor at the start
         let rect = Rect {
             min: Point::new(cx.rect().left(), cx.rect().top()),
             max: Point::new(
                 cx.rect().left() + 1.0,
-                cx.rect().bottom(),
+                cx.rect().top() + font_size * 1.15,
             ),
         };
 
