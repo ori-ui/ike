@@ -298,7 +298,11 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
     fn cursor_offset_in_line(cursor: usize, line: &TextLayoutLine) -> f32 {
         for glyph in &line.glyphs {
             if cursor >= glyph.start_index && cursor < glyph.end_index {
-                return glyph.bounds.left();
+                // TODO: handle ligatures better
+                let t = (cursor as f32 - glyph.start_index as f32)
+                    / (glyph.end_index as f32 - glyph.start_index as f32);
+
+                return glyph.bounds.left() * (1.0 - t) + glyph.bounds.right() * t;
             }
         }
 

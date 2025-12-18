@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::BuildHasherDefault};
+use std::{collections::HashMap, hash::BuildHasherDefault, mem};
 
 use ike_core::{
     FontStretch, FontStyle, GlyphCluster, Paint, Painter, Paragraph, Point, Rect, Shader, Size,
@@ -245,80 +245,89 @@ impl Painter for SkiaPainter {
         let skia = self.create_paragraph(paragraph, max_width);
 
         let mut lines = Vec::new();
+        let mut glyphs = Vec::new();
+        let mut prev_start = 0;
+        let mut prev_end = 0;
+
+        fn create_line(
+            metrics: &skia_safe::textlayout::LineMetrics,
+            glyphs: &mut Vec<GlyphCluster>,
+            start: usize,
+            end: usize,
+        ) -> TextLayoutLine {
+            let start_index = glyphs.first().map_or(start, |glyph| glyph.start_index);
+            let end_index = glyphs.last().map_or(end, |glyph| glyph.end_index);
+
+            let left = glyphs.first().map_or(0.0, |glyph| glyph.bounds.left());
+            let right = glyphs.last().map_or(0.0, |glyph| glyph.bounds.right());
+
+            TextLayoutLine {
+                ascent: metrics.ascent as f32,
+                descent: metrics.descent as f32,
+                left,
+                width: right - left,
+                height: metrics.height as f32,
+                baseline: metrics.baseline as f32,
+                start_index,
+                end_index,
+                glyphs: mem::take(glyphs),
+            }
+        }
 
         let metrics = skia.get_line_metrics();
 
-        for (i, metric) in metrics.iter().enumerate() {
-            let end_index = metric.end_including_newline.saturating_sub(1);
-
-            let has_newline = if paragraph.text.is_char_boundary(end_index) {
-                paragraph.text[end_index..].starts_with('\n')
-            } else {
-                false
+        for (i, c) in paragraph.text.char_indices() {
+            let Some(glyph) = skia.get_glyph_cluster_at(i) else {
+                continue;
             };
 
-            let is_last = i == metrics.len() - 1;
+            let bounds = Rect::min_size(
+                Point::new(glyph.bounds.x(), glyph.bounds.y()),
+                Size::new(
+                    glyph.bounds.width(),
+                    glyph.bounds.height(),
+                ),
+            );
 
-            let (start_index, end_index) = if has_newline {
-                if is_last {
-                    (
-                        metric.start_index + 1,
-                        metric.end_including_newline,
-                    )
-                } else {
-                    (metric.start_index, end_index)
-                }
-            } else {
-                (
-                    metric.start_index,
-                    metric.end_including_newline,
-                )
+            let direction = match glyph.position {
+                skia_safe::textlayout::TextDirection::LTR => TextDirection::Ltr,
+                skia_safe::textlayout::TextDirection::RTL => TextDirection::Rtl,
             };
 
-            let mut line = TextLayoutLine {
-                ascent: metric.ascent as f32,
-                descent: metric.descent as f32,
-                left: metric.left as f32,
-                width: metric.width as f32,
-                height: metric.height as f32,
-                baseline: metric.baseline as f32,
-                start_index,
-                end_index,
-                glyphs: Vec::new(),
+            let glyph = GlyphCluster {
+                bounds,
+                start_index: glyph.text_range.start,
+                end_index: glyph.text_range.end,
+                direction,
             };
 
-            for i in metric.start_index..metric.end_index {
-                let Some(glyph) = skia.get_glyph_cluster_at(i) else {
-                    continue;
-                };
-
-                if paragraph.text[glyph.text_range.clone()] == *"\n" {
-                    continue;
-                }
-
-                // skia doesn't count trailing spaces in the line width
-                line.width = line.width.max(glyph.bounds.right);
-
-                let bounds = Rect {
-                    min: Point::new(glyph.bounds.left, glyph.bounds.top),
-                    max: Point::new(glyph.bounds.right, glyph.bounds.bottom),
-                };
-
-                let direction = match glyph.position {
-                    skia_safe::textlayout::TextDirection::RTL => TextDirection::Rtl,
-                    skia_safe::textlayout::TextDirection::LTR => TextDirection::Ltr,
-                };
-
-                line.glyphs.push(GlyphCluster {
-                    bounds,
-                    start_index: glyph.text_range.start,
-                    end_index: glyph.text_range.end,
-                    direction,
-                });
+            if c == '\n' || skia.get_line_number_at(i) != Some(lines.len()) {
+                lines.push(create_line(
+                    &metrics[lines.len()],
+                    &mut glyphs,
+                    prev_start,
+                    prev_end,
+                ));
             }
 
-            lines.push(line);
+            prev_start = glyph.start_index;
+            prev_end = glyph.end_index;
+
+            if c != '\n' {
+                glyphs.push(glyph);
+            }
         }
+
+        if lines.len() < metrics.len() {
+            lines.push(create_line(
+                &metrics[lines.len()],
+                &mut glyphs,
+                prev_start,
+                prev_end,
+            ));
+        }
+
+        assert_eq!(lines.len(), metrics.len());
 
         lines
     }
