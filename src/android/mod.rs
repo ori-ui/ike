@@ -4,7 +4,10 @@ use std::{
     fmt,
     pin::Pin,
     ptr::{self, NonNull},
-    sync::{OnceLock, mpsc::Receiver},
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        mpsc::Receiver,
+    },
     time::Instant,
 };
 
@@ -33,13 +36,7 @@ use crate::{
     app::{AnyEffect, UiBuilder},
 };
 
-static NATIVE_ACTIVITY: OnceLock<NativeActivity> = OnceLock::new();
-
-#[derive(Clone, Copy)]
-struct NativeActivity(NonNull<ndk_sys::ANativeActivity>);
-
-unsafe impl Send for NativeActivity {}
-unsafe impl Sync for NativeActivity {}
+static NATIVE_ACTIVITY: AtomicPtr<ndk_sys::ANativeActivity> = AtomicPtr::new(ptr::null_mut());
 
 #[doc(hidden)]
 pub fn android_main(native_activity: *mut ffi::c_void, main: fn()) {
@@ -64,17 +61,19 @@ pub fn android_main(native_activity: *mut ffi::c_void, main: fn()) {
         callbacks::register_callbacks(native_activity.as_mut());
     }
 
-    let _ = NATIVE_ACTIVITY.set(NativeActivity(native_activity.cast()));
+    NATIVE_ACTIVITY.store(
+        native_activity.as_ptr(),
+        Ordering::SeqCst,
+    );
 
     std::thread::spawn(main);
 }
 
 pub fn run<T>(data: &mut T, build: UiBuilder<T>) {
-    let native_activity = *NATIVE_ACTIVITY
-        .get()
+    let native_activity = NonNull::new(NATIVE_ACTIVITY.load(Ordering::SeqCst))
         .expect("native activity should be set");
 
-    let mut event_loop = EventLoop::new(native_activity.0, data, build);
+    let mut event_loop = EventLoop::new(native_activity, data, build);
     event_loop.run();
 }
 
@@ -259,6 +258,8 @@ impl<'a, T> EventLoop<'a, T> {
     }
 
     fn handle_event(&mut self, event: Event) {
+        tracing::trace!(?event, "android event");
+
         match event {
             Event::Resumed => {}
 

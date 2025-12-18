@@ -564,7 +564,7 @@ unsafe extern "C" fn set_composing_text<'local>(
 ) -> bool {
     tracing::info!("set composing text");
 
-    true
+    false
 }
 
 unsafe extern "C" fn send_key_event<'local>(
