@@ -145,9 +145,9 @@ impl<V> Scroll<V> {
             .unwrap_or_else(|| theme.bar_border_color.unwrap_or(palette.outline))
     }
 
-    fn get_bar_paint(&self, theme: &ScrollTheme, palette: &Palette) -> Color {
+    fn get_bar_paint(&self, theme: &ScrollTheme, _palette: &Palette) -> Color {
         self.bar_color
-            .unwrap_or_else(|| theme.bar_color.unwrap_or(palette.surface))
+            .unwrap_or_else(|| theme.bar_color.unwrap_or(Color::TRANSPARENT))
     }
 
     fn get_knob_paint(&self, theme: &ScrollTheme, palette: &Palette) -> Color {
