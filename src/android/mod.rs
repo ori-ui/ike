@@ -70,7 +70,13 @@ where
     );
 
     std::thread::spawn(move || {
-        let _ = main().report();
+        let exit_code = main().report();
+
+        if exit_code == std::process::ExitCode::SUCCESS {
+            std::process::exit(0);
+        } else {
+            std::process::exit(1);
+        }
     });
 }
 
