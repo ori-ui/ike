@@ -1,4 +1,5 @@
 mod init;
+mod run;
 
 use clap::Parser;
 
@@ -26,6 +27,7 @@ impl Args {
     fn run(self) -> eyre::Result<()> {
         match self.command {
             Command::Init(init) => init.run(),
+            Command::Run(run) => run.run(),
         }
     }
 }
@@ -34,4 +36,8 @@ impl Args {
 enum Command {
     /// Initialize a project.
     Init(init::Command),
+
+    /// Run a project.
+    #[clap(visible_alias = "r")]
+    Run(run::Command),
 }
