@@ -117,7 +117,7 @@ impl ori::ProviderContext for Context {
 }
 
 impl ori::Proxy for Proxy {
-    fn clone(&self) -> Arc<dyn ori::Proxy> {
+    fn cloned(&self) -> Arc<dyn ori::Proxy> {
         Arc::new(Clone::clone(self))
     }
 
