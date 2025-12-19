@@ -180,7 +180,7 @@ impl Prose {
             paint: Paint::from(self.color.unwrap_or_else(|| {
                 text_area_theme
                     .color
-                    .unwrap_or_else(|| text_theme.color.unwrap_or(palette.contrast_low(0)))
+                    .unwrap_or_else(|| text_theme.color.unwrap_or(palette.contrast))
             })),
         };
 
