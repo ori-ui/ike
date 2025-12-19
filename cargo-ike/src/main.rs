@@ -1,14 +1,25 @@
 mod init;
 mod run;
 
+use std::process::ExitCode;
+
 use clap::Parser;
 
-fn main() -> eyre::Result<()> {
-    color_eyre::install()?;
+fn main() -> ExitCode {
+    let _ = color_eyre::config::HookBuilder::new()
+        .display_env_section(false)
+        .display_location_section(false)
+        .install();
 
     let Ike::Ike(args) = Ike::parse();
 
-    args.run()
+    if let Err(err) = args.run() {
+        eprintln!("{err}");
+
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 #[derive(Parser)]
