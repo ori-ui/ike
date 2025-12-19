@@ -62,7 +62,7 @@ pub fn find_widget_at(arena: &Arena, root_widget: WidgetId, point: Point) -> Opt
         return None;
     }
 
-    for &child in &state.children {
+    for &child in state.children.iter().rev() {
         if let Some(id) = find_widget_at(arena, child, point) {
             return Some(id);
         }
