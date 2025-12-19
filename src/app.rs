@@ -15,7 +15,7 @@ impl App {
         Self {}
     }
 
-    pub fn init_log() {
+    pub fn install_log() {
         let mut filter = EnvFilter::default();
 
         if cfg!(debug_assertions) {
@@ -50,7 +50,7 @@ impl App {
         V: Effect<T> + 'static,
         V::State: 'static,
     {
-        Self::init_log();
+        Self::install_log();
 
         let build: UiBuilder<T> = Box::new(move |data| Box::new(ui(data)));
 
