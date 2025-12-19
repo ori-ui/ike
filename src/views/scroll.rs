@@ -31,7 +31,7 @@ impl Default for ScrollTheme {
         Self {
             bar_width:          16.0,
             bar_padding:        Padding::all(5.0),
-            bar_border_width:   BorderWidth::all(1.0),
+            bar_border_width:   BorderWidth::all(0.0),
             bar_corner_radius:  CornerRadius::all(0.0),
             knob_corner_radius: CornerRadius::all(3.0),
             transition:         Transition::ease(0.1),
