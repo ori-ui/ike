@@ -309,6 +309,15 @@ where
 
         if self.cx.is_pixel_perfect() {
             size = size.ceil_to_scale(scale);
+
+            // make sure we don't exceed maximum width
+            if size.width > space.max.width {
+                size.width -= scale.recip();
+            }
+
+            if size.height > space.max.height {
+                size.height -= scale.recip();
+            }
         }
 
         if !size.is_finite() {
