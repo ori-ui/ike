@@ -53,6 +53,8 @@ where
                 );
             }
         }
+
+        std::process::abort();
     }));
 
     tracing::debug!("app starting");
