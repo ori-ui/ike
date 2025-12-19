@@ -205,7 +205,7 @@ impl Widget for Button {
 
     fn on_key_event(&mut self, _cx: &mut EventCx<'_>, event: &KeyEvent) -> Propagate {
         match event {
-            KeyEvent::Up(event)
+            KeyEvent::Down(event)
                 if matches!(event.key, Key::Character(ref c) if c == " ")
                     || event.key == Key::Named(NamedKey::Enter) =>
             {
