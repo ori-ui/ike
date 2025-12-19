@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     io::{self, Write},
     process::{self, Stdio},
 };
@@ -66,7 +67,19 @@ impl Android {
             );
         }
 
-        let install_output = process::Command::new("gradle")
+        let gradlew_path = if cfg!(target_os = "windows") {
+            android_dir.join("gradlew.bat")
+        } else {
+            android_dir.join("gradlew")
+        };
+
+        let gradle = if gradlew_path.exists() {
+            gradlew_path.as_os_str().to_owned()
+        } else {
+            OsString::from("gradle")
+        };
+
+        let install_output = process::Command::new(&gradle)
             .current_dir(android_dir)
             .arg("installDebug")
             .stderr(Stdio::inherit())
@@ -79,12 +92,25 @@ impl Android {
             eyre::bail!("gradle build failed");
         }
 
-        process::Command::new("adb")
+        let adb_output = process::Command::new(&gradle)
+            .arg("getAdbExe")
+            .arg("--quiet")
+            .output();
+
+        let adb = if let Ok(output) = adb_output
+            && output.status.success()
+        {
+            String::from_utf8_lossy(&output.stdout).into()
+        } else {
+            String::from("adb")
+        };
+
+        process::Command::new(&adb)
             .arg("logcat")
             .arg("-c")
             .output()?;
 
-        let start_output = process::Command::new("adb")
+        let start_output = process::Command::new(&adb)
             .arg("shell")
             .arg("am")
             .arg("start-activity")
@@ -98,7 +124,7 @@ impl Android {
             eyre::bail!("starting app failed");
         }
 
-        let pid_output = process::Command::new("adb")
+        let pid_output = process::Command::new(&adb)
             .arg("shell")
             .arg("pidof")
             .arg("-s")
@@ -112,7 +138,7 @@ impl Android {
 
         let pid = String::from_utf8_lossy(&pid_output.stdout);
 
-        process::Command::new("adb")
+        process::Command::new(&adb)
             .arg("logcat")
             .arg("-s")
             .arg("rust")
