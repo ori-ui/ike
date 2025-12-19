@@ -625,7 +625,8 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                     _ if matches!(event.text, Some(ref text) if !text.chars().any(|c| c.is_ascii_control()))
                         && EDITABLE =>
                     {
-                        self.insert_text(event.text.as_ref().unwrap());
+                        let text = event.text.as_ref().expect("checked by condition");
+                        self.insert_text(text);
 
                         self.text_changed(cx);
                         self.set_selection_event(cx);

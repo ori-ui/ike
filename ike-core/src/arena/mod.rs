@@ -333,7 +333,7 @@ mod tests {
         let a = arena.insert(&mut root.state, TestWidget(0.0)).id();
         let b = arena.insert(&mut root.state, TestWidget(1.0)).id();
 
-        let mut widget_mut = arena.get_mut(&mut root.state, a).unwrap();
+        let mut widget_mut = arena.get_mut(&mut root.state, a).expect("inserted");
 
         // getting a widget while it's borrowed mutable is not possible
         assert!(widget_mut.cx.get(a).is_none());

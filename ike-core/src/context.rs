@@ -291,8 +291,12 @@ impl EventCx<'_> {
 impl LayoutCx<'_> {
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
         let child = self.state.children[index];
-        let mut child = self.arena.get_mut(self.root, child).unwrap();
-        child.set_stashed_without_propagate(is_stashed);
+
+        if let Some(mut child) = self.arena.get_mut(self.root, child) {
+            child.set_stashed_without_propagate(is_stashed);
+        } else {
+            tracing::error!("`LayoutCx::set_child_stashed` called on invalid child");
+        }
     }
 
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
@@ -301,7 +305,7 @@ impl LayoutCx<'_> {
         {
             child.layout_recursive(self.scale, painter, space)
         } else {
-            tracing::error!("`LayoutCx::layout_child` called on widget that doesn't exist");
+            tracing::error!("`LayoutCx::layout_child` called on invalid child");
 
             Size::ZERO
         }
@@ -322,7 +326,7 @@ impl LayoutCx<'_> {
                 state.needs_compose = true;
             }
         } else {
-            tracing::error!("`LayoutCx::place_child` called on widget that doesn't exist");
+            tracing::error!("`LayoutCx::place_child` called on invalid child");
         }
     }
 
@@ -354,7 +358,7 @@ impl ComposeCx<'_> {
 
             state.transform = transform;
         } else {
-            tracing::error!("`ComposeCx::place_child` called on widget that doesn't exist");
+            tracing::error!("`ComposeCx::place_child` called on invalid child");
         }
     }
 }
@@ -408,9 +412,9 @@ impl_contexts! {
             &self.state.children
         }
 
-        pub fn iter_children(&self) -> impl ExactSizeIterator<Item = WidgetRef<'_>> {
-            self.state.children.iter().map(|child| {
-                self.arena.get(self.root, *child).unwrap()
+        pub fn iter_children(&self) -> impl DoubleEndedIterator<Item = WidgetRef<'_>> {
+            self.state.children.iter().filter_map(|child| {
+                self.arena.get(self.root, *child)
             })
         }
 

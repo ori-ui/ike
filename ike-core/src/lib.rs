@@ -1,3 +1,5 @@
+#![warn(clippy::unwrap_used)]
+
 mod arena;
 mod axis;
 mod border;

@@ -82,7 +82,8 @@ impl Widget for Stack {
             min_minor = max_minor;
         }
 
-        let total_gap = self.gap * cx.iter_children().len().saturating_sub(1) as f32;
+        let child_count = cx.children().len();
+        let total_gap = self.gap * child_count.saturating_sub(1) as f32;
 
         let mut flex_sum = 0.0;
         let mut major_sum = total_gap;
@@ -161,12 +162,11 @@ impl Widget for Stack {
 
         let excess_major = major - major_sum + total_gap;
 
-        let count = cx.iter_children().len();
         let gap = match self.justify {
             Justify::Start | Justify::Center | Justify::End => self.gap,
-            Justify::SpaceBetween => excess_major / (count.saturating_sub(1)) as f32,
-            Justify::SpaceAround => excess_major / count as f32,
-            Justify::SpaceEvenly => excess_major / (count + 1) as f32,
+            Justify::SpaceBetween => excess_major / (child_count.saturating_sub(1)) as f32,
+            Justify::SpaceAround => excess_major / child_count as f32,
+            Justify::SpaceEvenly => excess_major / (child_count + 1) as f32,
         };
 
         let mut justify = match self.justify {
@@ -177,7 +177,7 @@ impl Widget for Stack {
             Justify::SpaceEvenly => gap,
         };
 
-        for i in 0..count {
+        for i in 0..child_count {
             let size = cx.child_size(i);
             let (child_major, child_minor) = self.axis.unpack_size(size);
 

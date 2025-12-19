@@ -29,8 +29,9 @@ impl Color {
         Self::rgba(r, g, b, 1.0)
     }
 
+    #[track_caller]
     pub const fn hex(hex: &str) -> Self {
-        Self::try_hex(hex).unwrap()
+        Self::try_hex(hex).expect("hex string should have valid format")
     }
 
     /// Try to parse a color from a hex string.
