@@ -274,7 +274,10 @@ impl SkiaVulkanSurface {
         } else if surface_formats.contains(&Self::SDR_FORMAT) {
             Self::SDR_FORMAT
         } else {
-            panic!("could not find appropriate surface format");
+            panic!(
+                "could not find appropriate surface format, \
+                available formats are:\n{surface_formats:#?}"
+            );
         };
 
         let composite_alpha = if capabilities
