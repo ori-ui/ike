@@ -177,8 +177,13 @@ impl Drop for SkiaVulkanSurface {
 }
 
 impl SkiaVulkanSurface {
-    const SDR_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format:      vk::Format::R8G8B8A8_UNORM,
+    const SDR_BGRA_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+        format:      vk::Format::B8G8R8_SRGB,
+        color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
+    };
+
+    const SDR_RGBA_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+        format:      vk::Format::R8G8B8A8_SRGB,
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
     };
 
@@ -271,8 +276,10 @@ impl SkiaVulkanSurface {
 
         let surface_format = if surface_formats.contains(&Self::HDR_FORMAT) {
             Self::HDR_FORMAT
-        } else if surface_formats.contains(&Self::SDR_FORMAT) {
-            Self::SDR_FORMAT
+        } else if surface_formats.contains(&Self::SDR_BGRA_FORMAT) {
+            Self::SDR_BGRA_FORMAT
+        } else if surface_formats.contains(&Self::SDR_RGBA_FORMAT) {
+            Self::SDR_RGBA_FORMAT
         } else {
             panic!(
                 "could not find appropriate surface format, \
@@ -363,6 +370,11 @@ impl SkiaVulkanSurface {
                     skia_safe::ColorSpace::new_srgb(),
                 )
             }
+        } else if self.surface_format == Self::SDR_BGRA_FORMAT {
+            (
+                skia_safe::ColorType::BGRA8888,
+                skia_safe::ColorSpace::new_srgb(),
+            )
         } else {
             (
                 skia_safe::ColorType::RGBA8888,
