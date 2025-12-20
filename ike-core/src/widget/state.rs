@@ -1,4 +1,4 @@
-use crate::{Affine, Clip, CursorIcon, Recording, Size, Space, Widget, WidgetId, WindowId};
+use crate::{Affine, Clip, CursorIcon, Size, Space, Widget, WidgetId, WindowId};
 
 #[derive(Debug)]
 pub struct WidgetState {
@@ -12,11 +12,9 @@ pub struct WidgetState {
     pub(crate) cursor:           CursorIcon,
     pub(crate) window:           Option<WindowId>,
 
-    pub(crate) is_pixel_perfect:  bool,
-    pub(crate) is_recording_draw: bool,
-    pub(crate) stable_draws:      u32,
-    pub(crate) clip:              Option<Clip>,
-    pub(crate) recording:         Option<Recording>,
+    pub(crate) is_pixel_perfect: bool,
+    pub(crate) stable_draws:     u32,
+    pub(crate) clip:             Option<Clip>,
 
     pub(crate) is_hovered:  bool,
     pub(crate) has_hovered: bool,
@@ -61,11 +59,9 @@ impl WidgetState {
             cursor:           CursorIcon::Default,
             window:           None,
 
-            is_pixel_perfect:  true,
-            is_recording_draw: false,
-            stable_draws:      0,
-            clip:              None,
-            recording:         None,
+            is_pixel_perfect: true,
+            stable_draws:     0,
+            clip:             None,
 
             is_hovered:  false,
             has_hovered: false,

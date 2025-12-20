@@ -384,10 +384,6 @@ impl_contexts! {
             self.state.is_pixel_perfect
         }
 
-        pub fn is_recording_draw(&self) -> bool {
-            self.state.is_recording_draw
-        }
-
         pub fn is_hovered(&self) -> bool {
             self.state.is_hovered
         }

@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    cmp::Ordering,
     fmt,
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -177,6 +178,24 @@ impl<T: ?Sized, U: ?Sized> PartialEq<WidgetId<U>> for WidgetId<T> {
 }
 
 impl<T: ?Sized> Eq for WidgetId<T> {}
+
+impl<T: ?Sized, U: ?Sized> PartialOrd<WidgetId<U>> for WidgetId<T> {
+    fn partial_cmp(&self, other: &WidgetId<U>) -> Option<Ordering> {
+        Some(
+            self.index
+                .cmp(&other.index)
+                .then(self.generation.cmp(&other.generation)),
+        )
+    }
+}
+
+impl<T: ?Sized> Ord for WidgetId<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.index
+            .cmp(&other.index)
+            .then(self.generation.cmp(&other.generation))
+    }
+}
 
 impl<T: ?Sized> Hash for WidgetId<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {

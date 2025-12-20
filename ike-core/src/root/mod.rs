@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Size, Update, WidgetId, Window, WindowId,
-    WindowSizing, event::TouchSettings,
+    Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Recorder, Size, Update, WidgetId, Window,
+    WindowId, WindowSizing, event::TouchSettings,
 };
 
 mod focus;
@@ -35,6 +35,7 @@ pub struct RootState {
     pub(crate) sink:           Box<dyn Fn(RootSignal)>,
     pub(crate) trace:          bool,
     pub(crate) touch_settings: TouchSettings,
+    pub(crate) recorder:       Recorder,
 }
 
 impl RootState {
@@ -147,6 +148,7 @@ impl Root {
                 sink:           Box::new(sink),
                 trace:          false,
                 touch_settings: TouchSettings::default(),
+                recorder:       Recorder::new(),
             },
         }
     }
@@ -327,10 +329,17 @@ impl Root {
             }
 
             {
+                let _span = tracing::info_span!("record");
+                widget.record_recursive(canvas);
+            }
+
+            {
                 let _span = tracing::info_span!("draw_over");
                 widget.draw_over_recursive(canvas);
             }
         }
+
+        self.state.recorder.frame();
 
         matches!(sizing, WindowSizing::FitContent)
             .then_some(new_window_size)

@@ -1,9 +1,8 @@
 use std::{marker::PhantomData, mem, time::Duration};
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, BorderWidth, Canvas, ChildUpdate, Clip, CornerRadius, MutCx,
-    Offset, Paint, Painter, Paragraph, Recording, Rect, RefCx, Size, Space, Svg, Update, Widget,
-    WidgetId, WidgetRef,
+    Affine, AnyWidget, AnyWidgetId, Canvas, ChildUpdate, MutCx, Painter, RefCx, Size, Space,
+    Update, Widget, WidgetId, WidgetRef,
 };
 
 pub struct WidgetMut<'a, T = dyn Widget>
@@ -261,7 +260,7 @@ where
             && self.cx.is_pixel_perfect()
         {
             self.cx.state.needs_layout = true;
-            self.cx.state.recording = None;
+            self.cx.state.needs_draw = true;
         }
 
         self.update_without_propagate(update);
@@ -360,132 +359,93 @@ where
         self.cx.update_state();
     }
 
-    pub(crate) fn draw_recursive(&mut self, canvas: &mut dyn Canvas) -> bool {
+    pub(crate) fn draw_recursive(&mut self, canvas: &mut dyn Canvas) {
         if self.cx.is_stashed() {
-            return false;
+            return;
         }
 
         self.cx.state.stable_draws += 1;
 
         if self.cx.state.needs_draw {
             self.cx.state.stable_draws = 0;
+            self.cx.root.recorder.remove(self.cx.id());
         }
 
-        if let Some(ref recording) = self.cx.state.recording
-            && !self.cx.state.needs_draw
-        {
-            canvas.transform(self.cx.transform(), &mut |canvas| {
-                canvas.draw_recording(recording);
-            });
-
-            return false;
-        }
-
-        let _span = self.cx.enter_span();
-
-        if self.cx.state.is_recording_draw {
-            let mut did_update_recording = false;
-
-            let recording = canvas.record(self.cx.size(), &mut |canvas| {
-                did_update_recording |= self
-                    .draw_update_recording_heuristic(canvas, |this, canvas| {
-                        this.draw_recursive_impl(canvas)
-                    });
-            });
-
+        if let Some(recording) = self.cx.root.recorder.get_marked(self.cx.id()) {
             canvas.transform(self.cx.transform(), &mut |canvas| {
                 canvas.draw_recording(&recording);
             });
-
-            self.cx.state.recording = Some(recording);
-
-            did_update_recording
         } else {
-            self.draw_update_recording_heuristic(canvas, |this, canvas| {
-                this.draw_recursive_transformed(canvas)
-            })
+            let _span = self.cx.enter_span();
+            self.draw_recursive_transformed(canvas);
         }
     }
 
-    fn draw_update_recording_heuristic(
-        &mut self,
-        canvas: &mut dyn Canvas,
-        f: impl FnOnce(&mut Self, &mut dyn Canvas) -> bool,
-    ) -> bool {
-        // return early if unstable, no need to track the draw
-        if self.cx.state.stable_draws < 3 || self.cx.size().area() < 256.0 {
-            self.cx.state.is_recording_draw = false;
-            self.cx.state.recording = None;
-            return f(self, canvas);
-        }
-
-        let mut tracked = TrackedCanvas::new(canvas);
-        let did_update_recording = f(self, &mut tracked);
-
-        // a descendant updated its recording state, this will
-        // effect our cost evaluation
-        if did_update_recording {
-            return false;
-        }
-
-        let mut cost = tracked.cost_heuristic;
-        cost += self.cx.size().area().sqrt();
-        cost += f32::min(
-            self.cx.state.stable_draws as f32 / 8.0,
-            1.0,
-        );
-
-        if self.cx.state.is_recording_draw {
-            cost *= 0.8;
-        }
-
-        let should_record = cost > 100.0;
-
-        if self.cx.state.is_recording_draw != should_record {
-            tracing::trace!(
-                widget = ?self.cx.state.id,
-                cost,
-                size = ?self.cx.size(),
-                record = ?should_record,
-                "draw recording changed",
-            );
-
-            self.cx.state.is_recording_draw = should_record;
-            self.cx.state.recording = None;
-
-            true
-        } else {
-            false
-        }
-    }
-
-    fn draw_recursive_transformed(&mut self, canvas: &mut dyn Canvas) -> bool {
-        let mut did_update_recording = false;
-
+    fn draw_recursive_transformed(&mut self, canvas: &mut dyn Canvas) {
         canvas.transform(self.cx.transform(), &mut |canvas| {
-            if let Some(ref clip) = self.cx.state.clip {
-                canvas.clip(&clip.clone(), &mut |canvas| {
-                    did_update_recording |= self.draw_recursive_impl(canvas);
-                });
-            } else {
-                did_update_recording |= self.draw_recursive_impl(canvas);
-            }
+            self.draw_recursive_clipped(canvas);
         });
-
-        did_update_recording
     }
 
-    fn draw_recursive_impl(&mut self, canvas: &mut dyn Canvas) -> bool {
+    fn draw_recursive_clipped(&mut self, canvas: &mut dyn Canvas) {
+        if let Some(ref clip) = self.cx.state.clip {
+            canvas.clip(&clip.clone(), &mut |canvas| {
+                self.draw_recursive_raw(canvas);
+            });
+        } else {
+            self.draw_recursive_raw(canvas);
+        }
+    }
+
+    fn draw_recursive_raw(&mut self, canvas: &mut dyn Canvas) {
         let mut cx = self.cx.as_draw_cx();
         self.widget.draw(&mut cx, canvas);
 
-        let mut did_update_recording = false;
+        self.cx.for_each_child(|child| {
+            child.draw_recursive(canvas);
+        });
+    }
+
+    pub(crate) fn record_recursive(&mut self, canvas: &mut dyn Canvas) {
+        if self.cx.root.recorder.contains(self.cx.id()) {
+            return;
+        }
+
+        let scale = self.cx.get_window().map_or(1.0, |x| x.scale);
+        let draw_cost = (self.cx.size().area() * scale * scale).sqrt()
+            + f32::min(
+                self.cx.state.stable_draws as f32 / 8.0,
+                1.0,
+            );
+
+        let memory_estimate = (self.cx.size().area() * scale * scale * 4.0) as u64;
+        let total_memory_estimate = self.cx.root.recorder.memory_usage() + memory_estimate;
+
+        if draw_cost >= self.cx.root.recorder.cost_threshold
+            && self.cx.state.stable_draws >= 3
+            && self.cx.size().area() > 256.0
+            && total_memory_estimate < self.cx.root.recorder.max_memory_usage
+        {
+            tracing::trace!(
+                widget = ?self.cx.id(),
+                cost = draw_cost,
+                "recording",
+            );
+
+            let recording = canvas.record(self.cx.size(), &mut |canvas| {
+                self.draw_recursive_clipped(canvas);
+            });
+
+            (self.cx.root.recorder).insert(self.cx.id(), draw_cost, recording);
+
+            return;
+        }
+
+        self.cx.root.recorder.remove(self.cx.id());
 
         self.cx.for_each_child(|child| {
-            did_update_recording |= child.draw_recursive(canvas);
+            child.record_recursive(canvas);
         });
-
-        did_update_recording
     }
 
     pub(crate) fn draw_over_recursive(&mut self, canvas: &mut dyn Canvas) {
@@ -516,101 +476,5 @@ where
                 });
             }
         });
-    }
-}
-
-/// [`Canvas`] tracking a heuristic of the cost drawing.
-struct TrackedCanvas<'a> {
-    canvas:         &'a mut dyn Canvas,
-    cost_heuristic: f32,
-}
-
-impl<'a> TrackedCanvas<'a> {
-    const TRANSFORM_COST: f32 = 0.0;
-    const LAYER_COST: f32 = 5.0;
-    const CLIP_COST: f32 = 2.0;
-    const FILL_COST: f32 = 1.0;
-    const RECT_COST: f32 = 2.0;
-    const BORDER_COST: f32 = 1.0;
-    const TEXT_COST: f32 = 3.0;
-    const SVG_COST: f32 = 4.0;
-    const RECORDING_COST: f32 = 1.0;
-
-    fn new(canvas: &'a mut dyn Canvas) -> Self {
-        Self {
-            canvas,
-            cost_heuristic: 0.0,
-        }
-    }
-
-    fn wrap(
-        &mut self,
-        f: &mut dyn FnMut(&mut dyn Canvas),
-        g: impl FnOnce(&mut dyn Canvas, &mut dyn FnMut(&mut dyn Canvas)),
-    ) {
-        g(self.canvas, &mut |canvas| {
-            let mut tracked = TrackedCanvas::new(canvas);
-            f(&mut tracked);
-            self.cost_heuristic += tracked.cost_heuristic;
-        })
-    }
-}
-
-impl Canvas for TrackedCanvas<'_> {
-    fn painter(&mut self) -> &mut dyn Painter {
-        self.canvas.painter()
-    }
-
-    fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas)) {
-        self.wrap(f, |canvas, f| {
-            canvas.transform(affine, f)
-        });
-
-        self.cost_heuristic += Self::TRANSFORM_COST;
-    }
-
-    fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas)) {
-        self.wrap(f, |canvas, f| canvas.layer(f));
-        self.cost_heuristic += Self::LAYER_COST;
-    }
-
-    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording {
-        // NOTE: we intentionally don't track the cost of the record call
-        self.canvas.record(size, f)
-    }
-
-    fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas)) {
-        self.wrap(f, |canvas, f| canvas.clip(clip, f));
-        self.cost_heuristic += Self::CLIP_COST;
-    }
-
-    fn fill(&mut self, paint: &Paint) {
-        self.canvas.fill(paint);
-        self.cost_heuristic += Self::FILL_COST;
-    }
-
-    fn draw_rect(&mut self, rect: Rect, corners: CornerRadius, paint: &Paint) {
-        self.canvas.draw_rect(rect, corners, paint);
-        self.cost_heuristic += Self::RECT_COST;
-    }
-
-    fn draw_border(&mut self, rect: Rect, width: BorderWidth, radius: CornerRadius, paint: &Paint) {
-        self.canvas.draw_border(rect, width, radius, paint);
-        self.cost_heuristic += Self::BORDER_COST;
-    }
-
-    fn draw_text(&mut self, paragraph: &Paragraph, max_width: f32, offset: Offset) {
-        self.canvas.draw_text(paragraph, max_width, offset);
-        self.cost_heuristic += Self::TEXT_COST;
-    }
-
-    fn draw_svg(&mut self, svg: &Svg) {
-        self.canvas.draw_svg(svg);
-        self.cost_heuristic += Self::SVG_COST;
-    }
-
-    fn draw_recording(&mut self, recording: &Recording) {
-        self.canvas.draw_recording(recording);
-        self.cost_heuristic += Self::RECORDING_COST;
     }
 }

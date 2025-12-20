@@ -1,6 +1,6 @@
 use ike_core::{
     Affine, BorderWidth, Canvas, Clip, CornerRadius, Offset, Paint, Painter, Paragraph, Recording,
-    Rect, Size, Svg,
+    RecordingData, Rect, Size, Svg,
 };
 
 use crate::{painter::SkiaPainter, vulkan::SkiaVulkanSurface};
@@ -48,11 +48,11 @@ impl Canvas for SkiaCanvas<'_> {
         let scale_x = matrix.scale_x();
         let scale_y = matrix.scale_y();
 
-        let mut surface = self.surface.create_render_target(
-            (size.width * scale_x).ceil() as u32,
-            (size.height * scale_y).ceil() as u32,
-            false,
-        );
+        let width = (size.width * scale_x).ceil() as u32;
+        let height = (size.height * scale_y).ceil() as u32;
+        let memory = width as u64 * height as u64 * 4;
+
+        let mut surface = self.surface.create_render_target(width, height, false);
 
         let mut canvas = SkiaCanvas {
             surface: self.surface,
@@ -67,7 +67,12 @@ impl Canvas for SkiaCanvas<'_> {
 
         let image = surface.image_snapshot();
 
-        let recording = Recording::new();
+        let recording = Recording::new(RecordingData {
+            size,
+            width,
+            height,
+            memory,
+        });
         let weak = Recording::downgrade(&recording);
 
         self.painter.recordings.insert(weak, (image, size));
