@@ -1,4 +1,6 @@
 use std::{
+    collections::HashSet,
+    hash::BuildHasherDefault,
     mem,
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
@@ -19,6 +21,7 @@ mod signal;
 mod text;
 mod touch;
 
+use seahash::SeaHasher;
 pub use signal::{ImeSignal, RootSignal, WindowUpdate};
 
 pub struct Root {
@@ -28,6 +31,7 @@ pub struct Root {
 
 pub struct RootState {
     pub(crate) windows:        Vec<Window>,
+    pub(crate) propagate:      HashSet<WidgetId, BuildHasherDefault<SeaHasher>>,
     pub(crate) sink:           Box<dyn Fn(RootSignal)>,
     pub(crate) trace:          bool,
     pub(crate) touch_settings: TouchSettings,
@@ -53,6 +57,10 @@ impl RootState {
 
     pub(crate) fn windows(&self) -> impl Iterator<Item = &Window> {
         self.windows.iter()
+    }
+
+    pub(crate) fn request_propagate(&mut self, widget: WidgetId) {
+        self.propagate.insert(widget);
     }
 
     pub(crate) fn request_redraw(&self, window: WindowId) {
@@ -135,6 +143,7 @@ impl Root {
             arena: Arena::new(),
             state: RootState {
                 windows:        Vec::new(),
+                propagate:      HashSet::default(),
                 sink:           Box::new(sink),
                 trace:          false,
                 touch_settings: TouchSettings::default(),
@@ -255,8 +264,27 @@ impl Root {
         self.state.set_window_color(window, color);
     }
 
+    fn handle_updates(&mut self) {
+        for widget in mem::take(&mut self.state.propagate) {
+            self.propagate_state(widget);
+        }
+    }
+
+    fn propagate_state(&mut self, widget: WidgetId) {
+        let mut current = Some(widget);
+
+        while let Some(widget) = current
+            && let Some(mut widget) = self.get_mut(widget)
+        {
+            widget.cx.update_state();
+            current = widget.cx.parent();
+        }
+    }
+
     #[must_use]
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
+        self.handle_updates();
+
         let window = self.state.get_window(window)?;
         let window_id = window.id;
         let sizing = window.sizing;
@@ -310,6 +338,8 @@ impl Root {
     }
 
     pub fn animate(&mut self, window: WindowId, delta_time: Duration) {
+        self.handle_updates();
+
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
@@ -329,6 +359,8 @@ impl Root {
     }
 
     pub fn window_focused(&mut self, window: WindowId, is_focused: bool) {
+        self.handle_updates();
+
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
@@ -358,6 +390,8 @@ impl Root {
     }
 
     pub fn window_resized(&mut self, window: WindowId, new_size: Size) {
+        self.handle_updates();
+
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;
@@ -379,6 +413,8 @@ impl Root {
     }
 
     pub fn window_scaled(&mut self, window: WindowId, new_scale: f32, new_size: Size) {
+        self.handle_updates();
+
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return;

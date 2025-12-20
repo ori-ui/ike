@@ -8,6 +8,8 @@ use crate::{
 
 impl Root {
     pub fn pointer_entered(&mut self, window: WindowId, pointer_id: PointerId) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
@@ -21,6 +23,8 @@ impl Root {
     }
 
     pub fn pointer_left(&mut self, window: WindowId, pointer_id: PointerId) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
@@ -44,6 +48,8 @@ impl Root {
         pointer_id: PointerId,
         position: Point,
     ) -> bool {
+        self.handle_updates();
+
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
@@ -114,6 +120,8 @@ impl Root {
         button: PointerButton,
         pressed: bool,
     ) -> bool {
+        self.handle_updates();
+
         let window_id = window;
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
@@ -199,6 +207,8 @@ impl Root {
         pointer_id: PointerId,
         delta: ScrollDelta,
     ) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
@@ -317,10 +327,7 @@ fn send_pointer_event(
         current = widget.cx.parent();
     }
 
-    if let Some(mut target) = root.get_mut(target) {
-        target.cx.propagate_state();
-    }
-
+    root.propagate_state(target);
     focus::update_focus(root, root_widget, focus);
 
     propagate

@@ -9,6 +9,8 @@ use crate::{
 
 impl Root {
     pub fn text_pasted(&mut self, window: WindowId, contents: String) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.get_window(window) else {
             return false;
         };
@@ -24,6 +26,8 @@ impl Root {
     }
 
     pub fn ime_commit_text(&mut self, window: WindowId, text: String) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.get_window(window) else {
             return false;
         };
@@ -39,6 +43,8 @@ impl Root {
     }
 
     pub fn ime_select(&mut self, window: WindowId, selection: Range<usize>) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.get_window(window) else {
             return false;
         };
@@ -81,9 +87,7 @@ fn send_text_event(
         current = widget.cx.parent();
     }
 
-    if let Some(mut target) = root.get_mut(target) {
-        target.cx.propagate_state();
-    }
+    root.propagate_state(target);
 
     focus::update_focus(root, root_widget, focus);
 

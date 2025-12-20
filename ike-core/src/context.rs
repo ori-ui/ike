@@ -92,7 +92,7 @@ impl MutCx<'_> {
 
     pub fn request_animate(&mut self) {
         self.state.needs_animate = true;
-        self.propagate_state();
+        self.root.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
             self.root.request_animate(window);
@@ -102,7 +102,7 @@ impl MutCx<'_> {
     pub fn request_layout(&mut self) {
         self.state.needs_layout = true;
         self.state.needs_draw = true;
-        self.propagate_state();
+        self.root.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
             self.root.request_redraw(window);
@@ -112,7 +112,7 @@ impl MutCx<'_> {
     pub fn request_compose(&mut self) {
         self.state.needs_compose = true;
         self.state.needs_draw = true;
-        self.propagate_state();
+        self.root.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
             self.root.request_redraw(window);
@@ -121,7 +121,7 @@ impl MutCx<'_> {
 
     pub fn request_draw(&mut self) {
         self.state.needs_draw = true;
-        self.propagate_state();
+        self.root.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
             self.root.request_redraw(window);
@@ -196,68 +196,6 @@ impl MutCx<'_> {
         }
 
         self.state.children = children;
-    }
-
-    pub(crate) fn propagate_state(&mut self) {
-        // update our own state, this is necessary, but I don't quite know why
-        self.update_state();
-
-        let Some(parent) = self.state.parent else {
-            return;
-        };
-
-        let id = self.id();
-
-        // this is a bit of a mess since self is borrowed, we need to handle that special case for
-        // our parent, but not for our parents ancestors
-        let grand_parent = if let Some(parent) = self.arena.get_mut(self.root, parent) {
-            parent.cx.state.reset();
-
-            let children = mem::take(&mut parent.cx.state.children);
-
-            for &child in &children {
-                if child == id {
-                    parent.cx.state.merge(self.state);
-                    continue;
-                }
-
-                if let Some(child_state) = parent.cx.arena.get_state(child.index) {
-                    parent.cx.state.merge(child_state);
-                }
-            }
-
-            parent.cx.state.children = children;
-            parent.cx.state.parent
-        } else {
-            None
-        };
-
-        if let Some(grand_parent) = grand_parent {
-            self.propagate_state_recursive(grand_parent);
-        }
-    }
-
-    fn propagate_state_recursive(&mut self, widget: WidgetId) {
-        let parent = if let Some(widget) = self.arena.get_mut(self.root, widget) {
-            widget.cx.state.reset();
-
-            let children = mem::take(&mut widget.cx.state.children);
-
-            for &child in &children {
-                if let Some(child_state) = widget.cx.arena.get_state(child.index) {
-                    widget.cx.state.merge(child_state);
-                }
-            }
-
-            widget.cx.state.children = children;
-            widget.cx.state.parent
-        } else {
-            None
-        };
-
-        if let Some(parent) = parent {
-            self.propagate_state_recursive(parent);
-        }
     }
 
     pub(crate) fn set_window_recursive(&mut self, window: Option<WindowId>) {

@@ -1,6 +1,8 @@
 use crate::{BuildCx, Rect, Root, Update, WidgetId};
 
 pub(crate) fn scroll_to(root: &mut Root, target: WidgetId, mut rect: Rect) {
+    root.handle_updates();
+
     let mut current = Some(target);
 
     while let Some(id) = current {
@@ -13,7 +15,5 @@ pub(crate) fn scroll_to(root: &mut Root, target: WidgetId, mut rect: Rect) {
         }
     }
 
-    if let Some(mut target) = root.get_mut(target) {
-        target.cx.propagate_state();
-    }
+    root.propagate_state(target);
 }

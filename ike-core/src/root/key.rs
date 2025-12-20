@@ -21,6 +21,8 @@ impl Root {
         text: Option<&str>,
         pressed: bool,
     ) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.get_window(window) else {
             return false;
         };
@@ -81,10 +83,7 @@ fn send_key_event(
         current = widget.cx.parent();
     }
 
-    if let Some(mut target) = root.get_mut(target) {
-        target.cx.propagate_state();
-    }
-
+    root.propagate_state(target);
     focus::update_focus(root, root_widget, focus);
 
     propagate

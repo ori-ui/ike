@@ -10,6 +10,8 @@ use crate::{
 
 impl Root {
     pub fn touch_down(&mut self, window: WindowId, touch_id: TouchId, position: Point) -> bool {
+        self.handle_updates();
+
         let Some(window) = self.state.get_window_mut(window) else {
             return false;
         };
@@ -67,6 +69,8 @@ impl Root {
     }
 
     pub fn touch_up(&mut self, window: WindowId, touch_id: TouchId, position: Point) -> bool {
+        self.handle_updates();
+
         let tap_slop = self.state.touch_settings.tap_slop;
         let tap_time = self.state.touch_settings.tap_time;
         let double_tap_slop = self.state.touch_settings.double_tap_slop;
@@ -150,6 +154,8 @@ impl Root {
     }
 
     pub fn touch_moved(&mut self, window: WindowId, touch_id: TouchId, position: Point) -> bool {
+        self.handle_updates();
+
         let pan_distance = self.state.touch_settings.pan_distance;
 
         let Some(window) = self.state.get_window_mut(window) else {
@@ -247,10 +253,7 @@ fn send_touch_event(
         current = widget.cx.parent();
     }
 
-    if let Some(mut target) = root.get_mut(target) {
-        target.cx.propagate_state();
-    }
-
+    root.propagate_state(target);
     focus::update_focus(root, root_widget, focus);
 
     propagate
