@@ -178,7 +178,7 @@ impl Drop for SkiaVulkanSurface {
 
 impl SkiaVulkanSurface {
     const SDR_BGRA_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
-        format:      vk::Format::B8G8R8_SRGB,
+        format:      vk::Format::B8G8R8A8_SRGB,
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
     };
 
