@@ -312,9 +312,12 @@ impl Widget for Scroll {
                 let (major, _) = self.axis.unpack_point(local);
                 let point = major - self.track_start() - self.drag_offset;
                 let fraction = point.clamp(0.0, self.knob_space()) / self.knob_space();
+                let scroll = self.overflow() * fraction;
 
-                self.scroll.set(self.overflow() * fraction);
-                cx.request_compose();
+                if *self.scroll != scroll {
+                    self.scroll.set(scroll);
+                    cx.request_compose();
+                }
 
                 PointerPropagate::Bubble
             }
@@ -336,8 +339,10 @@ impl Widget for Scroll {
                     }
 
                     ScrollDelta::Pixel(..) => {
-                        self.scroll.set(scroll);
-                        cx.request_compose();
+                        if *self.scroll != scroll {
+                            self.scroll.set(scroll);
+                            cx.request_compose();
+                        }
                     }
                 }
 
@@ -355,8 +360,10 @@ impl Widget for Scroll {
                 let mut scroll = self.scroll.to() - delta;
                 scroll = scroll.clamp(0.0, self.overflow());
 
-                self.scroll.set(scroll);
-                cx.request_compose();
+                if *self.scroll != scroll {
+                    self.scroll.set(scroll);
+                    cx.request_compose();
+                }
 
                 TouchPropagate::Handled
             }
