@@ -25,8 +25,7 @@ impl Container {
     }
 
     pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        let child = this.replace_child(0, child);
-        this.cx.remove(child);
+        this.set_child(0, child);
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {

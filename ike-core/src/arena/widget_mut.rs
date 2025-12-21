@@ -138,6 +138,15 @@ where
         prev_child
     }
 
+    pub fn set_child(&mut self, index: usize, child: impl AnyWidgetId) {
+        let child = child.upcast();
+        let prev_child = self.replace_child(index, child);
+
+        if prev_child != child {
+            self.cx.remove(prev_child);
+        }
+    }
+
     pub fn remove_child(&mut self, index: usize) {
         let id = self.cx.state.children.remove(index);
 
