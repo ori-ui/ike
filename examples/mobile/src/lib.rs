@@ -189,5 +189,5 @@ pub fn main() {
         filter: Filter::All,
     };
 
-    App::new().run(&mut data, ui);
+    App::new().run(&mut data, ui).unwrap();
 }

@@ -39,7 +39,7 @@ pub fn set_focused(root: &mut Root, root_widget: WidgetId, target: Option<Widget
     }
 
     if let Some(current) = current
-        && let Some(mut widget) = root.get_mut(current)
+        && let Some(mut widget) = root.get_widget_mut(current)
     {
         widget.set_focused(false);
 
@@ -49,7 +49,7 @@ pub fn set_focused(root: &mut Root, root_widget: WidgetId, target: Option<Widget
     }
 
     if let Some(target) = target {
-        let rect = if let Some(mut widget) = root.get_mut(target) {
+        let rect = if let Some(mut widget) = root.get_widget_mut(target) {
             widget.set_focused(true);
 
             if widget.cx.state.accepts_text {

@@ -8,7 +8,7 @@ pub trait BuildCx {
     fn root(&self) -> &Root;
     fn root_mut(&mut self) -> &mut Root;
 
-    fn get<T>(&self, id: WidgetId<T>) -> Option<WidgetRef<'_, T>>
+    fn get_widget<T>(&self, id: WidgetId<T>) -> Option<WidgetRef<'_, T>>
     where
         Self: Sized,
         T: ?Sized + AnyWidget,
@@ -17,7 +17,7 @@ pub trait BuildCx {
         root.arena.get(&root.state, id)
     }
 
-    fn get_mut<T>(&mut self, id: WidgetId<T>) -> Option<WidgetMut<'_, T>>
+    fn get_widget_mut<T>(&mut self, id: WidgetId<T>) -> Option<WidgetMut<'_, T>>
     where
         Self: Sized,
         T: ?Sized + AnyWidget,
@@ -26,7 +26,7 @@ pub trait BuildCx {
         root.arena.get_mut(&mut root.state, id)
     }
 
-    fn insert<T>(&mut self, widget: T) -> WidgetMut<'_, T>
+    fn insert_widget<T>(&mut self, widget: T) -> WidgetMut<'_, T>
     where
         Self: Sized,
         T: Widget,
@@ -35,7 +35,7 @@ pub trait BuildCx {
         root.arena.insert(&mut root.state, widget)
     }
 
-    fn remove(&mut self, id: impl AnyWidgetId)
+    fn remove_widget(&mut self, id: impl AnyWidgetId)
     where
         Self: Sized,
     {

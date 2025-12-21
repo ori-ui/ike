@@ -1,6 +1,19 @@
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
 
-use crate::{Context, Effect};
+use crate::Effect;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[cfg(backend = "winit")]
+    #[error(transparent)]
+    Winit(ike_winit::Error),
+
+    #[cfg(backend = "android")]
+    #[error(transparent)]
+    Android(ike_android::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct App {}
 
@@ -30,14 +43,13 @@ impl App {
 
         let subscriber = tracing_subscriber::registry().with(filter);
 
-        #[cfg(not(target_arch = "wasm32"))]
         let subscriber = {
             #[cfg(not(target_os = "android"))]
             let fmt_layer = tracing_subscriber::fmt::layer();
 
             #[cfg(target_os = "android")]
-            let fmt_layer =
-                tracing_subscriber::fmt::layer().with_writer(crate::android::MakeAndroidWriter);
+            let fmt_layer = tracing_subscriber::fmt::layer() // android uses it's own logging
+                .with_writer(ike_android::MakeAndroidWriter);
 
             subscriber.with(fmt_layer)
         };
@@ -45,29 +57,21 @@ impl App {
         let _ = tracing::subscriber::set_global_default(subscriber);
     }
 
-    pub fn run<T, V>(self, data: &mut T, mut ui: impl FnMut(&mut T) -> V + 'static)
+    pub fn run<T, V>(self, data: &mut T, mut ui: impl FnMut(&mut T) -> V + 'static) -> Result<()>
     where
         V: Effect<T> + 'static,
         V::State: 'static,
     {
         Self::install_log();
 
-        let build: UiBuilder<T> = Box::new(move |data| Box::new(ui(data)));
+        let build: ike_ori::UiBuilder<T> = Box::new(move |data| Box::new(ui(data)));
 
-        #[cfg(all(
-            feature = "winit",
-            any(
-                all(target_family = "unix", not(target_os = "android")),
-                target_os = "macos",
-                target_os = "windows"
-            )
-        ))]
-        crate::winit::run(data, build);
+        #[cfg(backend = "winit")]
+        ike_winit::run(data, build).map_err(Error::Winit)?;
 
-        #[cfg(target_os = "android")]
-        crate::android::run(data, build);
+        #[cfg(backend = "android")]
+        ike_android::run(data, build).map_err(Error::Android)?;
+
+        Ok(())
     }
 }
-
-pub(crate) type AnyEffect<T> = Box<dyn ori::AnyView<Context, T, ori::NoElement>>;
-pub(crate) type UiBuilder<T> = Box<dyn FnMut(&mut T) -> AnyEffect<T>>;

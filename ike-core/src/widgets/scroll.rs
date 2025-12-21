@@ -28,7 +28,7 @@ pub struct Scroll {
 
 impl Scroll {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert(Self {
+        let mut this = cx.insert_widget(Self {
             axis:               Axis::Vertical,
             bar_width:          16.0,
             bar_padding:        Padding::all(4.0),

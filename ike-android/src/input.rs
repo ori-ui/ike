@@ -2,7 +2,7 @@ use std::ptr;
 
 use ike_core::{Point, TouchId, WindowId};
 
-use crate::android::{EventLoop, WindowState};
+use crate::{EventLoop, WindowState};
 
 #[derive(Debug)]
 pub(super) enum InputQueueEvent {
@@ -93,7 +93,7 @@ impl<'a, T> EventLoop<'a, T> {
                 let id = unsafe { ndk_sys::AMotionEvent_getPointerId(event, index) };
                 let touch_id = TouchId::from_u64(id as u64);
 
-                (self.context.root).touch_down(window_id, touch_id, point)
+                self.context.touch_down(window_id, touch_id, point)
             }
 
             ndk_sys::AMOTION_EVENT_ACTION_UP => {
@@ -107,7 +107,7 @@ impl<'a, T> EventLoop<'a, T> {
                 let id = unsafe { ndk_sys::AMotionEvent_getPointerId(event, index) };
                 let touch_id = TouchId::from_u64(id as u64);
 
-                (self.context.root).touch_up(window_id, touch_id, point)
+                self.context.touch_up(window_id, touch_id, point)
             }
 
             ndk_sys::AMOTION_EVENT_ACTION_MOVE => {
@@ -128,7 +128,7 @@ impl<'a, T> EventLoop<'a, T> {
 
                     tracing::trace!(index, ?point, tool, "move event");
 
-                    handled |= self.context.root.touch_moved(window_id, touch_id, point);
+                    handled |= self.context.touch_moved(window_id, touch_id, point);
                 }
 
                 handled

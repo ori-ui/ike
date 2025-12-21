@@ -17,5 +17,5 @@ fn ui(_: &mut ()) -> impl Effect<()> + use<> {
 }
 
 fn main() {
-    App::new().run(&mut (), ui);
+    App::new().run(&mut (), ui).unwrap();
 }

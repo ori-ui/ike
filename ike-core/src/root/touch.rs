@@ -37,7 +37,7 @@ impl Root {
         let window_contents = window.contents;
 
         if let Some(focused) = query::find_focused(&self.arena, window_contents)
-            && self.get(focused).is_some_and(|widget| {
+            && self.get_widget(focused).is_some_and(|widget| {
                 let local = widget.cx.global_transform().inverse() * position;
                 !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
             })
@@ -56,7 +56,7 @@ impl Root {
                 TouchPropagate::Handled => true,
 
                 TouchPropagate::Capture => {
-                    if let Some(mut widget) = self.get_mut(target) {
+                    if let Some(mut widget) = self.get_widget_mut(target) {
                         widget.set_active(true);
                     }
 
@@ -143,7 +143,7 @@ impl Root {
         });
 
         if let Some(target) = find_touch_target_at(&self.arena, window_contents, position) {
-            if let Some(mut widget) = self.get_mut(target) {
+            if let Some(mut widget) = self.get_widget_mut(target) {
                 widget.set_active(false);
             }
 
@@ -239,7 +239,7 @@ fn send_touch_event(
     let _span = tracing::info_span!("touch_event");
 
     while let Some(id) = current
-        && let Some(widget) = root.get_mut(id)
+        && let Some(widget) = root.get_widget_mut(id)
         && let TouchPropagate::Bubble = propagate
     {
         let mut cx = EventCx {

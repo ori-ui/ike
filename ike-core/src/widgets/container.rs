@@ -13,7 +13,7 @@ pub struct Container {
 
 impl Container {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert(Container {
+        let mut this = cx.insert_widget(Container {
             padding:          Padding::all(8.0),
             border_width:     BorderWidth::all(1.0),
             corner_radius:    CornerRadius::all(8.0),

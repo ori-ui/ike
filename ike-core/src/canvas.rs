@@ -61,7 +61,7 @@ pub trait Canvas {
     fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas));
 
     #[must_use]
-    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording;
+    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording>;
 
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas));
 

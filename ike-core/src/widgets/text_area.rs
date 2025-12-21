@@ -66,7 +66,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
     pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
         let cursor = paragraph.text.len();
 
-        cx.insert(Self {
+        cx.insert_widget(Self {
             paragraph,
             selection_color: Color::BLUE,
             cursor_color: Color::BLACK,

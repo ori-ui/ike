@@ -25,7 +25,7 @@ impl Entry {
         let placeholder = Paragraph::new(16.0, TextAlign::Start, TextWrap::None);
         let placeholder = Label::new(cx, placeholder).id();
 
-        let mut this = cx.insert(Entry {
+        let mut this = cx.insert_widget(Entry {
             text_area,
             placeholder,
 

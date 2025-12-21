@@ -5,6 +5,7 @@ use std::{
     pin::Pin,
     ptr::{self, NonNull},
     sync::{
+        Arc,
         atomic::{AtomicPtr, Ordering},
         mpsc::Receiver,
     },
@@ -18,25 +19,24 @@ mod input;
 mod log;
 mod window;
 
-pub use context::Context;
 use jni::JavaVM;
-pub(crate) use log::MakeAndroidWriter;
+pub use log::MakeAndroidWriter;
 
-use ike_core::{RootSignal, WindowId, WindowUpdate};
-use ori::AsyncContext;
+use ike_core::{Root, RootSignal, WindowId, WindowUpdate};
+use ori::Proxyable;
 use raw_window_handle::DisplayHandle;
 
 use crate::{
-    android::{
-        context::Proxy,
-        ime::{Ime, ImeEvent},
-        input::InputQueueEvent,
-        window::WindowEvent,
-    },
-    app::{AnyEffect, UiBuilder},
+    context::Proxy,
+    ime::{Ime, ImeEvent},
+    input::InputQueueEvent,
+    window::WindowEvent,
 };
 
 static NATIVE_ACTIVITY: AtomicPtr<ndk_sys::ANativeActivity> = AtomicPtr::new(ptr::null_mut());
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {}
 
 #[doc(hidden)]
 pub fn android_main<T>(native_activity: *mut ffi::c_void, main: fn() -> T)
@@ -82,7 +82,7 @@ where
     });
 }
 
-pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
+pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) {
     let native_activity = NonNull::new(NATIVE_ACTIVITY.load(Ordering::SeqCst))
         .expect("native activity should be set");
 
@@ -96,7 +96,7 @@ pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
     let runtime = tokio::runtime::Handle::current();
     let display_handle = DisplayHandle::android();
-    let vulkan_context = ike_skia::vulkan::SkiaVulkanContext::new(display_handle);
+    let vulkan_context = ike_skia::vulkan::Context::new(display_handle).unwrap();
     let painter = ike_skia::SkiaPainter::new();
 
     let scale_factor = unsafe {
@@ -116,14 +116,20 @@ pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
         unsafe { ndk_sys::ALooper_prepare(ndk_sys::ALOOPER_PREPARE_ALLOW_NON_CALLBACKS as i32) };
 
     let proxy = Proxy::new(sender, looper);
-    let mut context = Context::new(proxy.clone());
+
+    let root = Root::new({
+        let proxy = proxy.clone();
+
+        move |signal| proxy.send(Event::Signal(signal))
+    });
+    let mut context = ike_ori::Context::new(root, Arc::new(proxy.clone()));
 
     let mut view = build(data);
     let (_, state) = view.any_build(&mut context, data);
 
     let (jvm, ime) = unsafe {
         let jvm = JavaVM::from_raw(native_activity.as_ref().vm).unwrap();
-        let ime = ime::init(&jvm, native_activity, proxy).unwrap();
+        let ime = ime::init(&jvm, native_activity, proxy.clone()).unwrap();
 
         (jvm, ime)
     };
@@ -136,12 +142,13 @@ pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
         runtime,
         context,
-        ime,
+        proxy,
 
         native_activity,
         looper,
         receiver,
         jvm,
+        ime,
 
         choreographer: None,
         is_rendering: false,
@@ -165,12 +172,13 @@ pub fn run<T>(data: &mut T, mut build: UiBuilder<T>) {
 
 struct EventLoop<'a, T> {
     data:  &'a mut T,
-    build: UiBuilder<T>,
-    view:  AnyEffect<T>,
+    build: ike_ori::UiBuilder<T>,
+    view:  ike_ori::AnyEffect<T>,
     state: Box<dyn Any>,
 
     runtime: tokio::runtime::Handle,
-    context: Context,
+    context: ike_ori::Context,
+    proxy:   Proxy,
 
     native_activity: NonNull<ndk_sys::ANativeActivity>,
     looper:          *mut ndk_sys::ALooper,
@@ -181,7 +189,7 @@ struct EventLoop<'a, T> {
     choreographer: Option<NonNull<ndk_sys::AChoreographer>>,
     is_rendering:  bool,
     wants_render:  bool,
-    vulkan:        ike_skia::vulkan::SkiaVulkanContext,
+    vulkan:        ike_skia::vulkan::Context,
     painter:       ike_skia::SkiaPainter,
     scale_factor:  f32,
 
@@ -203,7 +211,7 @@ enum WindowState {
 struct Window {
     id:      WindowId,
     android: *mut ndk_sys::ANativeWindow,
-    surface: ike_skia::vulkan::SkiaVulkanSurface,
+    surface: ike_skia::vulkan::Surface,
 }
 
 enum Event {
@@ -236,7 +244,7 @@ impl fmt::Debug for Event {
 impl<'a, T> EventLoop<'a, T> {
     fn run(&mut self) {
         unsafe {
-            let proxy = Box::new(self.context.proxy.clone());
+            let proxy = Box::new(self.proxy.clone());
             self.native_activity.as_mut().instance = Box::into_raw(proxy).cast();
         }
 
@@ -308,13 +316,13 @@ impl<'a, T> EventLoop<'a, T> {
     fn handle_signal(&mut self, signal: RootSignal) {
         match signal {
             RootSignal::RequestRedraw(..) => {
-                self.context.proxy.send(Event::Window(WindowEvent::Redraw));
+                self.proxy.send(Event::Window(WindowEvent::Redraw));
             }
 
             RootSignal::RequestAnimate(_, last_frame) => {
                 if self.animate.is_none() {
                     self.animate = Some(last_frame);
-                    self.context.proxy.send(Event::Window(WindowEvent::Redraw));
+                    self.proxy.send(Event::Window(WindowEvent::Redraw));
                 }
             }
 

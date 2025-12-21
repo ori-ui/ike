@@ -22,7 +22,7 @@ pub struct Button {
 
 impl Button {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert(Button {
+        let mut this = cx.insert_widget(Button {
             padding:       Padding::all(8.0),
             border_width:  BorderWidth::all(1.0),
             corner_radius: CornerRadius::all(8.0),

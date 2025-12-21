@@ -1,4 +1,4 @@
-use crate::android::{Event, InputQueueEvent, WindowEvent, context::Proxy};
+use crate::{Event, InputQueueEvent, WindowEvent, context::Proxy};
 
 pub fn register_callbacks(activity: &mut ndk_sys::ANativeActivity) {
     let callbacks = unsafe { &mut *activity.callbacks };

@@ -3,10 +3,10 @@ use ike_core::{
     RecordingData, Rect, Size, Svg,
 };
 
-use crate::{painter::SkiaPainter, vulkan::SkiaVulkanSurface};
+use crate::{painter::SkiaPainter, vulkan::Surface};
 
 pub struct SkiaCanvas<'a> {
-    pub(crate) surface: &'a mut SkiaVulkanSurface,
+    pub(crate) surface: &'a mut Surface,
     pub(crate) painter: &'a mut SkiaPainter,
     pub(crate) canvas:  &'a skia_safe::Canvas,
 }
@@ -43,7 +43,7 @@ impl Canvas for SkiaCanvas<'_> {
         self.canvas.restore();
     }
 
-    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Recording {
+    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording> {
         let matrix = self.canvas.local_to_device_as_3x3();
         let scale_x = matrix.scale_x();
         let scale_y = matrix.scale_y();
@@ -52,7 +52,10 @@ impl Canvas for SkiaCanvas<'_> {
         let height = (size.height * scale_y).ceil() as u32;
         let memory = width as u64 * height as u64 * 4;
 
-        let mut surface = self.surface.create_render_target(width, height, false);
+        let mut surface = self
+            .surface
+            .create_render_target(width, height, false)
+            .ok()?;
 
         let mut canvas = SkiaCanvas {
             surface: self.surface,
@@ -77,7 +80,7 @@ impl Canvas for SkiaCanvas<'_> {
 
         self.painter.recordings.insert(weak, (image, size));
 
-        recording
+        Some(recording)
     }
 
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas)) {

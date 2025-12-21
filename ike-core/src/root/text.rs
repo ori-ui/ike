@@ -73,7 +73,7 @@ fn send_text_event(
     let _span = tracing::info_span!("text_event");
 
     while let Some(id) = current
-        && let Some(widget) = root.get_mut(id)
+        && let Some(widget) = root.get_widget_mut(id)
         && let Propagate::Bubble = propagate
     {
         let mut cx = EventCx {

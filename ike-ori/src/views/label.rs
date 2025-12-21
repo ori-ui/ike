@@ -2,7 +2,7 @@ use ike_core::{
     BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::ProviderContext;
+use ori::Providable;
 
 use crate::{Context, Palette, views::TextTheme};
 
@@ -119,8 +119,8 @@ impl<T> ori::View<Context, T> for Label {
     type State = ();
 
     fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
+        let palette = cx.get_or_default::<Palette>();
+        let theme = cx.get_or_default::<TextTheme>();
 
         let paragraph = self.build_paragraph(&palette, &theme);
         let widget = widgets::Label::new(cx, paragraph);
@@ -147,10 +147,10 @@ impl<T> ori::View<Context, T> for Label {
             || self.wrap != old.wrap
             || self.color != old.color
         {
-            let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-            let theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
+            let palette = cx.get_or_default::<Palette>();
+            let theme = cx.get_or_default::<TextTheme>();
 
-            if let Some(mut widget) = cx.get_mut(*element) {
+            if let Some(mut widget) = cx.get_widget_mut(*element) {
                 let paragraph = self.build_paragraph(&palette, &theme);
                 widgets::Label::set_text(&mut widget, paragraph);
             }
@@ -164,7 +164,7 @@ impl<T> ori::View<Context, T> for Label {
         cx: &mut Context,
         _data: &mut T,
     ) {
-        cx.remove(element);
+        cx.remove_widget(element);
     }
 
     fn event(

@@ -2,9 +2,9 @@ use ike_core::{
     AnyWidgetId, Axis, BuildCx, WidgetId, WidgetMut,
     widgets::{self, Align, Justify},
 };
-use ori::ElementSeq;
+use ori::{ElementSeq, View, ViewMarker};
 
-use crate::{Context, View};
+use crate::context::Context;
 
 pub fn stack<V>(axis: Axis, contents: V) -> Stack<V> {
     Stack::new(axis, contents)
@@ -53,15 +53,16 @@ impl<V> Stack<V> {
     }
 }
 
-impl<V> ori::ViewMarker for Stack<V> {}
-impl<T, V> ori::View<Context, T> for Stack<V>
+impl<V> ViewMarker for Stack<V> {}
+impl<C, T, V> View<C, T> for Stack<V>
 where
-    V: ori::ViewSeq<Context, T, Flex<WidgetId>>,
+    C: BuildCx,
+    V: ori::ViewSeq<C, T, Flex<WidgetId>>,
 {
     type Element = WidgetId<widgets::Stack>;
     type State = (V::Elements, V::States);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (children, states) = self.contents.seq_build(cx, data);
 
         let mut widget = widgets::Stack::new(cx);
@@ -83,7 +84,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (children, states): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -95,7 +96,7 @@ where
             &mut old.contents,
         );
 
-        let Some(mut widget) = cx.get_mut(*element) else {
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
@@ -122,24 +123,24 @@ where
         &mut self,
         element: Self::Element,
         (children, states): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
     ) {
         self.contents.seq_teardown(children, states, cx, data);
-        cx.remove(element);
+        cx.remove_widget(element);
     }
 
     fn event(
         &mut self,
         element: &mut Self::Element,
         (children, states): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {
         let action = self.contents.seq_event(children, states, cx, data, event);
 
-        if let Some(mut widget) = cx.get_mut(*element) {
+        if let Some(mut widget) = cx.get_widget_mut(*element) {
             update_children(&mut widget, children);
         }
 
@@ -206,15 +207,15 @@ impl<V> Flex<V> {
     }
 }
 
-impl<V> ori::ViewMarker for Flex<V> {}
-impl<T, V> ori::View<Context, T> for Flex<V>
+impl<V> ViewMarker for Flex<V> {}
+impl<C, T, V> View<C, T> for Flex<V>
 where
-    V: View<T>,
+    V: View<C, T>,
 {
     type Element = Flex<V::Element>;
     type State = V::State;
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
         let element = Flex {
             contents: element,
@@ -229,7 +230,7 @@ where
         &mut self,
         element: &mut Self::Element,
         state: &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -242,13 +243,7 @@ where
         );
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        state: Self::State,
-        cx: &mut Context,
-        data: &mut T,
-    ) {
+    fn teardown(&mut self, element: Self::Element, state: Self::State, cx: &mut C, data: &mut T) {
         self.contents.teardown(element.contents, state, cx, data);
     }
 
@@ -256,7 +251,7 @@ where
         &mut self,
         element: &mut Self::Element,
         state: &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

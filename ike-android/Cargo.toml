@@ -1,0 +1,31 @@
+[package]
+name = "ike-android"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+ike-core  = { workspace = true }
+ike-ori   = { workspace = true }
+ori       = { workspace = true }
+tracing   = { workspace = true }
+thiserror = { workspace = true }
+
+raw-window-handle = "0.6"
+jni = "0.21"
+
+[dependencies.ike-skia]
+workspace = true
+features = ["vulkan"]
+
+[dependencies.tokio]
+workspace = true
+features = ["rt-multi-thread"]
+
+[dependencies.tracing-subscriber]
+workspace = true
+features = ["env-filter"]
+
+[dependencies.ndk-sys]
+version = "0.6"
+features = ["test"]

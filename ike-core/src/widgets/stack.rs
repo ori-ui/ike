@@ -33,7 +33,7 @@ pub struct Stack {
 
 impl Stack {
     pub fn new(cx: &mut impl BuildCx) -> WidgetMut<'_, Self> {
-        cx.insert(Self {
+        cx.insert_widget(Self {
             axis:    Axis::Vertical,
             justify: Justify::Start,
             align:   Align::Center,

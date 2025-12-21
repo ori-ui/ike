@@ -3,7 +3,7 @@ use std::{ffi, ptr};
 use ike_core::Size;
 use raw_window_handle::{AndroidNdkWindowHandle, DisplayHandle, RawWindowHandle, WindowHandle};
 
-use crate::android::{Event, EventLoop, Window, WindowState, context::Proxy};
+use crate::{Event, EventLoop, Window, WindowState, context::Proxy};
 
 #[derive(Debug)]
 pub(super) enum WindowEvent {
@@ -34,13 +34,14 @@ impl<'a, T> EventLoop<'a, T> {
                 tracing::debug!(width, height, "window created");
 
                 let vulkan = unsafe {
-                    ike_skia::vulkan::SkiaVulkanSurface::new(
+                    ike_skia::vulkan::Surface::new(
                         &mut self.vulkan,
                         DisplayHandle::android(),
                         window_handle,
                         width as u32,
                         height as u32,
                     )
+                    .unwrap()
                 };
 
                 if let WindowState::Pending {
@@ -65,7 +66,7 @@ impl<'a, T> EventLoop<'a, T> {
                         height as f32 / self.scale_factor,
                     );
 
-                    self.context.root.window_scaled(id, self.scale_factor, size);
+                    self.context.window_scaled(id, self.scale_factor, size);
                 } else {
                     tracing::error!("android must have at least one window!");
                 }
@@ -93,30 +94,33 @@ impl<'a, T> EventLoop<'a, T> {
 
                     if let Some(animate) = self.animate.take() {
                         let delta_time = animate.elapsed();
-                        self.context.root.animate(window.id, delta_time);
+                        self.context.animate(window.id, delta_time);
                     }
 
-                    let color = self.context.root.get_window(window.id).unwrap().color();
+                    let color = self.context.get_window(window.id).unwrap().color();
 
                     if let Some(choreographer) = self.choreographer {
                         unsafe {
                             ndk_sys::AChoreographer_postFrameCallback(
                                 choreographer.as_ptr(),
                                 Some(frame_callback),
-                                (&mut self.context.proxy) as *mut _ as *mut _,
+                                (&mut self.proxy) as *mut _ as *mut _,
                             );
                         };
                     }
 
                     self.is_rendering = true;
 
-                    window.surface.draw(
-                        &mut self.painter,
-                        color,
-                        self.scale_factor,
-                        || {},
-                        |canvas| self.context.root.draw(window.id, canvas),
-                    );
+                    window
+                        .surface
+                        .draw(
+                            &mut self.painter,
+                            color,
+                            self.scale_factor,
+                            || {},
+                            |canvas| self.context.draw(window.id, canvas),
+                        )
+                        .unwrap();
                 }
             }
 
@@ -127,13 +131,13 @@ impl<'a, T> EventLoop<'a, T> {
                     let width = unsafe { ndk_sys::ANativeWindow_getWidth(window.android) };
                     let height = unsafe { ndk_sys::ANativeWindow_getHeight(window.android) };
 
-                    window.surface.resize(width as u32, height as u32);
+                    window.surface.resize(width as u32, height as u32).unwrap();
                     let size = Size::new(
                         width as f32 / self.scale_factor,
                         height as f32 / self.scale_factor,
                     );
 
-                    self.context.root.window_resized(window.id, size);
+                    self.context.window_resized(window.id, size);
                 }
             }
 
@@ -141,7 +145,7 @@ impl<'a, T> EventLoop<'a, T> {
                 tracing::trace!(focused, "window focus changed");
 
                 if let WindowState::Open(ref window) = self.window {
-                    (self.context.root).window_focused(window.id, focused);
+                    self.context.window_focused(window.id, focused);
                 }
             }
 
@@ -152,7 +156,7 @@ impl<'a, T> EventLoop<'a, T> {
 
                 if self.wants_render {
                     self.wants_render = false;
-                    self.context.proxy.send(Event::Window(WindowEvent::Redraw));
+                    self.proxy.send(Event::Window(WindowEvent::Redraw));
                 }
             }
         }

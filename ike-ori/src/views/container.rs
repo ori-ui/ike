@@ -1,7 +1,7 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, WidgetId, widgets,
 };
-use ori::ProviderContext;
+use ori::Providable;
 
 use crate::{Context, Palette, View};
 
@@ -111,11 +111,8 @@ where
     fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let theme = cx
-            .get_context::<ContainerTheme>()
-            .cloned()
-            .unwrap_or_default();
+        let palette = cx.get_or_default::<Palette>();
+        let theme = cx.get_or_default::<ContainerTheme>();
 
         let mut widget = widgets::Container::new(cx, contents.upcast());
 
@@ -150,13 +147,10 @@ where
             &mut old.contents,
         );
 
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let theme = cx
-            .get_context::<ContainerTheme>()
-            .cloned()
-            .unwrap_or_default();
+        let palette = cx.get_or_default::<Palette>();
+        let theme = cx.get_or_default::<ContainerTheme>();
 
-        let Some(mut widget) = cx.get_mut(*element) else {
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
@@ -198,7 +192,7 @@ where
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
-        cx.remove(element);
+        cx.remove_widget(element);
     }
 
     fn event(
@@ -211,7 +205,7 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let Some(mut widget) = cx.get_mut(*element) else {
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
             return action;
         };
 

@@ -1,6 +1,7 @@
 [package]
 name = "ike"
-version = "0.1.0"
+version.workspace = true
+authors.workspace = true
 edition.workspace = true
 
 [workspace]
@@ -9,71 +10,59 @@ members = [
   "ike-skia",
   "ike-macro",
   "cargo-ike",
-  "examples/*",
+  "examples/*", "ike-ori", "ike-winit", "ike-android",
 ]
 
 [workspace.package]
+version = "0.1.0"
+authors = ["Ori developers"]
 edition = "2024"
 
 [workspace.dependencies]
-ike-core  = { path = "ike-core"  }
-ike-macro = { path = "ike-macro" }
-ike-skia  = { path = "ike-skia"  }
-ike       = { path = "."         }
+ike-android = { path = "ike-android" }
+ike-core    = { path = "ike-core"    }
+ike-macro   = { path = "ike-macro"   }
+ike-ori     = { path = "ike-ori"     }
+ike-skia    = { path = "ike-skia"    }
+ike-winit   = { path = "ike-winit"   }
+ike         = { path = "."           }
+
+[workspace.dependencies.ori]
+git = "https://github.com/ori-ui/ori"
+
+[workspace.dependencies.tokio]
+version = "1"
+
+[workspace.dependencies.tracing]
+version = "0.1"
+
+[workspace.dependencies.thiserror]
+version = "2"
+
+[workspace.dependencies.tracing-subscriber]
+version = "0.3"
 
 [features]
 default = ["winit"]
-reload = ["dep:libloading", "dep:rand", "dep:json"]
 
-winit = ["dep:copypasta", "dep:winit"]
+winit = ["dep:ike-winit"]
 
 [dependencies]
 ike-core  = { workspace = true }
 ike-macro = { workspace = true }
+ike-ori   = { workspace = true }
 ike-skia  = { workspace = true }
+ori       = { workspace = true }
+tracing   = { workspace = true }
+thiserror = { workspace = true }
 
-[dependencies.ori]
-git = "https://github.com/ori-ui/ori"
 
-[dependencies.tokio]
-version = "1"
-features = ["rt-multi-thread"]
-
-[target.'cfg(any(all(target_family = "unix", not(target_os = "android")), target_os = "macos", target_os = "windows"))'.dependencies.copypasta]
-version = "0.10"
-optional = true
-
-[target.'cfg(any(all(target_family = "unix", not(target_os = "android")), target_os = "macos", target_os = "windows"))'.dependencies.winit]
-version = "0.30"
-optional = true
-default-features = false
-features = [
-  "wayland",
-  "wayland-dlopen",
-  "x11",
-  "rwh_06"
-]
+[target.'cfg(any(all(target_family = "unix", not(target_os = "android")), target_os = "macos", target_os = "windows"))'.dependencies]
+ike-winit = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
-raw-window-handle = "0.6"
-ndk-sys = "0.6"
-jni = "0.21"
-
-[dependencies.libloading]
-version = "0.9"
-optional = true
-
-[dependencies.rand]
-version = "0.9"
-optional = true
-
-[dependencies.json]
-version = "0.12"
-optional = true
-
-[dependencies.tracing]
-version = "0.1"
+ike-android = { workspace = true }
 
 [dependencies.tracing-subscriber]
-version = "0.3"
+workspace = true
 features = ["env-filter"]

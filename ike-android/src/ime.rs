@@ -6,7 +6,7 @@ use jni::{
     objects::{JClass, JObject, JString},
 };
 
-use crate::android::{Event, EventLoop, WindowState, context::Proxy};
+use crate::{Event, EventLoop, WindowState, context::Proxy};
 
 #[derive(Debug)]
 pub(super) enum ImeEvent {
@@ -101,7 +101,7 @@ impl<'a, T> EventLoop<'a, T> {
                 );
 
                 if let WindowState::Open(ref window) = self.window {
-                    self.context.root.ime_commit_text(window.id, text);
+                    self.context.ime_commit_text(window.id, text);
                 }
             }
 
@@ -112,20 +112,20 @@ impl<'a, T> EventLoop<'a, T> {
                     let selection = self.ime.selection();
 
                     if selection.start != selection.end {
-                        self.context.root.ime_commit_text(window.id, String::new());
+                        self.context.ime_commit_text(window.id, String::new());
                         return;
                     }
 
                     if before != 0 {
                         let start = self.ime.index_n_chars_before(before);
-                        (self.context.root).ime_select(window.id, start..selection.start);
-                        self.context.root.ime_commit_text(window.id, String::new());
+                        self.context.ime_select(window.id, start..selection.start);
+                        self.context.ime_commit_text(window.id, String::new());
                     }
 
                     if after != 0 {
                         let end = self.ime.index_n_chars_after(after);
-                        (self.context.root).ime_select(window.id, selection.end..end);
-                        self.context.root.ime_commit_text(window.id, String::new());
+                        self.context.ime_select(window.id, selection.end..end);
+                        self.context.ime_commit_text(window.id, String::new());
                     }
                 }
             }
@@ -134,7 +134,7 @@ impl<'a, T> EventLoop<'a, T> {
                 tracing::trace!(?key, pressed, "ime send key event");
 
                 if let WindowState::Open(ref window) = self.window {
-                    (self.context.root).key_pressed(window.id, key, false, None, pressed);
+                    (self.context).key_pressed(window.id, key, false, None, pressed);
                 }
             }
 
@@ -143,7 +143,7 @@ impl<'a, T> EventLoop<'a, T> {
 
                 if let WindowState::Open(ref window) = self.window {
                     self.ime.set_selection(start..end);
-                    (self.context.root).ime_select(window.id, start..end);
+                    self.context.ime_select(window.id, start..end);
                 }
             }
         }

@@ -1,0 +1,33 @@
+[package]
+name = "ike-winit"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+ike-core  = { workspace = true }
+ike-ori   = { workspace = true }
+ori       = { workspace = true }
+tracing   = { workspace = true }
+thiserror = { workspace = true }
+
+[dependencies.ike-skia]
+workspace = true
+features = ["vulkan"]
+
+[dependencies.tokio]
+workspace = true
+features = ["rt-multi-thread"]
+
+[dependencies.copypasta]
+version = "0.10"
+
+[dependencies.winit]
+version = "0.30"
+default-features = false
+features = [
+  "wayland",
+  "wayland-dlopen",
+  "x11",
+  "rwh_06"
+]

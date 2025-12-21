@@ -12,7 +12,7 @@ pub struct Constrain {
 
 impl Constrain {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert(Self {
+        let mut this = cx.insert_widget(Self {
             min_size: Transitioned::new(Size::all(0.0), Transition::INSTANT),
             max_size: Transitioned::new(
                 Size::all(f32::INFINITY),

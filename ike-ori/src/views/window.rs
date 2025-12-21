@@ -1,5 +1,5 @@
 use ike_core::{AnyWidgetId, BuildCx, Color, Size, WindowId, WindowSizing};
-use ori::ProviderContext;
+use ori::Providable;
 
 use crate::{Context, Palette, View};
 
@@ -74,8 +74,8 @@ where
     fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let id = cx.create_window(contents);
+        let palette = cx.get_or_default::<Palette>();
+        let id = cx.root_mut().create_window(contents.upcast());
 
         cx.set_window_title(id, self.title.clone());
         cx.set_window_sizing(id, self.sizing);
@@ -105,13 +105,13 @@ where
             &mut old.contents,
         );
 
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
+        let palette = cx.get_or_default::<Palette>();
 
         if let Some(window) = cx.root().get_window(*id)
             && window.contents() != contents.upcast()
             && let Some(prev) = cx.set_window_contents(*id, *contents)
         {
-            cx.remove(prev)
+            cx.remove_widget(prev)
         }
 
         if self.title != old.title {
@@ -145,7 +145,7 @@ where
         cx: &mut Context,
         _data: &mut T,
     ) {
-        cx.remove_window(window);
+        cx.root_mut().remove_window(window);
     }
 
     fn event(
@@ -162,7 +162,7 @@ where
             && window.contents() != contents.upcast()
             && let Some(prev) = cx.set_window_contents(*id, *contents)
         {
-            cx.remove(prev)
+            cx.remove_widget(prev)
         }
 
         action

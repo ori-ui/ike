@@ -6,7 +6,7 @@ pub struct Pad {
 
 impl Pad {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert(Pad {
+        let mut this = cx.insert_widget(Pad {
             padding: Padding::all(8.0),
         });
 

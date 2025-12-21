@@ -12,7 +12,7 @@ impl Aligned {
         y: f32,
         contents: impl AnyWidgetId,
     ) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert(Aligned { x, y });
+        let mut this = cx.insert_widget(Aligned { x, y });
         this.add_child(contents);
         this
     }

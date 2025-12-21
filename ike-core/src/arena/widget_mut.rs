@@ -436,7 +436,9 @@ where
                 self.draw_recursive_clipped(canvas);
             });
 
-            (self.cx.root.recorder).insert(self.cx.id(), draw_cost, recording);
+            if let Some(recording) = recording {
+                (self.cx.root.recorder).insert(self.cx.id(), draw_cost, recording);
+            }
 
             return;
         }

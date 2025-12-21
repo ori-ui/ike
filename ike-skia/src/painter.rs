@@ -159,7 +159,10 @@ impl SkiaPainter {
             self.paragraphs.insert(weak.clone(), (max_width, paragraph));
         }
 
-        let (current_max_width, paragraph) = self.paragraphs.get_mut(&weak).unwrap();
+        let (current_max_width, paragraph) = self
+            .paragraphs
+            .get_mut(&weak)
+            .expect("inserted if not contained");
 
         if *current_max_width != max_width {
             paragraph.layout(max_width);

@@ -1,6 +1,7 @@
 [package]
 name = "ike-skia"
-version = "0.1.0"
+version.workspace = true
+authors.workspace = true
 edition.workspace = true
 
 [features]
@@ -12,6 +13,7 @@ ike-core.workspace = true
 
 seahash = "4"
 tracing = "0.1"
+thiserror = "2"
 
 [dependencies.skia-safe]
 version = "0.91"

@@ -2,7 +2,7 @@ use ike_core::{
     BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::ProviderContext;
+use ori::Providable;
 
 use crate::{Context, Palette, views::TextTheme};
 
@@ -217,9 +217,9 @@ impl<T> ori::View<Context, T> for Prose {
     type State = ori::ViewId;
 
     fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let text_theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
-        let theme = cx.get_context::<ProseTheme>().cloned().unwrap_or_default();
+        let palette = cx.get_or_default::<Palette>();
+        let text_theme = cx.get_or_default::<TextTheme>();
+        let theme = cx.get_or_default::<ProseTheme>();
         let id = ori::ViewId::next();
 
         let paragraph = self.build_paragraph(
@@ -250,11 +250,11 @@ impl<T> ori::View<Context, T> for Prose {
         _data: &mut T,
         old: &mut Self,
     ) {
-        let palette = cx.get_context::<Palette>().cloned().unwrap_or_default();
-        let text_theme = cx.get_context::<TextTheme>().cloned().unwrap_or_default();
-        let theme = cx.get_context::<ProseTheme>().cloned().unwrap_or_default();
+        let palette = cx.get_or_default::<Palette>();
+        let text_theme = cx.get_or_default::<TextTheme>();
+        let theme = cx.get_or_default::<ProseTheme>();
 
-        let Some(mut widget) = cx.get_mut(*element) else {
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
@@ -302,7 +302,7 @@ impl<T> ori::View<Context, T> for Prose {
         cx: &mut Context,
         _data: &mut T,
     ) {
-        cx.remove(element);
+        cx.remove_widget(element);
     }
 
     fn event(

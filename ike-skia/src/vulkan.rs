@@ -1,12 +1,25 @@
-use std::slice;
+use std::{ptr, slice};
 
-use ash::vk::{self, Handle};
+use ash::{
+    LoadingError,
+    vk::{self, Handle},
+};
 use ike_core::Color;
 use raw_window_handle::{DisplayHandle, WindowHandle};
 
 use crate::{SkiaCanvas, SkiaPainter};
 
-pub struct SkiaVulkanContext {
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    Loading(#[from] LoadingError),
+    #[error("vulkan runtime error: {0}")]
+    Runtime(&'static str),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub struct Context {
     entry:        ash::Entry,
     instance:     ash::Instance,
     physical:     vk::PhysicalDevice,
@@ -15,7 +28,7 @@ pub struct SkiaVulkanContext {
     queue:        vk::Queue,
 }
 
-impl Drop for SkiaVulkanContext {
+impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_device(None);
@@ -24,9 +37,9 @@ impl Drop for SkiaVulkanContext {
     }
 }
 
-impl SkiaVulkanContext {
-    pub fn new(display: DisplayHandle) -> Self {
-        let entry = unsafe { ash::Entry::load().unwrap() };
+impl Context {
+    pub fn new(display: DisplayHandle) -> Result<Self> {
+        let entry = unsafe { ash::Entry::load()? };
         let raw_display = display.as_raw();
 
         let api_version = unsafe {
@@ -48,7 +61,9 @@ impl SkiaVulkanContext {
             .engine_name(c"skia")
             .api_version(api_version);
 
-        let extensions = ash_window::enumerate_required_extensions(raw_display).unwrap();
+        let extensions = ash_window::enumerate_required_extensions(raw_display)
+            .map_err(|_| Error::Runtime("failed querying required extensions"))?;
+
         let validation_layers = [c"VK_LAYER_KHRONOS_validation"];
         let validation_layer_names = validation_layers
             .into_iter()
@@ -78,8 +93,17 @@ impl SkiaVulkanContext {
             }
         }
 
-        let instance = unsafe { entry.create_instance(&instance_info, None).unwrap() };
-        let physical = unsafe { instance.enumerate_physical_devices().unwrap()[0] };
+        let instance = unsafe {
+            entry
+                .create_instance(&instance_info, None)
+                .map_err(|_| Error::Runtime("failed creating instance"))?
+        };
+
+        let physical = unsafe {
+            instance
+                .enumerate_physical_devices()
+                .map_err(|_| Error::Runtime("failed querying physical devices"))?[0]
+        };
 
         let family_index = unsafe {
             instance
@@ -89,7 +113,9 @@ impl SkiaVulkanContext {
                     tracing::trace!(queue_family = ?family, "found queue family");
                     family.queue_flags.contains(vk::QueueFlags::GRAPHICS)
                 })
-                .unwrap()
+                .ok_or(Error::Runtime(
+                    "could not find compatible queue family device",
+                ))?
         };
 
         let queue_info = [vk::DeviceQueueCreateInfo::default()
@@ -105,22 +131,22 @@ impl SkiaVulkanContext {
         let device = unsafe {
             instance
                 .create_device(physical, &device_info, None)
-                .unwrap()
+                .map_err(|_| Error::Runtime("failed creating logical device"))?
         };
         let queue = unsafe { device.get_device_queue(family_index as u32, 0) };
 
-        Self {
+        Ok(Self {
             entry,
             instance,
             physical,
             device,
             family_index: family_index as u32,
             queue,
-        }
+        })
     }
 }
 
-pub struct SkiaVulkanSurface {
+pub struct Surface {
     entry:            ash::Entry,
     instance:         ash::Instance,
     device:           ash::Device,
@@ -146,7 +172,7 @@ pub struct SkiaVulkanSurface {
     msaa:             bool,
 }
 
-impl Drop for SkiaVulkanSurface {
+impl Drop for Surface {
     fn drop(&mut self) {
         unsafe {
             let _ = self.device.device_wait_idle();
@@ -176,7 +202,7 @@ impl Drop for SkiaVulkanSurface {
     }
 }
 
-impl SkiaVulkanSurface {
+impl Surface {
     const SDR_BGRA_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
         format:      vk::Format::B8G8R8A8_SRGB,
         color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR,
@@ -197,12 +223,12 @@ impl SkiaVulkanSurface {
     /// - Display and window handles from `window` must be vaild for the `display` `context` was
     ///   created with.
     pub unsafe fn new(
-        context: &mut SkiaVulkanContext,
+        context: &mut Context,
         display: DisplayHandle,
         window: WindowHandle,
         width: u32,
         height: u32,
-    ) -> Self {
+    ) -> Result<Self> {
         let skia_context = unsafe {
             let get_proc = |gpo| match gpo {
                 skia_safe::gpu::vk::GetProcOf::Instance(instance, name) => {
@@ -210,12 +236,13 @@ impl SkiaVulkanSurface {
                     context
                         .entry
                         .get_instance_proc_addr(instance, name)
-                        .unwrap() as _
+                        .map_or(ptr::null(), |f| f as *const _)
                 }
 
                 skia_safe::gpu::vk::GetProcOf::Device(device, name) => {
                     let device = vk::Device::from_raw(device as _);
-                    (context.instance.fp_v1_0().get_device_proc_addr)(device, name).unwrap() as _
+                    (context.instance.fp_v1_0().get_device_proc_addr)(device, name)
+                        .map_or(ptr::null(), |f| f as *const _)
                 }
             };
 
@@ -232,7 +259,9 @@ impl SkiaVulkanSurface {
                 ),
                 None,
             )
-            .unwrap()
+            .ok_or(Error::Runtime(
+                "failed creating skia direct context",
+            ))?
         };
 
         let surface = unsafe {
@@ -243,7 +272,7 @@ impl SkiaVulkanSurface {
                 window.as_raw(),
                 None,
             )
-            .unwrap()
+            .map_err(|_| Error::Runtime("failed creating window surface"))?
         };
 
         let instance = ash::khr::surface::Instance::new(&context.entry, &context.instance);
@@ -251,13 +280,13 @@ impl SkiaVulkanSurface {
         let capabilities = unsafe {
             instance
                 .get_physical_device_surface_capabilities(context.physical, surface)
-                .unwrap()
+                .map_err(|_| Error::Runtime("failed querying surface capabilities"))?
         };
 
         let present_modes = unsafe {
             instance
                 .get_physical_device_surface_present_modes(context.physical, surface)
-                .unwrap()
+                .map_err(|_| Error::Runtime("failed querying surface present modes"))?
         };
 
         let present_mode = if present_modes.contains(&vk::PresentModeKHR::MAILBOX) {
@@ -271,7 +300,7 @@ impl SkiaVulkanSurface {
         let surface_formats = unsafe {
             instance
                 .get_physical_device_surface_formats(context.physical, surface)
-                .unwrap()
+                .map_err(|_| Error::Runtime("failed querying surface formats"))?
         };
 
         let surface_format = if surface_formats.contains(&Self::HDR_FORMAT) {
@@ -311,7 +340,7 @@ impl SkiaVulkanSurface {
             context
                 .device
                 .create_command_pool(&pool_info, None)
-                .unwrap()
+                .map_err(|_| Error::Runtime("failed creating command pool"))?
         };
 
         let mut this = Self {
@@ -343,9 +372,9 @@ impl SkiaVulkanSurface {
             )),
         };
 
-        this.resize(width, height);
+        this.resize(width, height)?;
 
-        this
+        Ok(this)
     }
 
     pub(crate) fn create_render_target(
@@ -353,7 +382,7 @@ impl SkiaVulkanSurface {
         width: u32,
         height: u32,
         is_primary: bool,
-    ) -> skia_safe::Surface {
+    ) -> Result<skia_safe::Surface> {
         let (color_type, color_space) = if self.surface_format == Self::HDR_FORMAT {
             if is_primary {
                 (
@@ -362,7 +391,9 @@ impl SkiaVulkanSurface {
                         skia_safe::named_primaries::CicpId::Rec2020,
                         skia_safe::named_transfer_fn::CicpId::PQ,
                     )
-                    .unwrap(),
+                    .ok_or(Error::Runtime(
+                        "failed creating skia color space",
+                    ))?,
                 )
             } else {
                 (
@@ -403,11 +434,17 @@ impl SkiaVulkanSurface {
             false,
             None,
         )
-        .unwrap()
+        .ok_or(Error::Runtime(
+            "failed creating skia render target",
+        ))
     }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
-        unsafe { self.device.device_wait_idle().unwrap() };
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<()> {
+        unsafe {
+            self.device
+                .device_wait_idle()
+                .map_err(|_| Error::Runtime("failed waiting for device"))?
+        };
 
         self.skia_surfaces.clear();
 
@@ -431,8 +468,18 @@ impl SkiaVulkanSurface {
             .composite_alpha(self.composite_alpha)
             .present_mode(self.present_mode);
 
-        self.swapchain = unsafe { device.create_swapchain(&swapchain_info, None).unwrap() };
-        self.swapchain_images = unsafe { device.get_swapchain_images(self.swapchain).unwrap() };
+        self.swapchain = unsafe {
+            device
+                .create_swapchain(&swapchain_info, None)
+                .map_err(|_| Error::Runtime("failed creating swapchain"))?
+        };
+
+        self.swapchain_images = unsafe {
+            device
+                .get_swapchain_images(self.swapchain)
+                .map_err(|_| Error::Runtime("failed getting swapchain images"))?
+        };
+
         self.width = width;
         self.height = height;
 
@@ -442,15 +489,18 @@ impl SkiaVulkanSurface {
                 .command_buffer_count(self.swapchain_images.len() as u32)
                 .level(vk::CommandBufferLevel::PRIMARY);
 
-            self.command_buffers =
-                unsafe { self.device.allocate_command_buffers(&buffer_info).unwrap() };
+            self.command_buffers = unsafe {
+                self.device
+                    .allocate_command_buffers(&buffer_info)
+                    .map_err(|_| Error::Runtime("failed allocating command buffers"))?
+            };
         }
 
         while self.image_available.len() < self.swapchain_images.len() {
             let image_available = unsafe {
                 self.device
                     .create_semaphore(&Default::default(), None)
-                    .unwrap()
+                    .map_err(|_| Error::Runtime("failed creating image available semaphore"))?
             };
 
             self.image_available.push(image_available);
@@ -460,7 +510,7 @@ impl SkiaVulkanSurface {
             let render_finished = unsafe {
                 self.device
                     .create_semaphore(&Default::default(), None)
-                    .unwrap()
+                    .map_err(|_| Error::Runtime("failed creating render finished semaphore"))?
             };
 
             self.render_finished.push(render_finished);
@@ -468,23 +518,38 @@ impl SkiaVulkanSurface {
 
         while self.in_flight.len() < self.swapchain_images.len() {
             let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
-            let in_flight = unsafe { self.device.create_fence(&fence_info, None).unwrap() };
+            let in_flight = unsafe {
+                self.device
+                    .create_fence(&fence_info, None)
+                    .map_err(|_| Error::Runtime("failed creating in flight fence"))?
+            };
 
             self.in_flight.push(in_flight);
         }
 
         while self.skia_surfaces.len() < self.swapchain_images.len() {
-            let mut surface = self.create_render_target(width, height, true);
+            let mut surface = self.create_render_target(width, height, true)?;
             let target = skia_safe::gpu::surfaces::get_backend_render_target(
                 &mut surface,
                 skia_safe::surface::BackendHandleAccess::FlushRead,
             )
-            .unwrap();
+            .ok_or(Error::Runtime(
+                "failed creating skia backend render target",
+            ))?;
 
-            let image = vk::Image::from_raw(*target.vulkan_image_info().unwrap().image() as _);
+            let image = vk::Image::from_raw(
+                *target
+                    .vulkan_image_info()
+                    .ok_or(Error::Runtime(
+                        "image not present in vulkan image info",
+                    ))?
+                    .image() as _,
+            );
 
             self.skia_surfaces.push((surface, image));
         }
+
+        Ok(())
     }
 
     pub fn draw<T>(
@@ -494,7 +559,7 @@ impl SkiaVulkanSurface {
         scale_factor: f32,
         pre_present: impl FnOnce(),
         f: impl FnOnce(&mut SkiaCanvas) -> T,
-    ) -> Option<T> {
+    ) -> Result<Option<T>> {
         let command_buffer = self.command_buffers[self.current_frame as usize];
         let image_available = self.image_available[self.current_frame as usize];
         let in_flight = self.in_flight[self.current_frame as usize];
@@ -503,9 +568,11 @@ impl SkiaVulkanSurface {
             // wait for resources to be available
             self.device
                 .wait_for_fences(&[in_flight], true, u64::MAX)
-                .unwrap();
+                .map_err(|_| Error::Runtime("failed waiting for in flight fence"))?;
 
-            self.device.reset_fences(&[in_flight]).unwrap();
+            self.device
+                .reset_fences(&[in_flight])
+                .map_err(|_| Error::Runtime("failed resetting in flight fence"))?;
 
             // acquire swapchain image
             let device = ash::khr::swapchain::Device::new(&self.instance, &self.device);
@@ -522,7 +589,7 @@ impl SkiaVulkanSurface {
                         ?error,
                         "error acquiring swapchain image",
                     );
-                    return None;
+                    return Ok(None);
                 }
             };
 
@@ -568,7 +635,7 @@ impl SkiaVulkanSurface {
 
             self.device
                 .begin_command_buffer(command_buffer, &begin_info)
-                .unwrap();
+                .map_err(|_| Error::Runtime("failed beginning command buffer"))?;
 
             let range = vk::ImageSubresourceRange::default()
                 .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -654,7 +721,9 @@ impl SkiaVulkanSurface {
                 &[skia_to_transfer_dst, swapchain_to_present],
             );
 
-            self.device.end_command_buffer(command_buffer).unwrap();
+            self.device
+                .end_command_buffer(command_buffer)
+                .map_err(|_| Error::Runtime("failed recording command buffer"))?;
 
             let submit = vk::SubmitInfo::default()
                 .wait_semaphores(slice::from_ref(&image_available))
@@ -664,7 +733,7 @@ impl SkiaVulkanSurface {
 
             self.device
                 .queue_submit(self.queue, &[submit], in_flight)
-                .unwrap();
+                .map_err(|_| Error::Runtime("failed submitting command buffer"))?;
 
             let present_info = vk::PresentInfoKHR::default()
                 .swapchains(slice::from_ref(&self.swapchain))
@@ -672,11 +741,13 @@ impl SkiaVulkanSurface {
                 .wait_semaphores(slice::from_ref(&render_finished));
 
             pre_present();
-            device.queue_present(self.queue, &present_info).unwrap();
+            device
+                .queue_present(self.queue, &present_info)
+                .map_err(|_| Error::Runtime("failed presenting swapchain"))?;
 
             self.current_frame = (self.current_frame + 1) % self.swapchain_images.len() as u32;
 
-            Some(output)
+            Ok(Some(output))
         }
     }
 }

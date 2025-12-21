@@ -38,7 +38,7 @@ pub struct Picture {
 
 impl Picture {
     pub fn new(cx: &mut impl BuildCx, contents: Picturable) -> WidgetMut<'_, Self> {
-        cx.insert(Self {
+        cx.insert_widget(Self {
             contents,
             fit: Fit::None,
             color: None,
@@ -133,8 +133,10 @@ impl Widget for Picture {
                         }
                     });
 
-                    canvas.draw_recording(&recording);
-                    self.recording = Some(recording);
+                    if let Some(recording) = recording {
+                        canvas.draw_recording(&recording);
+                        self.recording = Some(recording);
+                    }
                 }
             },
         }

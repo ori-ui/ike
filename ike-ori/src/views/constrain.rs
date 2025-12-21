@@ -175,7 +175,7 @@ where
             &mut old.contents,
         );
 
-        let Some(mut widget) = cx.get_mut(*element) else {
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
@@ -208,7 +208,7 @@ where
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
-        cx.remove(element);
+        cx.remove_widget(element);
     }
 
     fn event(
@@ -221,7 +221,7 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let Some(mut widget) = cx.get_mut(*element) else {
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
             return action;
         };
 

@@ -18,5 +18,5 @@ fn ui(data: &mut Data) -> impl Effect<Data> + use<> {
 fn main() {
     let mut data = Data { count: 0 };
 
-    App::new().run(&mut data, ui);
+    App::new().run(&mut data, ui).unwrap();
 }

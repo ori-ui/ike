@@ -185,7 +185,7 @@ impl Root {
 
         self.state.signal(RootSignal::CreateWindow(id));
 
-        if let Some(mut widget) = self.get_mut(contents) {
+        if let Some(mut widget) = self.get_widget_mut(contents) {
             widget.cx.set_window_recursive(Some(id));
         }
 
@@ -194,7 +194,7 @@ impl Root {
 
     pub fn remove_window(&mut self, window: WindowId) {
         if let Some(window) = self.get_window(window) {
-            self.remove(window.contents);
+            self.remove_widget(window.contents);
         }
 
         self.state.windows.retain(|w| w.id() != window);
@@ -219,7 +219,7 @@ impl Root {
         window: WindowId,
         contents: WidgetId,
     ) -> Option<WidgetId> {
-        if let Some(mut widget) = self.get_mut(contents) {
+        if let Some(mut widget) = self.get_widget_mut(contents) {
             widget.cx.set_window_recursive(Some(window));
             widget.cx.request_layout();
         } else {
@@ -276,7 +276,7 @@ impl Root {
         let mut current = Some(widget);
 
         while let Some(widget) = current
-            && let Some(mut widget) = self.get_mut(widget)
+            && let Some(mut widget) = self.get_widget_mut(widget)
         {
             widget.cx.update_state();
             current = widget.cx.parent();
@@ -390,7 +390,7 @@ impl Root {
 
         // if the window was left in an ime session, we need start it again
         if let Some(focused) = query::find_focused(&self.arena, contents)
-            && let Some(widget) = self.get(focused)
+            && let Some(widget) = self.get_widget(focused)
             && widget.cx.state.accepts_text
             && is_focused
         {

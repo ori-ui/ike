@@ -34,7 +34,7 @@ impl Root {
         }
 
         if let Some(hovered) = query::find_hovered(&self.arena, window.contents)
-            && let Some(mut widget) = self.get_mut(hovered)
+            && let Some(mut widget) = self.get_widget_mut(hovered)
         {
             widget.set_hovered(false);
         }
@@ -137,7 +137,7 @@ impl Root {
         if button == PointerButton::Primary
             && pressed
             && let Some(focused) = query::find_focused(&self.arena, window_contents)
-            && self.get(focused).is_some_and(|widget| {
+            && self.get_widget(focused).is_some_and(|widget| {
                 let local = widget.cx.global_transform().inverse() * pointer_position;
                 !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
             })
@@ -161,7 +161,7 @@ impl Root {
                 PointerPropagate::Handled => true,
 
                 PointerPropagate::Capture if pressed => {
-                    if let Some(mut widget) = self.get_mut(target) {
+                    if let Some(mut widget) = self.get_widget_mut(target) {
                         widget.set_active(true);
                     }
 
@@ -183,7 +183,7 @@ impl Root {
                 .is_some_and(|s| s.is_active);
 
             if !pressed && target_is_active {
-                if let Some(mut widget) = self.get_mut(target) {
+                if let Some(mut widget) = self.get_widget_mut(target) {
                     widget.set_active(false);
                 }
 
@@ -290,7 +290,7 @@ pub fn update_hovered(
     }
 
     if let Some(hovered) = hovered
-        && let Some(widget) = root.get_mut(hovered)
+        && let Some(widget) = root.get_widget_mut(hovered)
     {
         widget.cx.root.set_window_cursor(window, widget.cx.cursor());
     } else {
@@ -313,7 +313,7 @@ fn send_pointer_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current
-        && let Some(widget) = root.get_mut(id)
+        && let Some(widget) = root.get_widget_mut(id)
         && let PointerPropagate::Bubble = propagate
     {
         let mut cx = EventCx {
