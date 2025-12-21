@@ -1,7 +1,9 @@
+#![warn(clippy::unwrap_used)]
+
 use std::{
     any::Any,
     ffi::{self, CString},
-    fmt,
+    fmt, io,
     pin::Pin,
     ptr::{self, NonNull},
     sync::{
@@ -36,7 +38,16 @@ use crate::{
 static NATIVE_ACTIVITY: AtomicPtr<ndk_sys::ANativeActivity> = AtomicPtr::new(ptr::null_mut());
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {}
+pub enum Error {
+    #[error("vulkan error: {0}")]
+    Vulkan(#[from] ike_skia::vulkan::Error),
+
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
+
+    #[error("jni error: {0}")]
+    Jni(#[from] jni::errors::Error),
+}
 
 #[doc(hidden)]
 pub fn android_main<T>(native_activity: *mut ffi::c_void, main: fn() -> T)
@@ -88,16 +99,21 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
 
     let rt;
     let _rt_guard = if tokio::runtime::Handle::try_current().is_err() {
-        rt = Some(tokio::runtime::Runtime::new().unwrap());
-        Some(rt.as_ref().unwrap().enter())
+        rt = Some(tokio::runtime::Runtime::new()?);
+        rt.as_ref().map(|rt| rt.enter())
     } else {
         None
     };
 
     let runtime = tokio::runtime::Handle::current();
     let display_handle = DisplayHandle::android();
-    let vulkan_context = ike_skia::vulkan::Context::new(display_handle).unwrap();
-    let painter = ike_skia::SkiaPainter::new();
+    let vulkan_context = ike_skia::vulkan::Context::new(display_handle)?;
+    let mut painter = ike_skia::SkiaPainter::new();
+
+    painter.load_font(
+        include_bytes!("../../fonts/InterVariable.ttf"),
+        None,
+    );
 
     let scale_factor = unsafe {
         let config = ndk_sys::AConfiguration_new();
@@ -128,8 +144,8 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     let (_, state) = view.any_build(&mut context, data);
 
     let (jvm, ime) = unsafe {
-        let jvm = JavaVM::from_raw(native_activity.as_ref().vm).unwrap();
-        let ime = ime::init(&jvm, native_activity, proxy.clone()).unwrap();
+        let jvm = JavaVM::from_raw(native_activity.as_ref().vm)?;
+        let ime = ime::init(&jvm, native_activity, proxy.clone())?;
 
         (jvm, ime)
     };

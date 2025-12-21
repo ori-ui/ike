@@ -1,10 +1,11 @@
-use std::{ffi, ops::Range, ptr::NonNull, sync::Mutex};
+use std::{ffi, ops::Range, ptr::NonNull};
 
 use ike_core::{ImeSignal, Key, NamedKey};
 use jni::{
     JNIEnv, JavaVM,
     objects::{JClass, JObject, JString},
 };
+use parking_lot::Mutex;
 
 use crate::{Event, EventLoop, WindowState, context::Proxy};
 
@@ -22,23 +23,16 @@ pub(super) struct Ime {
 }
 
 impl Ime {
-    #[allow(dead_code)]
-    pub fn with_text(&self, f: impl FnOnce(&str)) {
-        if let Ok(state) = self.state.lock() {
-            f(&state.text);
-        }
-    }
-
     pub fn selection(&self) -> Range<usize> {
-        self.state.lock().unwrap().selection.clone()
+        self.state.lock().selection.clone()
     }
 
     pub fn composing(&self) -> Option<Range<usize>> {
-        self.state.lock().unwrap().composing.clone()
+        self.state.lock().composing.clone()
     }
 
     pub fn set_text(&self, text: String) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
 
         state.selection.start = state.selection.start.min(text.len());
         state.selection.end = state.selection.end.min(text.len());
@@ -46,7 +40,7 @@ impl Ime {
     }
 
     pub fn set_selection(&self, mut selection: Range<usize>) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
 
         selection.start = selection.start.min(state.text.len());
         selection.end = selection.end.min(state.text.len());
@@ -54,13 +48,13 @@ impl Ime {
     }
 
     pub fn set_composing(&self, composing: Option<Range<usize>>) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock();
 
         state.composing = composing;
     }
 
     pub fn index_n_chars_before(&self, n: usize) -> usize {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock();
 
         let mut index = state.selection.start;
 
@@ -72,7 +66,7 @@ impl Ime {
     }
 
     pub fn index_n_chars_after(&self, n: usize) -> usize {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock();
 
         let mut index = state.selection.end;
 
@@ -445,7 +439,7 @@ unsafe extern "C" fn get_text_before_cursor<'local>(
 
     if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
         let start = context.index_n_chars_before(n as usize);
-        let state = context.state.lock().unwrap();
+        let state = context.state.lock();
         let text = &state.text[start..state.selection.start];
 
         env.new_string(text)
@@ -465,7 +459,7 @@ unsafe extern "C" fn get_text_after_cursor<'local>(
 
     if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
         let end = context.index_n_chars_after(n as usize);
-        let state = context.state.lock().unwrap();
+        let state = context.state.lock();
         let text = &state.text[state.selection.end..end];
 
         env.new_string(text)
@@ -482,9 +476,8 @@ unsafe extern "C" fn get_selected_text<'local>(
 ) -> JString<'local> {
     tracing::trace!(flags, "get selected text");
 
-    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) }
-        && let Ok(state) = context.state.lock()
-    {
+    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
+        let state = context.state.lock();
         let start = state.selection.start.min(state.selection.len());
         let end = state.selection.end.min(state.selection.len());
         let text = &state.text[start..end];

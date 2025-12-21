@@ -104,7 +104,7 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     };
 
     #[cfg(not(target_os = "linux"))]
-    let clipboard = Box::new(copypasta::ClipboardContext::new().unwrap());
+    let clipboard = Box::new(copypasta::ClipboardContext::new().map_err(Error::Clipboard));
 
     let mut state = AppState {
         data,

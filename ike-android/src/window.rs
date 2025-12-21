@@ -22,9 +22,13 @@ impl<'a, T> EventLoop<'a, T> {
         match event {
             WindowEvent::Created(android) => {
                 let window_handle = unsafe {
-                    let window = ptr::NonNull::new(android).unwrap().cast();
+                    let Some(window) = ptr::NonNull::new(android) else {
+                        tracing::error!("android window was null");
+                        return;
+                    };
+
                     WindowHandle::borrow_raw(RawWindowHandle::AndroidNdk(
-                        AndroidNdkWindowHandle::new(window),
+                        AndroidNdkWindowHandle::new(window.cast()),
                     ))
                 };
 
@@ -41,7 +45,14 @@ impl<'a, T> EventLoop<'a, T> {
                         width as u32,
                         height as u32,
                     )
-                    .unwrap()
+                };
+
+                let vulkan = match vulkan {
+                    Ok(vulkan) => vulkan,
+                    Err(err) => {
+                        tracing::error!("failed creating vulkan context: {err}");
+                        return;
+                    }
                 };
 
                 if let WindowState::Pending {
@@ -97,7 +108,10 @@ impl<'a, T> EventLoop<'a, T> {
                         self.context.animate(window.id, delta_time);
                     }
 
-                    let color = self.context.get_window(window.id).unwrap().color();
+                    let Some(win) = self.context.get_window(window.id) else {
+                        tracing::error!("window not registered with ike");
+                        return;
+                    };
 
                     if let Some(choreographer) = self.choreographer {
                         unsafe {
@@ -111,16 +125,17 @@ impl<'a, T> EventLoop<'a, T> {
 
                     self.is_rendering = true;
 
-                    window
-                        .surface
-                        .draw(
-                            &mut self.painter,
-                            color,
-                            self.scale_factor,
-                            || {},
-                            |canvas| self.context.draw(window.id, canvas),
-                        )
-                        .unwrap();
+                    let result = window.surface.draw(
+                        &mut self.painter,
+                        win.color(),
+                        self.scale_factor,
+                        || {},
+                        |canvas| self.context.draw(window.id, canvas),
+                    );
+
+                    if let Err(err) = result {
+                        tracing::error!("draw failed: {err}");
+                    }
                 }
             }
 
@@ -131,7 +146,11 @@ impl<'a, T> EventLoop<'a, T> {
                     let width = unsafe { ndk_sys::ANativeWindow_getWidth(window.android) };
                     let height = unsafe { ndk_sys::ANativeWindow_getHeight(window.android) };
 
-                    window.surface.resize(width as u32, height as u32).unwrap();
+                    if let Err(err) = window.surface.resize(width as u32, height as u32) {
+                        tracing::error!("surface resize failed: {err}");
+                        return;
+                    }
+
                     let size = Size::new(
                         width as f32 / self.scale_factor,
                         height as f32 / self.scale_factor,
