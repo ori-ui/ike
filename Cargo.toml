@@ -6,11 +6,14 @@ edition.workspace = true
 
 [workspace]
 members = [
+  "ike-android",
   "ike-core",
-  "ike-skia",
   "ike-macro",
+  "ike-ori",
+  "ike-skia",
+  "ike-winit",
   "cargo-ike",
-  "examples/*", "ike-ori", "ike-winit", "ike-android",
+  "examples/*", 
 ]
 
 [workspace.package]

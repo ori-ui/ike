@@ -82,7 +82,7 @@ where
     });
 }
 
-pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) {
+pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Error> {
     let native_activity = NonNull::new(NATIVE_ACTIVITY.load(Ordering::SeqCst))
         .expect("native activity should be set");
 
@@ -167,7 +167,9 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) {
         },
     };
 
-    event_loop.run()
+    event_loop.run();
+
+    Ok(())
 }
 
 struct EventLoop<'a, T> {

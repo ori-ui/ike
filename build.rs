@@ -9,16 +9,14 @@ fn main() {
 
     println!("cargo::rustc-check-cfg=cfg(backend, values(\"winit\", \"android\"))");
 
-    if cfg!(target_os = "android") {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+
+    if target_os == "android" {
         println!("cargo::rustc-cfg=backend=\"android\"");
-    } else if cfg!(all(
-        feature = "winit",
-        any(
-            target_family = "unix",
-            target_os = "macos",
-            target_os = "windows",
-        )
-    )) {
+    } else if cfg!(feature = "winit")
+        && (target_family == "unix" || target_os == "macos" || target_os == "windows")
+    {
         println!("cargo::rustc-cfg=backend=\"winit\"");
     }
 }
