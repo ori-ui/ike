@@ -9,6 +9,10 @@ pub use ike_ori::*;
 
 pub use app::{App, Error};
 
+#[doc(hidden)]
+#[cfg(backend = "android")]
+pub use ike_android::android_main;
+
 pub mod prelude {
     pub use crate::App;
 
