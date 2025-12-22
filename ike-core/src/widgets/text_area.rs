@@ -42,7 +42,7 @@ pub struct SubmitBehaviour {
     pub clear_text: bool,
 }
 
-pub struct TextArea<const EDITABLE: bool = true> {
+pub struct TextArea<const EDITABLE: bool> {
     paragraph:         Paragraph,
     selection_color:   Color,
     cursor_color:      Color,

@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub struct Entry {
-    text_area:   WidgetId<TextArea>,
+    text_area:   WidgetId<TextArea<true>>,
     placeholder: WidgetId<Label>,
 
     min_width:        f32,
@@ -137,13 +137,15 @@ impl Entry {
         }
     }
 
-    pub fn get_text_area<'a>(this: &'a WidgetRef<'_, Self>) -> Option<WidgetRef<'a, TextArea>> {
+    pub fn get_text_area<'a>(
+        this: &'a WidgetRef<'_, Self>,
+    ) -> Option<WidgetRef<'a, TextArea<true>>> {
         this.cx.get(this.widget.text_area)
     }
 
     pub fn get_text_area_mut<'a>(
         this: &'a mut WidgetMut<'a, Self>,
-    ) -> Option<WidgetMut<'a, TextArea>> {
+    ) -> Option<WidgetMut<'a, TextArea<true>>> {
         this.cx.get_mut(this.widget.text_area)
     }
 }
