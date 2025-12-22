@@ -8,3 +8,4 @@ cargo_metadata = "0.23"
 clap = { version = "4", features = ["derive"] }
 eyre = "0.6"
 color-eyre = "0.6"
+serde_json = "1"

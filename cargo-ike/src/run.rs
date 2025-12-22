@@ -52,6 +52,8 @@ impl Android {
             .get("android")
             .ok_or_eyre("could not find `package.metadata.android`")?;
 
+        check_android_metadata(android_metadata);
+
         let package = android_metadata
             .get("package")
             .ok_or_eyre("could not find `package.metadata.android.package`")?
@@ -150,5 +152,28 @@ impl Android {
             .wait()?;
 
         Ok(())
+    }
+}
+
+fn check_android_metadata(metadata: &serde_json::Value) {
+    const VALID_KEYS: &[&str] = &[
+        "name",
+        "key-properties",
+        "package",
+        "compile-sdk",
+        "target-sdk",
+        "min-sdk",
+        "version",
+        "version-code",
+    ];
+
+    let Some(object) = metadata.as_object() else {
+        return;
+    };
+
+    for key in object.keys() {
+        if !VALID_KEYS.contains(&key.as_str()) {
+            eprintln!("unused key `package.metadata.android.{key}`");
+        }
     }
 }
