@@ -7,9 +7,8 @@ use std::{
     pin::Pin,
     ptr::{self, NonNull},
     sync::{
-        Arc,
-        atomic::{AtomicPtr, Ordering},
-        mpsc::Receiver,
+        Arc, OnceLock,
+        mpsc::{Receiver, Sender, channel},
     },
     time::Instant,
 };
@@ -24,8 +23,9 @@ mod window;
 use jni::JavaVM;
 pub use log::MakeAndroidWriter;
 
-use ike_core::{Root, RootSignal, WindowId, WindowUpdate};
+use ike_core::{Root, RootSignal, Size, WindowId, WindowUpdate};
 use ori::Proxyable;
+use parking_lot::Mutex;
 use raw_window_handle::DisplayHandle;
 
 use crate::{
@@ -35,7 +35,17 @@ use crate::{
     window::WindowEvent,
 };
 
-static NATIVE_ACTIVITY: AtomicPtr<ndk_sys::ANativeActivity> = AtomicPtr::new(ptr::null_mut());
+static GLOBAL_STATE: OnceLock<ActivityState> = OnceLock::new();
+
+struct ActivityState {
+    activity: NonNull<ndk_sys::ANativeActivity>,
+    receiver: Receiver<Event>,
+    sender:   Sender<Event>,
+    waker:    Mutex<Option<Box<dyn Fn() + Send>>>,
+}
+
+unsafe impl Send for ActivityState {}
+unsafe impl Sync for ActivityState {}
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -73,14 +83,20 @@ where
     let mut native_activity = NonNull::new(native_activity.cast())
         .expect("native_activity should never be null, but was null");
 
-    unsafe {
-        callbacks::register_callbacks(native_activity.as_mut());
-    }
+    let (sender, receiver) = channel();
 
-    NATIVE_ACTIVITY.store(
-        native_activity.as_ptr(),
-        Ordering::SeqCst,
-    );
+    let state = ActivityState {
+        activity: native_activity,
+        receiver,
+        sender,
+        waker: Default::default(),
+    };
+
+    GLOBAL_STATE
+        .set(state)
+        .unwrap_or_else(|_| panic!("android main should never called twice"));
+
+    unsafe { callbacks::register_callbacks(native_activity.as_mut()) };
 
     std::thread::spawn(move || {
         let exit_code = main().report();
@@ -94,8 +110,9 @@ where
 }
 
 pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Error> {
-    let native_activity = NonNull::new(NATIVE_ACTIVITY.load(Ordering::SeqCst))
-        .expect("native activity should be set");
+    let global_state = GLOBAL_STATE
+        .get()
+        .expect("android_main should have been called");
 
     let rt;
     let _rt_guard = if tokio::runtime::Handle::try_current().is_err() {
@@ -120,18 +137,16 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
 
         ndk_sys::AConfiguration_fromAssetManager(
             config,
-            native_activity.as_ref().assetManager,
+            global_state.activity.as_ref().assetManager,
         );
 
         ndk_sys::AConfiguration_getDensity(config) as f32 / 160.0
     };
 
-    let (sender, receiver) = std::sync::mpsc::channel::<Event>();
-
     let looper =
         unsafe { ndk_sys::ALooper_prepare(ndk_sys::ALOOPER_PREPARE_ALLOW_NON_CALLBACKS as i32) };
 
-    let proxy = Proxy::new(sender, looper);
+    let proxy = Proxy::new(global_state.sender.clone(), looper);
 
     let root = Root::new({
         let proxy = proxy.clone();
@@ -144,8 +159,12 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     let (_, state) = view.any_build(&mut context, data);
 
     let (jvm, ime) = unsafe {
-        let jvm = JavaVM::from_raw(native_activity.as_ref().vm)?;
-        let ime = ime::init(&jvm, native_activity, proxy.clone())?;
+        let jvm = JavaVM::from_raw(global_state.activity.as_ref().vm)?;
+        let ime = ime::init(
+            &jvm,
+            global_state.activity,
+            proxy.clone(),
+        )?;
 
         (jvm, ime)
     };
@@ -160,9 +179,8 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
         context,
         proxy,
 
-        native_activity,
+        native_activity: global_state.activity,
         looper,
-        receiver,
         jvm,
         ime,
 
@@ -200,7 +218,6 @@ struct EventLoop<'a, T> {
 
     native_activity: NonNull<ndk_sys::ANativeActivity>,
     looper:          *mut ndk_sys::ALooper,
-    receiver:        Receiver<Event>,
     jvm:             JavaVM,
     ime:             &'static Ime,
 
@@ -220,6 +237,7 @@ struct EventLoop<'a, T> {
 #[allow(clippy::large_enum_variant)]
 enum WindowState {
     Open(Window),
+
     Pending {
         id:      Option<WindowId>,
         updates: Vec<WindowUpdate>,
@@ -227,9 +245,12 @@ enum WindowState {
 }
 
 struct Window {
-    id:      WindowId,
+    id:      Option<WindowId>,
     android: *mut ndk_sys::ANativeWindow,
     surface: ike_skia::vulkan::Surface,
+    focused: bool,
+    width:   u32,
+    height:  u32,
 }
 
 enum Event {
@@ -271,6 +292,16 @@ impl<'a, T> EventLoop<'a, T> {
         }
 
         loop {
+            let global_state = GLOBAL_STATE
+                .get()
+                .expect("android_main should have been called");
+
+            while let Ok(event) = global_state.receiver.try_recv() {
+                self.handle_event(event);
+            }
+
+            self.handle_input_events();
+
             unsafe {
                 ndk_sys::ALooper_pollOnce(
                     -1,
@@ -279,12 +310,6 @@ impl<'a, T> EventLoop<'a, T> {
                     ptr::null_mut(),
                 );
             }
-
-            while let Ok(event) = self.receiver.try_recv() {
-                self.handle_event(event);
-            }
-
-            self.handle_input_events();
         }
     }
 
@@ -349,6 +374,17 @@ impl<'a, T> EventLoop<'a, T> {
             RootSignal::CreateWindow(window_id) => match self.window {
                 WindowState::Pending { ref mut id, .. } if id.is_none() => {
                     *id = Some(window_id);
+                }
+
+                WindowState::Open(ref mut window) if window.id.is_none() => {
+                    let size = Size::new(
+                        window.width as f32 / self.scale_factor,
+                        window.height as f32 / self.scale_factor,
+                    );
+
+                    window.id = Some(window_id);
+                    (self.context).window_scaled(window_id, self.scale_factor, size);
+                    (self.context).window_focused(window_id, window.focused);
                 }
 
                 _ => {

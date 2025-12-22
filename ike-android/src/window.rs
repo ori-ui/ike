@@ -37,7 +37,7 @@ impl<'a, T> EventLoop<'a, T> {
 
                 tracing::debug!(width, height, "window created");
 
-                let vulkan = unsafe {
+                let surface = unsafe {
                     ike_skia::vulkan::Surface::new(
                         &mut self.vulkan,
                         DisplayHandle::android(),
@@ -47,8 +47,8 @@ impl<'a, T> EventLoop<'a, T> {
                     )
                 };
 
-                let vulkan = match vulkan {
-                    Ok(vulkan) => vulkan,
+                let surface = match surface {
+                    Ok(surface) => surface,
                     Err(err) => {
                         tracing::error!("failed creating vulkan context: {err}");
                         return;
@@ -56,14 +56,17 @@ impl<'a, T> EventLoop<'a, T> {
                 };
 
                 if let WindowState::Pending {
-                    id: Some(id),
+                    id,
                     ref mut updates,
                 } = self.window
                 {
                     let mut window = Window {
                         id,
                         android,
-                        surface: vulkan,
+                        surface,
+                        focused: false,
+                        width: width as u32,
+                        height: height as u32,
                     };
 
                     for update in updates.drain(..) {
@@ -77,9 +80,11 @@ impl<'a, T> EventLoop<'a, T> {
                         height as f32 / self.scale_factor,
                     );
 
-                    self.context.window_scaled(id, self.scale_factor, size);
+                    if let Some(id) = id {
+                        self.context.window_scaled(id, self.scale_factor, size);
+                    }
                 } else {
-                    tracing::error!("android must have at least one window!");
+                    tracing::error!("android only supports one window");
                 }
             }
 
@@ -87,7 +92,7 @@ impl<'a, T> EventLoop<'a, T> {
                 match self.window {
                     WindowState::Open(ref window) => {
                         self.window = WindowState::Pending {
-                            id:      Some(window.id),
+                            id:      window.id,
                             updates: Vec::new(),
                         };
                     }
@@ -103,12 +108,16 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     }
 
+                    let Some(id) = window.id else {
+                        return;
+                    };
+
                     if let Some(animate) = self.animate.take() {
                         let delta_time = animate.elapsed();
-                        self.context.animate(window.id, delta_time);
+                        self.context.animate(id, delta_time);
                     }
 
-                    let Some(win) = self.context.get_window(window.id) else {
+                    let Some(win) = self.context.get_window(id) else {
                         tracing::error!("window not registered with ike");
                         return;
                     };
@@ -130,7 +139,7 @@ impl<'a, T> EventLoop<'a, T> {
                         win.color(),
                         self.scale_factor,
                         || {},
-                        |canvas| self.context.draw(window.id, canvas),
+                        |canvas| self.context.draw(id, canvas),
                     );
 
                     if let Err(err) = result {
@@ -146,25 +155,38 @@ impl<'a, T> EventLoop<'a, T> {
                     let width = unsafe { ndk_sys::ANativeWindow_getWidth(window.android) };
                     let height = unsafe { ndk_sys::ANativeWindow_getHeight(window.android) };
 
+                    window.width = width as u32;
+                    window.height = height as u32;
+
                     if let Err(err) = window.surface.resize(width as u32, height as u32) {
                         tracing::error!("surface resize failed: {err}");
                         return;
                     }
+
+                    let Some(id) = window.id else {
+                        return;
+                    };
 
                     let size = Size::new(
                         width as f32 / self.scale_factor,
                         height as f32 / self.scale_factor,
                     );
 
-                    self.context.window_resized(window.id, size);
+                    self.context.window_resized(id, size);
                 }
             }
 
             WindowEvent::FocusChanged(focused) => {
                 tracing::trace!(focused, "window focus changed");
 
-                if let WindowState::Open(ref window) = self.window {
-                    self.context.window_focused(window.id, focused);
+                if let WindowState::Open(ref mut window) = self.window {
+                    window.focused = focused;
+
+                    let Some(id) = window.id else {
+                        return;
+                    };
+
+                    self.context.window_focused(id, focused);
                 }
             }
 

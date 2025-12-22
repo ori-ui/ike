@@ -63,10 +63,14 @@ impl<'a, T> EventLoop<'a, T> {
             return false;
         };
 
+        let Some(id) = window.id else {
+            return false;
+        };
+
         let kind = unsafe { ndk_sys::AInputEvent_getType(event) };
 
         match kind as u32 {
-            ndk_sys::AINPUT_EVENT_TYPE_MOTION => self.handle_motion_event(window.id, event),
+            ndk_sys::AINPUT_EVENT_TYPE_MOTION => self.handle_motion_event(id, event),
             _ => false,
         }
     }

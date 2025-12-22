@@ -95,7 +95,11 @@ impl<'a, T> EventLoop<'a, T> {
                 );
 
                 if let WindowState::Open(ref window) = self.window {
-                    self.context.ime_commit_text(window.id, text);
+                    let Some(id) = window.id else {
+                        return;
+                    };
+
+                    self.context.ime_commit_text(id, text);
                 }
             }
 
@@ -103,23 +107,27 @@ impl<'a, T> EventLoop<'a, T> {
                 tracing::trace!(before, after, "delete surrounding");
 
                 if let WindowState::Open(ref window) = self.window {
+                    let Some(id) = window.id else {
+                        return;
+                    };
+
                     let selection = self.ime.selection();
 
                     if selection.start != selection.end {
-                        self.context.ime_commit_text(window.id, String::new());
+                        self.context.ime_commit_text(id, String::new());
                         return;
                     }
 
                     if before != 0 {
                         let start = self.ime.index_n_chars_before(before);
-                        self.context.ime_select(window.id, start..selection.start);
-                        self.context.ime_commit_text(window.id, String::new());
+                        self.context.ime_select(id, start..selection.start);
+                        self.context.ime_commit_text(id, String::new());
                     }
 
                     if after != 0 {
                         let end = self.ime.index_n_chars_after(after);
-                        self.context.ime_select(window.id, selection.end..end);
-                        self.context.ime_commit_text(window.id, String::new());
+                        self.context.ime_select(id, selection.end..end);
+                        self.context.ime_commit_text(id, String::new());
                     }
                 }
             }
@@ -128,7 +136,11 @@ impl<'a, T> EventLoop<'a, T> {
                 tracing::trace!(?key, pressed, "ime send key event");
 
                 if let WindowState::Open(ref window) = self.window {
-                    (self.context).key_pressed(window.id, key, false, None, pressed);
+                    let Some(id) = window.id else {
+                        return;
+                    };
+
+                    (self.context).key_pressed(id, key, false, None, pressed);
                 }
             }
 
@@ -136,8 +148,12 @@ impl<'a, T> EventLoop<'a, T> {
                 tracing::trace!(start, end, "set selection");
 
                 if let WindowState::Open(ref window) = self.window {
+                    let Some(id) = window.id else {
+                        return;
+                    };
+
                     self.ime.set_selection(start..end);
-                    self.context.ime_select(window.id, start..end);
+                    self.context.ime_select(id, start..end);
                 }
             }
         }
