@@ -339,7 +339,7 @@ impl Root {
             }
         }
 
-        self.state.recorder.frame();
+        self.state.recorder.frame(&self.arena);
 
         matches!(sizing, WindowSizing::FitContent)
             .then_some(new_window_size)

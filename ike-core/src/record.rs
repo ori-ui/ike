@@ -45,7 +45,7 @@ impl Default for Recorder {
 impl Recorder {
     pub fn new() -> Self {
         Self {
-            cost_threshold:    100.0,
+            cost_threshold:    65.0,
             max_frames_unused: 30,
             max_memory_usage:  512 * 1024u64.pow(2),
             memory_usage:      0,
@@ -96,7 +96,8 @@ impl Recorder {
         self.entries.contains_key(&widget)
     }
 
-    pub fn frame(&mut self) {
+    pub fn frame(&mut self, arena: &Arena) {
+        self.cleanup(arena);
         self.frame_count += 1;
 
         self.entries.retain(|widget, entry| {
