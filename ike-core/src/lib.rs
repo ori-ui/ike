@@ -26,10 +26,10 @@ pub use arena::{Arena, WidgetMut, WidgetRef};
 pub use axis::Axis;
 pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::BuildCx;
-pub use canvas::{BlendMode, Canvas, Clip, Paint, Shader};
+pub use canvas::{Blend, Canvas, Cap, Clip, Join, Paint, Shader, Stroke};
 pub use color::Color;
 pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
-pub use curve::Curve;
+pub use curve::{Curve, CurveData, CurveSegment, CurveVerb, Fill, WeakCurve};
 pub use event::{
     CursorIcon, Gesture, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, PanGesture,
     Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,

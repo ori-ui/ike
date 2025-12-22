@@ -23,6 +23,14 @@ pub(super) struct Ime {
 }
 
 impl Ime {
+    pub fn is_active(&self) -> bool {
+        self.state.lock().is_active
+    }
+
+    pub fn set_active(&self, active: bool) {
+        self.state.lock().is_active = active;
+    }
+
     pub fn selection(&self) -> Range<usize> {
         self.state.lock().selection.clone()
     }
@@ -79,6 +87,7 @@ impl Ime {
 }
 
 struct ImeState {
+    is_active: bool,
     text:      String,
     selection: Range<usize>,
     composing: Option<Range<usize>>,
@@ -163,21 +172,41 @@ impl<'a, T> EventLoop<'a, T> {
         match signal {
             ImeSignal::Start => {
                 if let Ok(mut env) = self.jvm.attach_current_thread() {
-                    if !self
+                    if self.ime.is_active() {
+                        if self.restart_input(&mut env).is_ok() {
+                            tracing::trace!("restart input");
+                        } else {
+                            tracing::warn!("restart input failed");
+                        }
+
+                        return;
+                    }
+
+                    if self
                         .show_soft_input(&mut env, 0)
                         .is_ok_and(|success| success)
                     {
-                        tracing::warn!("show soft input failed");
-                    } else {
+                        self.ime.set_active(true);
+
                         tracing::trace!("show soft input");
+                    } else {
+                        tracing::warn!("show soft input failed");
                     }
                 }
             }
 
             ImeSignal::End => {
                 if let Ok(mut env) = self.jvm.attach_current_thread() {
-                    let _ = self.hide_soft_input(&mut env, 0);
-                    tracing::trace!("hide soft input");
+                    if self
+                        .hide_soft_input(&mut env, 0)
+                        .is_ok_and(|success| success)
+                    {
+                        self.ime.set_active(false);
+
+                        tracing::trace!("hide soft input");
+                    } else {
+                        tracing::warn!("hide soft input failed");
+                    }
                 }
             }
 
@@ -255,6 +284,20 @@ impl<'a, T> EventLoop<'a, T> {
         .z()
     }
 
+    fn restart_input(&self, env: &mut JNIEnv<'_>) -> jni::errors::Result<()> {
+        let activity = unsafe { native_activity(self.native_activity) };
+        let view = rust_view(env, &activity)?;
+        let imm = self.input_method_manager(env, &view)?;
+
+        env.call_method(
+            imm,
+            "restartInput",
+            "(Landroid/view/View;)V",
+            &[(&view).into()],
+        )?
+        .v()
+    }
+
     fn update_selection(
         &self,
         env: &mut JNIEnv<'_>,
@@ -323,6 +366,7 @@ pub unsafe fn init(
     let context = Ime {
         proxy,
         state: Mutex::new(ImeState {
+            is_active: false,
             text:      String::new(),
             selection: 0..0,
             composing: None,

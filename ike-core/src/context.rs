@@ -480,7 +480,21 @@ impl_contexts! {
     MutCx<'_>,
     EventCx<'_>,
     UpdateCx<'_> {
+        pub fn restart_ime(&mut self) {
+            if !self.is_focused() || !self.state.accepts_text {
+                tracing::warn!("`restart_ime` can only be called on a focused view that accepts text");
+                return;
+            }
+
+            self.root.signal(RootSignal::Ime(ImeSignal::Start));
+        }
+
         pub fn set_ime_text(&mut self, text: String) {
+            if !self.is_focused() || !self.state.accepts_text {
+                tracing::warn!("`set_ime_text` can only be called on a focused view that accepts text");
+                return;
+            }
+
             self.root.signal(RootSignal::Ime(ImeSignal::Text(text)));
         }
 
@@ -489,6 +503,11 @@ impl_contexts! {
             selection: Range<usize>,
             composing: Option<Range<usize>>,
         ) {
+            if !self.is_focused() || !self.state.accepts_text {
+                tracing::warn!("`set_ime_selection` can only be called on a focused view that accepts text");
+                return;
+            }
+
             self.root.signal(RootSignal::Ime(ImeSignal::Selection {
                 selection,
                 composing,

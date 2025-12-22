@@ -1,6 +1,6 @@
 use ike_core::{
-    Affine, BorderWidth, Canvas, Clip, CornerRadius, Offset, Paint, Painter, Paragraph, Recording,
-    RecordingData, Rect, Size, Svg,
+    Affine, BorderWidth, Canvas, Clip, CornerRadius, Curve, Offset, Paint, Painter, Paragraph,
+    Recording, RecordingData, Rect, Size, Svg,
 };
 
 use crate::{painter::SkiaPainter, vulkan::Surface};
@@ -126,6 +126,13 @@ impl Canvas for SkiaCanvas<'_> {
     fn fill(&mut self, paint: &Paint) {
         let paint = self.painter.create_paint(paint);
         self.canvas.draw_paint(paint);
+    }
+
+    fn draw_curve(&mut self, curve: &Curve, paint: &Paint) {
+        let path = self.painter.create_path(curve).clone();
+        let paint = self.painter.create_paint(paint);
+
+        self.canvas.draw_path(&path, paint);
     }
 
     fn draw_rect(&mut self, rect: Rect, radius: CornerRadius, paint: &Paint) {

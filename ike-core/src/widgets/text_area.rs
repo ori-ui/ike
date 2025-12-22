@@ -105,6 +105,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
 
         if this.cx.is_focused() {
             this.cx.set_ime_text(this.widget.text().to_owned());
+            this.cx.restart_ime();
             this.widget.set_selection_mut(&mut this.cx);
         }
 

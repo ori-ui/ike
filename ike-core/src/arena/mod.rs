@@ -51,7 +51,7 @@ impl Arena {
 
     /// Check whether `widget` is contained in `self`.
     ///
-    /// Note that this is not the same as whether calling [`Self::get`] returns [`Some`].
+    /// Note that this is not the same as whether calling `get` returns [`Some`].
     pub fn contains(&self, widget: WidgetId) -> bool {
         self.entries
             .get(widget.index as usize)

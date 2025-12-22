@@ -1,5 +1,5 @@
 use crate::{
-    Affine, BlendMode, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Painter, Recording,
+    Affine, Blend, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Painter, Recording,
     Shader, Size, Space, Svg, SvgData, Widget, WidgetMut,
 };
 
@@ -126,7 +126,8 @@ impl Widget for Picture {
                         if let Some(color) = self.color {
                             let paint = Paint {
                                 shader: Shader::Solid(color),
-                                blend:  BlendMode::SrcIn,
+                                blend: Blend::SrcIn,
+                                ..Default::default()
                             };
 
                             canvas.fill(&paint);

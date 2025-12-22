@@ -1,21 +1,23 @@
 use std::{collections::HashMap, hash::BuildHasherDefault, mem};
 
 use ike_core::{
-    FontStretch, FontStyle, GlyphCluster, Paint, Painter, Paragraph, Point, Rect, Shader, Size,
-    Svg, TextDirection, TextLayoutLine, TextStyle, TextWrap, WeakParagraph, WeakRecording, WeakSvg,
+    Curve, Fill, FontStretch, FontStyle, GlyphCluster, Paint, Painter, Paragraph, Point, Rect,
+    Shader, Size, Svg, TextDirection, TextLayoutLine, TextStyle, TextWrap, WeakCurve,
+    WeakParagraph, WeakRecording, WeakSvg,
 };
 
-type FastHasher = BuildHasherDefault<seahash::SeaHasher>;
+type SeaHasher = BuildHasherDefault<seahash::SeaHasher>;
 type CachedParagraph = (f32, skia_safe::textlayout::Paragraph);
 
 pub struct SkiaPainter {
     pub(crate) provider:   skia_safe::textlayout::TypefaceFontProvider,
     pub(crate) manager:    skia_safe::FontMgr,
     pub(crate) fonts:      skia_safe::textlayout::FontCollection,
-    pub(crate) svgs:       HashMap<WeakSvg, Option<skia_safe::svg::Dom>, FastHasher>,
-    pub(crate) paragraphs: HashMap<WeakParagraph, CachedParagraph, FastHasher>,
-    pub(crate) recordings: HashMap<WeakRecording, (skia_safe::Image, Size), FastHasher>,
-    pub(crate) paints:     HashMap<Paint, skia_safe::Paint, FastHasher>,
+    pub(crate) svgs:       HashMap<WeakSvg, Option<skia_safe::svg::Dom>, SeaHasher>,
+    pub(crate) paragraphs: HashMap<WeakParagraph, CachedParagraph, SeaHasher>,
+    pub(crate) recordings: HashMap<WeakRecording, (skia_safe::Image, Size), SeaHasher>,
+    pub(crate) paths:      HashMap<WeakCurve, skia_safe::Path, SeaHasher>,
+    pub(crate) paints:     HashMap<Paint, skia_safe::Paint, SeaHasher>,
 }
 
 impl Default for SkiaPainter {
@@ -39,6 +41,7 @@ impl SkiaPainter {
             svgs: HashMap::default(),
             paragraphs: HashMap::default(),
             recordings: HashMap::default(),
+            paths: HashMap::default(),
             paints: HashMap::default(),
         }
     }
@@ -47,6 +50,7 @@ impl SkiaPainter {
         self.svgs.retain(|k, _| k.strong_count() > 0);
         self.paragraphs.retain(|k, _| k.strong_count() > 0);
         self.recordings.retain(|k, _| k.strong_count() > 0);
+        self.paths.retain(|k, _| k.strong_count() > 0);
         self.paints.clear();
     }
 
@@ -172,6 +176,54 @@ impl SkiaPainter {
         paragraph
     }
 
+    pub(crate) fn create_path(&mut self, curve: &Curve) -> &skia_safe::Path {
+        let weak = Curve::downgrade(curve);
+
+        self.paths.entry(weak).or_insert_with(|| {
+            let mut path = skia_safe::PathBuilder::new();
+
+            let fill_type = match curve.fill {
+                Fill::Winding => skia_safe::PathFillType::Winding,
+                Fill::EvenOdd => skia_safe::PathFillType::EvenOdd,
+            };
+
+            path.set_fill_type(fill_type);
+
+            for segment in curve.iter() {
+                match segment {
+                    ike_core::CurveSegment::Move(p) => {
+                        path.move_to(skia_safe::Point::new(p.x, p.y));
+                    }
+
+                    ike_core::CurveSegment::Line(p) => {
+                        path.line_to(skia_safe::Point::new(p.x, p.y));
+                    }
+
+                    ike_core::CurveSegment::Quad(a, p) => {
+                        path.quad_to(
+                            skia_safe::Point::new(a.x, a.y),
+                            skia_safe::Point::new(p.x, p.y),
+                        );
+                    }
+
+                    ike_core::CurveSegment::Cubic(a, b, p) => {
+                        path.cubic_to(
+                            skia_safe::Point::new(a.x, a.y),
+                            skia_safe::Point::new(b.x, b.y),
+                            skia_safe::Point::new(p.x, p.y),
+                        );
+                    }
+
+                    ike_core::CurveSegment::Close => {
+                        path.close();
+                    }
+                }
+            }
+
+            path.into()
+        })
+    }
+
     pub(crate) fn create_paint(&mut self, paint: &Paint) -> &skia_safe::Paint {
         self.paints.entry(paint.clone()).or_insert_with(|| {
             let mut skia_paint = skia_safe::Paint::default();
@@ -187,15 +239,15 @@ impl SkiaPainter {
             }
 
             let blend = match paint.blend {
-                ike_core::BlendMode::Clear => skia_safe::BlendMode::Clear,
-                ike_core::BlendMode::Src => skia_safe::BlendMode::Src,
-                ike_core::BlendMode::Dst => skia_safe::BlendMode::Dst,
-                ike_core::BlendMode::SrcOver => skia_safe::BlendMode::SrcOver,
-                ike_core::BlendMode::DstOver => skia_safe::BlendMode::DstOver,
-                ike_core::BlendMode::SrcIn => skia_safe::BlendMode::SrcIn,
-                ike_core::BlendMode::DstIn => skia_safe::BlendMode::DstIn,
-                ike_core::BlendMode::SrcATop => skia_safe::BlendMode::SrcATop,
-                ike_core::BlendMode::DstATop => skia_safe::BlendMode::DstATop,
+                ike_core::Blend::Clear => skia_safe::BlendMode::Clear,
+                ike_core::Blend::Src => skia_safe::BlendMode::Src,
+                ike_core::Blend::Dst => skia_safe::BlendMode::Dst,
+                ike_core::Blend::SrcOver => skia_safe::BlendMode::SrcOver,
+                ike_core::Blend::DstOver => skia_safe::BlendMode::DstOver,
+                ike_core::Blend::SrcIn => skia_safe::BlendMode::SrcIn,
+                ike_core::Blend::DstIn => skia_safe::BlendMode::DstIn,
+                ike_core::Blend::SrcATop => skia_safe::BlendMode::SrcATop,
+                ike_core::Blend::DstATop => skia_safe::BlendMode::DstATop,
             };
 
             skia_paint.set_blend_mode(blend);

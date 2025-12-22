@@ -1,6 +1,8 @@
+use std::hash::{Hash, Hasher};
+
 use crate::{
-    Affine, BorderWidth, Color, CornerRadius, Offset, Painter, Paragraph, Recording, Rect, Size,
-    Svg,
+    Affine, BorderWidth, Color, CornerRadius, Curve, Offset, Painter, Paragraph, Recording, Rect,
+    Size, Svg,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
@@ -9,7 +11,7 @@ pub enum Shader {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum BlendMode {
+pub enum Blend {
     Clear,
     Src,
     Dst,
@@ -21,17 +23,72 @@ pub enum BlendMode {
     DstATop,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Join {
+    Miter,
+    Round,
+    Bevel,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Cap {
+    Butt,
+    Round,
+    Square,
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct Stroke {
+    pub width: f32,
+    pub miter: f32,
+    pub join:  Join,
+    pub cap:   Cap,
+}
+
+impl Default for Stroke {
+    fn default() -> Self {
+        Self {
+            width: 1.0,
+            miter: 4.0,
+            join:  Join::Miter,
+            cap:   Cap::Butt,
+        }
+    }
+}
+
+impl Eq for Stroke {}
+
+impl Hash for Stroke {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.width.to_bits().hash(state);
+        self.miter.to_bits().hash(state);
+        self.join.hash(state);
+        self.cap.hash(state);
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
 pub struct Paint {
     pub shader: Shader,
-    pub blend:  BlendMode,
+    pub blend:  Blend,
+    pub stroke: Stroke,
+}
+
+impl Default for Paint {
+    fn default() -> Self {
+        Self {
+            shader: Shader::Solid(Color::BLACK),
+            blend:  Blend::SrcOver,
+            stroke: Stroke::default(),
+        }
+    }
 }
 
 impl From<Color> for Paint {
     fn from(color: Color) -> Self {
         Self {
             shader: Shader::Solid(color),
-            blend:  BlendMode::SrcOver,
+            ..Default::default()
         }
     }
 }
@@ -66,6 +123,8 @@ pub trait Canvas {
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas));
 
     fn fill(&mut self, paint: &Paint);
+
+    fn draw_curve(&mut self, curve: &Curve, paint: &Paint);
 
     fn draw_rect(&mut self, rect: Rect, corners: CornerRadius, paint: &Paint);
 
