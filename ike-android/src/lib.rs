@@ -155,6 +155,11 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     });
     let mut context = ike_ori::Context::new(root, Arc::new(proxy.clone()));
 
+    *global_state.waker.lock() = Some(Box::new({
+        let proxy = proxy.clone();
+        move || proxy.wake()
+    }));
+
     let mut view = build(data);
     let (_, state) = view.any_build(&mut context, data);
 

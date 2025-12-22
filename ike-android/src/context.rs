@@ -21,6 +21,10 @@ impl Proxy {
 
     pub(super) fn send(&self, event: Event) {
         let _ = self.sender.send(event);
+        self.wake();
+    }
+
+    pub(super) fn wake(&self) {
         unsafe { ndk_sys::ALooper_wake(self.looper) };
     }
 }

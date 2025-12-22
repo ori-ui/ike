@@ -21,6 +21,15 @@ impl<'a, T> EventLoop<'a, T> {
     pub fn handle_window_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::Created(android) => {
+                let WindowState::Pending {
+                    id,
+                    ref mut updates,
+                } = self.window
+                else {
+                    tracing::error!("android only supports one window");
+                    return;
+                };
+
                 let window_handle = unsafe {
                     let Some(window) = ptr::NonNull::new(android) else {
                         tracing::error!("android window was null");
@@ -55,36 +64,28 @@ impl<'a, T> EventLoop<'a, T> {
                     }
                 };
 
-                if let WindowState::Pending {
+                let mut window = Window {
                     id,
-                    ref mut updates,
-                } = self.window
-                {
-                    let mut window = Window {
-                        id,
-                        android,
-                        surface,
-                        focused: false,
-                        width: width as u32,
-                        height: height as u32,
-                    };
+                    android,
+                    surface,
+                    focused: false,
+                    width: width as u32,
+                    height: height as u32,
+                };
 
-                    for update in updates.drain(..) {
-                        window.handle_update(update);
-                    }
+                for update in updates.drain(..) {
+                    window.handle_update(update);
+                }
 
-                    self.window = WindowState::Open(window);
+                self.window = WindowState::Open(window);
 
-                    let size = Size::new(
-                        width as f32 / self.scale_factor,
-                        height as f32 / self.scale_factor,
-                    );
+                let size = Size::new(
+                    width as f32 / self.scale_factor,
+                    height as f32 / self.scale_factor,
+                );
 
-                    if let Some(id) = id {
-                        self.context.window_scaled(id, self.scale_factor, size);
-                    }
-                } else {
-                    tracing::error!("android only supports one window");
+                if let Some(id) = id {
+                    self.context.window_scaled(id, self.scale_factor, size);
                 }
             }
 
