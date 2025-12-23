@@ -243,9 +243,8 @@ impl MutCx<'_> {
             }
 
             self.state.window = window;
+            self.for_each_child(|child| child.cx.set_window_recursive(window));
         }
-
-        self.for_each_child(|child| child.cx.set_window_recursive(window));
     }
 }
 
