@@ -140,9 +140,9 @@ impl Widget for Button {
     fn draw_over(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         if cx.is_focused() && cx.is_window_focused() {
             canvas.draw_border(
-                cx.rect().expand(4.0),
+                cx.rect(),
                 BorderWidth::all(2.0),
-                self.corner_radius + 4.0,
+                self.corner_radius,
                 &Paint::from(self.focus_color),
             );
         }

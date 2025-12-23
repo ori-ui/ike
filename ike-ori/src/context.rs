@@ -4,11 +4,11 @@ use std::{
     sync::Arc,
 };
 
-use ike_core::{AnyWidgetId, BuildCx, Root, WidgetId};
+use ike_core::{AnyWidgetId, BuildCx, WidgetId, World};
 use ori::{Providable, Proxy, Proxyable, Super};
 
 pub struct Context {
-    root:      Root,
+    world:     World,
     proxy:     Arc<dyn Proxy>,
     resources: Vec<Resouce>,
 
@@ -16,9 +16,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(root: Root, proxy: Arc<dyn Proxy>) -> Self {
+    pub fn new(world: World, proxy: Arc<dyn Proxy>) -> Self {
         Self {
-            root,
+            world,
             proxy,
             resources: Vec::new(),
             use_type_names_unsafe: false,
@@ -27,16 +27,16 @@ impl Context {
 }
 
 impl Deref for Context {
-    type Target = Root;
+    type Target = World;
 
     fn deref(&self) -> &Self::Target {
-        &self.root
+        &self.world
     }
 }
 
 impl DerefMut for Context {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.root
+        &mut self.world
     }
 }
 
@@ -47,12 +47,12 @@ struct Resouce {
 }
 
 impl BuildCx for Context {
-    fn root(&self) -> &Root {
-        &self.root
+    fn world(&self) -> &World {
+        &self.world
     }
 
-    fn root_mut(&mut self) -> &mut Root {
-        &mut self.root
+    fn world_mut(&mut self) -> &mut World {
+        &mut self.world
     }
 }
 

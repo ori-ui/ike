@@ -5,7 +5,7 @@ use cursor_icon::CursorIcon;
 use crate::{Rect, WindowId, WindowSizing};
 
 #[derive(Clone, Debug)]
-pub enum RootSignal {
+pub enum Signal {
     RequestRedraw(WindowId),
     RequestAnimate(WindowId, Instant),
 

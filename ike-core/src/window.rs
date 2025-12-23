@@ -1,6 +1,9 @@
-use std::{any::Any, fmt};
+use std::{any::Any, fmt, rc::Rc};
 
-use crate::{Color, CursorIcon, Modifiers, Pointer, Size, Touch, WidgetId};
+use crate::{
+    Color, CursorIcon, Modifiers, Point, Pointer, PointerId, Size, Touch, TouchId, WidgetId,
+    debug::debug_panic,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WindowId {
@@ -23,33 +26,41 @@ pub enum WindowSizing {
     },
 }
 
+#[derive(Clone, Debug)]
+pub struct Layer {
+    pub root:     WidgetId,
+    pub size:     Size,
+    pub position: Point,
+}
+
 #[derive(Debug)]
 pub struct Window {
-    pub(crate) id:           WindowId,
-    pub(crate) anchor:       Option<WindowId>,
+    pub(crate) id:     WindowId,
+    pub(crate) layers: Rc<Vec<Layer>>,
+
+    pub(crate) modifiers: Modifiers,
+    pub(crate) pointers:  Vec<Pointer>,
+    pub(crate) touches:   Vec<Touch>,
+
+    pub(crate) focused: Option<WidgetId>,
+
+    pub(crate) properties: Vec<Box<dyn Any>>,
+
     pub(crate) scale:        f32,
-    pub(crate) pointers:     Vec<Pointer>,
-    pub(crate) touches:      Vec<Touch>,
-    pub(crate) modifiers:    Modifiers,
     pub(crate) size:         Size,
-    pub(crate) properties:   Vec<Box<dyn Any>>,
-    pub(crate) cursor:       CursorIcon,
-    pub(crate) title:        String,
-    pub(crate) contents:     WidgetId,
-    pub(crate) sizing:       WindowSizing,
-    pub(crate) is_focused:   bool,
     pub(crate) is_visible:   bool,
+    pub(crate) is_focused:   bool,
     pub(crate) is_decorated: bool,
-    pub(crate) color:        Color,
+
+    pub(crate) cursor: CursorIcon,
+    pub(crate) title:  String,
+    pub(crate) sizing: WindowSizing,
+    pub(crate) color:  Color,
 }
 
 impl Window {
     pub fn id(&self) -> WindowId {
         self.id
-    }
-
-    pub fn anchor(&self) -> Option<WindowId> {
-        self.anchor
     }
 
     pub fn scale(&self) -> f32 {
@@ -76,8 +87,8 @@ impl Window {
         self.sizing
     }
 
-    pub fn contents(&self) -> WidgetId {
-        self.contents
+    pub fn layers(&self) -> &[Layer] {
+        &self.layers
     }
 
     pub fn is_focused(&self) -> bool {
@@ -94,6 +105,46 @@ impl Window {
 
     pub fn color(&self) -> Color {
         self.color
+    }
+
+    pub(crate) fn pointer(&self, id: PointerId) -> Option<&Pointer> {
+        match self.pointers.iter().find(|pointer| pointer.id == id) {
+            Some(pointer) => Some(pointer),
+            None => {
+                debug_panic!("invalid pointer `{id:?}`");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn pointer_mut(&mut self, id: PointerId) -> Option<&mut Pointer> {
+        match self.pointers.iter_mut().find(|pointer| pointer.id == id) {
+            Some(pointer) => Some(pointer),
+            None => {
+                debug_panic!("invalid pointer `{id:?}`");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn touch(&self, id: TouchId) -> Option<&Touch> {
+        match self.touches.iter().find(|touch| touch.id == id) {
+            Some(touch) => Some(touch),
+            None => {
+                debug_panic!("invalid touch `{id:?}`");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn touch_mut(&mut self, id: TouchId) -> Option<&mut Touch> {
+        match self.touches.iter_mut().find(|touch| touch.id == id) {
+            Some(touch) => Some(touch),
+            None => {
+                debug_panic!("invalid touch `{id:?}`");
+                None
+            }
+        }
     }
 
     pub fn add_property<T: Any>(&mut self, property: T) {

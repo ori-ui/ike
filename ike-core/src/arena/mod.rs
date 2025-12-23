@@ -10,10 +10,10 @@ pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
 
 use crate::{
-    AnyWidgetId, LayoutCx, Painter, Size, Space, Update, Widget, WidgetId,
+    AnyWidgetId, ImeSignal, LayoutCx, Painter, Signal, Size, Space, Update, Widget, WidgetId,
     context::{MutCx, RefCx},
-    root::RootState,
     widget::{AnyWidget, ChildUpdate, WidgetState},
+    world::WorldState,
 };
 
 pub struct Arena {
@@ -63,7 +63,7 @@ impl Arena {
     /// Will use a previously freed entry.
     pub(crate) fn insert<'a, T>(
         &'a mut self,
-        root: &'a mut RootState,
+        world: &'a mut WorldState,
         widget: T,
     ) -> WidgetMut<'a, T>
     where
@@ -110,7 +110,7 @@ impl Arena {
             widget: unsafe { &mut *entry.widget.get().cast() },
 
             cx: MutCx {
-                root,
+                world,
                 state: unsafe { &mut *entry.state.get() },
                 arena: self,
             },
@@ -118,13 +118,52 @@ impl Arena {
     }
 
     /// Remove a widget and all it's descendants.
-    pub(crate) fn remove<T>(&mut self, root: &mut RootState, id: WidgetId<T>)
+    pub(crate) fn remove<T>(&mut self, world: &mut WorldState, id: WidgetId<T>)
     where
         T: ?Sized + AnyWidget,
     {
-        let Some(mut widget) = self.get_mut(root, id) else {
+        let Some(mut widget) = self.get_mut(world, id) else {
             return;
         };
+
+        if let Some(window) = widget.cx.state.window
+            && let Some(window) = widget.cx.world.window_mut(window)
+        {
+            if widget.cx.state.is_active
+                && let Some(pointer) = window
+                    .pointers
+                    .iter_mut()
+                    .find(|p| p.capturer == Some(id.upcast()))
+            {
+                pointer.capturer = None;
+            }
+
+            if widget.cx.state.is_hovered
+                && let Some(pointer) = window
+                    .pointers
+                    .iter_mut()
+                    .find(|p| p.hovering == Some(id.upcast()))
+            {
+                pointer.hovering = None;
+            }
+
+            if widget.cx.state.is_active
+                && let Some(touch) = window
+                    .touches
+                    .iter_mut()
+                    .find(|t| t.capturer == Some(id.upcast()))
+            {
+                touch.capturer = None;
+            }
+
+            if window.focused == Some(id.upcast()) {
+                window.focused = None;
+
+                if widget.cx.state.accepts_text {
+                    widget.cx.world.signal(Signal::Ime(ImeSignal::End));
+                }
+            }
+        }
 
         if let Some(mut parent) = widget.cx.get_parent_mut()
             && let Some(index) = parent.cx.state.children.iter().position(|x| *x == id)
@@ -137,7 +176,7 @@ impl Arena {
         }
 
         for &child in &widget.cx.state.children {
-            widget.cx.arena.remove(widget.cx.root, child);
+            widget.cx.arena.remove(widget.cx.world, child);
         }
 
         drop(widget);
@@ -179,7 +218,7 @@ impl Arena {
     /// Get a reference to a widget.
     pub(crate) fn get<'a, T>(
         &'a self,
-        root: &'a RootState,
+        world: &'a WorldState,
         id: WidgetId<T>,
     ) -> Option<WidgetRef<'a, T>>
     where
@@ -200,7 +239,7 @@ impl Arena {
             widget: unsafe { &*T::downcast_ptr(entry.widget.get()) },
 
             cx: RefCx {
-                root,
+                world,
                 arena: self,
                 state: unsafe { &*entry.state.get() },
             },
@@ -210,7 +249,7 @@ impl Arena {
     /// Get a mutable reference to a widget.
     pub(crate) fn get_mut<'a, T>(
         &'a mut self,
-        root: &'a mut RootState,
+        world: &'a mut WorldState,
         id: WidgetId<T>,
     ) -> Option<WidgetMut<'a, T>>
     where
@@ -231,7 +270,7 @@ impl Arena {
             widget: unsafe { &mut *T::downcast_ptr(entry.widget.get()) },
 
             cx: MutCx {
-                root,
+                world,
                 state: unsafe { &mut *entry.state.get() },
                 arena: self,
             },
@@ -310,7 +349,7 @@ impl Widget for Tombstone {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Arena, LayoutCx, Painter, Root, Size, Space, Widget};
+    use crate::{Arena, LayoutCx, Painter, Size, Space, Widget, World};
 
     struct TestWidget(f32);
 
@@ -327,22 +366,22 @@ mod tests {
 
     #[test]
     fn insert_and_get() {
-        let mut root = Root::new(|_| {});
+        let mut world = World::new(|_| {});
         let mut arena = Arena::new();
 
-        let id = arena.insert(&mut root.state, TestWidget(0.0)).id();
-        assert!(arena.get(&root.state, id).is_some());
+        let id = arena.insert(&mut world.state, TestWidget(0.0)).id();
+        assert!(arena.get(&world.state, id).is_some());
     }
 
     #[test]
     fn get_mutability() {
-        let mut root = Root::new(|_| {});
+        let mut world = World::new(|_| {});
         let mut arena = Arena::new();
 
-        let a = arena.insert(&mut root.state, TestWidget(0.0)).id();
-        let b = arena.insert(&mut root.state, TestWidget(1.0)).id();
+        let a = arena.insert(&mut world.state, TestWidget(0.0)).id();
+        let b = arena.insert(&mut world.state, TestWidget(1.0)).id();
 
-        let mut widget_mut = arena.get_mut(&mut root.state, a).expect("inserted");
+        let mut widget_mut = arena.get_mut(&mut world.state, a).expect("inserted");
 
         // getting a widget while it's borrowed mutable is not possible
         assert!(widget_mut.cx.get(a).is_none());
@@ -356,6 +395,6 @@ mod tests {
         drop(widget_mut);
 
         // getting a widget after the reference has been dropped is possible
-        assert!(arena.get(&root.state, a).is_some());
+        assert!(arena.get(&world.state, a).is_some());
     }
 }

@@ -2,8 +2,8 @@ use std::{mem, ops::Range};
 
 use crate::{
     Affine, AnyWidget, AnyWidgetId, Arena, Clip, CursorIcon, ImeSignal, Painter, Point, Rect,
-    RootSignal, Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId,
-    root::RootState, widget::WidgetState,
+    Signal, Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId,
+    widget::WidgetState, world::WorldState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -15,76 +15,76 @@ pub(crate) enum FocusUpdate {
 }
 
 pub struct RefCx<'a> {
-    pub(crate) root:  &'a RootState,
+    pub(crate) world: &'a WorldState,
     pub(crate) arena: &'a Arena,
     pub(crate) state: &'a WidgetState,
 }
 
 pub struct MutCx<'a> {
-    pub(crate) root:  &'a mut RootState,
+    pub(crate) world: &'a mut WorldState,
     pub(crate) arena: &'a mut Arena,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct EventCx<'a> {
-    pub(crate) root:  &'a mut RootState,
+    pub(crate) world: &'a mut WorldState,
     pub(crate) arena: &'a mut Arena,
     pub(crate) state: &'a mut WidgetState,
     pub(crate) focus: &'a mut FocusUpdate,
 }
 
 pub struct UpdateCx<'a> {
-    pub(crate) root:  &'a mut RootState,
+    pub(crate) world: &'a mut WorldState,
     pub(crate) arena: &'a mut Arena,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct LayoutCx<'a> {
     pub(crate) scale: f32,
-    pub(crate) root:  &'a mut RootState,
+    pub(crate) world: &'a mut WorldState,
     pub(crate) arena: &'a mut Arena,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct ComposeCx<'a> {
     pub(crate) scale: f32,
-    pub(crate) root:  &'a mut RootState,
+    pub(crate) world: &'a mut WorldState,
     pub(crate) arena: &'a mut Arena,
     pub(crate) state: &'a mut WidgetState,
 }
 
 pub struct DrawCx<'a> {
-    pub(crate) root:  &'a mut RootState,
+    pub(crate) world: &'a mut WorldState,
     pub(crate) arena: &'a mut Arena,
     pub(crate) state: &'a mut WidgetState,
 }
 
 impl MutCx<'_> {
     pub fn remove(&mut self, id: impl AnyWidgetId) {
-        self.arena.remove(self.root, id.upcast());
+        self.arena.remove(self.world, id.upcast());
     }
 
     pub fn get_mut<U>(&mut self, id: WidgetId<U>) -> Option<WidgetMut<'_, U>>
     where
         U: ?Sized + AnyWidget,
     {
-        self.arena.get_mut(self.root, id)
+        self.arena.get_mut(self.world, id)
     }
 
     pub fn get_child_mut(&mut self, index: usize) -> Option<WidgetMut<'_, dyn Widget>> {
         self.arena.get_mut(
-            self.root,
+            self.world,
             *self.state.children.get(index)?,
         )
     }
 
     pub fn get_parent_mut(&mut self) -> Option<WidgetMut<'_>> {
-        self.arena.get_mut(self.root, self.state.parent?)
+        self.arena.get_mut(self.world, self.state.parent?)
     }
 
     pub fn for_each_child(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
         for &child in &self.state.children {
-            if let Some(mut child) = self.arena.get_mut(self.root, child) {
+            if let Some(mut child) = self.arena.get_mut(self.world, child) {
                 f(&mut child);
             }
         }
@@ -92,39 +92,39 @@ impl MutCx<'_> {
 
     pub fn request_animate(&mut self) {
         self.state.needs_animate = true;
-        self.root.request_propagate(self.state.id);
+        self.world.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
-            self.root.request_animate(window);
+            self.world.request_animate(window);
         }
     }
 
     pub fn request_layout(&mut self) {
         self.state.needs_layout = true;
         self.state.needs_draw = true;
-        self.root.request_propagate(self.state.id);
+        self.world.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
-            self.root.request_redraw(window);
+            self.world.request_redraw(window);
         }
     }
 
     pub fn request_compose(&mut self) {
         self.state.needs_compose = true;
         self.state.needs_draw = true;
-        self.root.request_propagate(self.state.id);
+        self.world.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
-            self.root.request_redraw(window);
+            self.world.request_redraw(window);
         }
     }
 
     pub fn request_draw(&mut self) {
         self.state.needs_draw = true;
-        self.root.request_propagate(self.state.id);
+        self.world.request_propagate(self.state.id);
 
         if let Some(window) = self.state.window {
-            self.root.request_redraw(window);
+            self.world.request_redraw(window);
         }
     }
 
@@ -142,47 +142,55 @@ impl MutCx<'_> {
     pub(crate) fn split(
         &mut self,
     ) -> (
-        &mut RootState,
+        &mut WorldState,
         &mut Arena,
         &mut WidgetState,
     ) {
-        (self.root, self.arena, self.state)
+        (self.world, self.arena, self.state)
     }
 
     pub(crate) fn as_update_cx(&mut self) -> UpdateCx<'_> {
-        let (root, arena, state) = self.split();
-        UpdateCx { root, arena, state }
+        let (world, arena, state) = self.split();
+        UpdateCx {
+            world,
+            arena,
+            state,
+        }
     }
 
     pub(crate) fn as_layout_cx(&mut self, scale: f32) -> LayoutCx<'_> {
-        let (root, arena, state) = self.split();
+        let (world, arena, state) = self.split();
 
         LayoutCx {
             scale,
-            root,
+            world,
             arena,
             state,
         }
     }
 
     pub(crate) fn as_compose_cx(&mut self, scale: f32) -> ComposeCx<'_> {
-        let (root, arena, state) = self.split();
+        let (world, arena, state) = self.split();
 
         ComposeCx {
             scale,
-            root,
+            world,
             arena,
             state,
         }
     }
 
     pub(crate) fn as_draw_cx(&mut self) -> DrawCx<'_> {
-        let (root, arena, state) = self.split();
-        DrawCx { root, arena, state }
+        let (world, arena, state) = self.split();
+        DrawCx {
+            world,
+            arena,
+            state,
+        }
     }
 
     pub(crate) fn enter_span(&self) -> Option<tracing::span::EnteredSpan> {
-        (self.root.trace).then(|| self.state.tracing_span.clone().entered())
+        (self.world.trace).then(|| self.state.tracing_span.clone().entered())
     }
 
     pub(crate) fn update_state(&mut self) {
@@ -222,7 +230,7 @@ impl EventCx<'_> {
     }
 
     pub fn set_clipboard(&mut self, contents: String) {
-        self.root.signal(RootSignal::ClipboardSet(contents));
+        self.world.signal(Signal::ClipboardSet(contents));
     }
 }
 
@@ -230,7 +238,7 @@ impl LayoutCx<'_> {
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
         let child = self.state.children[index];
 
-        if let Some(mut child) = self.arena.get_mut(self.root, child) {
+        if let Some(mut child) = self.arena.get_mut(self.world, child) {
             child.set_stashed_without_propagate(is_stashed);
         } else {
             tracing::error!("`LayoutCx::set_child_stashed` called on invalid child");
@@ -239,7 +247,7 @@ impl LayoutCx<'_> {
 
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
         if let Some(child) = self.state.children.get(index)
-            && let Some(mut child) = self.arena.get_mut(self.root, *child)
+            && let Some(mut child) = self.arena.get_mut(self.world, *child)
         {
             child.layout_recursive(self.scale, painter, space)
         } else {
@@ -343,7 +351,7 @@ impl_contexts! {
         where
             U: ?Sized + AnyWidget,
         {
-            self.arena.get(self.root, id)
+            self.arena.get(self.world, id)
         }
 
         pub fn children(&self) -> &[WidgetId] {
@@ -352,7 +360,7 @@ impl_contexts! {
 
         pub fn iter_children(&self) -> impl DoubleEndedIterator<Item = WidgetRef<'_>> {
             self.state.children.iter().filter_map(|child| {
-                self.arena.get(self.root, *child)
+                self.arena.get(self.world, *child)
             })
         }
 
@@ -361,7 +369,7 @@ impl_contexts! {
         }
 
         pub fn get_child(&self, index: usize) -> Option<WidgetRef<'_>> {
-            self.arena.get(self.root, self.state.children[index])
+            self.arena.get(self.world, self.state.children[index])
         }
 
         pub fn parent(&self) -> Option<WidgetId> {
@@ -369,11 +377,11 @@ impl_contexts! {
         }
 
         pub fn get_parent(&self) -> Option<WidgetRef<'_>> {
-            self.arena.get(self.root, self.state.parent?)
+            self.arena.get(self.world, self.state.parent?)
         }
 
         pub fn get_window(&self) -> Option<&Window> {
-            self.root.get_window(self.state.window?)
+            self.world.window(self.state.window?)
         }
 
         pub fn is_window_focused(&self) -> bool {
@@ -433,7 +441,7 @@ impl_contexts! {
             self.state.needs_animate = true;
 
             if let Some(window) = self.state.window {
-                self.root.request_animate(window);
+                self.world.request_animate(window);
             }
         }
 
@@ -442,7 +450,7 @@ impl_contexts! {
             self.state.needs_draw = true;
 
             if let Some(window) = self.state.window {
-                self.root.request_redraw(window);
+                self.world.request_redraw(window);
             }
         }
 
@@ -451,7 +459,7 @@ impl_contexts! {
             self.state.needs_draw = true;
 
             if let Some(window) = self.state.window {
-                self.root.request_redraw(window);
+                self.world.request_redraw(window);
             }
         }
 
@@ -459,7 +467,7 @@ impl_contexts! {
             self.state.needs_draw = true;
 
             if let Some(window) = self.state.window {
-                self.root.request_redraw(window);
+                self.world.request_redraw(window);
             }
         }
 
@@ -486,7 +494,7 @@ impl_contexts! {
                 return;
             }
 
-            self.root.signal(RootSignal::Ime(ImeSignal::Start));
+            self.world.signal(Signal::Ime(ImeSignal::Start));
         }
 
         pub fn set_ime_text(&mut self, text: String) {
@@ -495,7 +503,7 @@ impl_contexts! {
                 return;
             }
 
-            self.root.signal(RootSignal::Ime(ImeSignal::Text(text)));
+            self.world.signal(Signal::Ime(ImeSignal::Text(text)));
         }
 
         pub fn set_ime_selection(
@@ -508,7 +516,7 @@ impl_contexts! {
                 return;
             }
 
-            self.root.signal(RootSignal::Ime(ImeSignal::Selection {
+            self.world.signal(Signal::Ime(ImeSignal::Selection {
                 selection,
                 composing,
             }));

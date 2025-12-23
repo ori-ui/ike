@@ -23,7 +23,7 @@ mod window;
 use jni::JavaVM;
 pub use log::MakeAndroidWriter;
 
-use ike_core::{Root, RootSignal, Size, WindowId, WindowUpdate};
+use ike_core::{Signal, Size, WindowId, WindowUpdate, World};
 use ori::Proxyable;
 use parking_lot::Mutex;
 use raw_window_handle::DisplayHandle;
@@ -148,12 +148,12 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
 
     let proxy = Proxy::new(global_state.sender.clone(), looper);
 
-    let root = Root::new({
+    let world = World::new({
         let proxy = proxy.clone();
 
         move |signal| proxy.send(Event::Signal(signal))
     });
-    let mut context = ike_ori::Context::new(root, Arc::new(proxy.clone()));
+    let mut context = ike_ori::Context::new(world, Arc::new(proxy.clone()));
 
     *global_state.waker.lock() = Some(Box::new({
         let proxy = proxy.clone();
@@ -264,7 +264,7 @@ enum Event {
     InputQueue(InputQueueEvent),
     Window(WindowEvent),
     Ime(ImeEvent),
-    Signal(RootSignal),
+    Signal(Signal),
     Rebuild,
     Event(ori::Event),
     Future(Pin<Box<dyn Future<Output = ()> + Send>>),
@@ -361,22 +361,22 @@ impl<'a, T> EventLoop<'a, T> {
         }
     }
 
-    fn handle_signal(&mut self, signal: RootSignal) {
+    fn handle_signal(&mut self, signal: Signal) {
         match signal {
-            RootSignal::RequestRedraw(..) => {
+            Signal::RequestRedraw(..) => {
                 self.proxy.send(Event::Window(WindowEvent::Redraw));
             }
 
-            RootSignal::RequestAnimate(_, last_frame) => {
+            Signal::RequestAnimate(_, last_frame) => {
                 if self.animate.is_none() {
                     self.animate = Some(last_frame);
                     self.proxy.send(Event::Window(WindowEvent::Redraw));
                 }
             }
 
-            RootSignal::ClipboardSet(..) => {}
+            Signal::ClipboardSet(..) => {}
 
-            RootSignal::CreateWindow(window_id) => match self.window {
+            Signal::CreateWindow(window_id) => match self.window {
                 WindowState::Pending { ref mut id, .. } if id.is_none() => {
                     *id = Some(window_id);
                 }
@@ -397,15 +397,15 @@ impl<'a, T> EventLoop<'a, T> {
                 }
             },
 
-            RootSignal::RemoveWindow(..) => {}
+            Signal::RemoveWindow(..) => {}
 
-            RootSignal::UpdateWindow(_, update) => {
+            Signal::UpdateWindow(_, update) => {
                 if let WindowState::Open(ref mut window) = self.window {
                     window.handle_update(update);
                 }
             }
 
-            RootSignal::Ime(ime) => self.handle_ime_signal(ime),
+            Signal::Ime(ime) => self.handle_ime_signal(ime),
         }
     }
 }

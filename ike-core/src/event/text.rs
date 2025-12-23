@@ -13,8 +13,8 @@ pub struct TextPasteEvent {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ImeEvent {
-    Enabled,
+    Start,
     Select(Range<usize>),
     Commit(String),
-    Disabled,
+    End,
 }

@@ -1,39 +1,43 @@
 use crate::{
-    Arena, BuildCx, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent,
-    PointerEvent, PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, Root,
-    ScrollDelta, WidgetId, WindowId,
+    BuildCx, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent,
+    PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, ScrollDelta, WidgetId,
+    WindowId, World,
     context::FocusUpdate,
-    root::{focus, query},
+    world::{focus, query},
 };
 
-impl Root {
-    pub fn pointer_entered(&mut self, window: WindowId, pointer_id: PointerId) -> bool {
+impl World {
+    pub fn pointer_entered(&mut self, window: WindowId, pointer: PointerId) -> bool {
         self.handle_updates();
 
-        let Some(window) = self.state.get_window_mut(window) else {
+        let Some(window) = self.state.window_mut(window) else {
             return false;
         };
 
         window.pointers.push(Pointer {
-            id:       pointer_id,
+            id:       pointer,
             position: Point::all(0.0),
+            hovering: None,
+            capturer: None,
         });
 
         false
     }
 
-    pub fn pointer_left(&mut self, window: WindowId, pointer_id: PointerId) -> bool {
+    pub fn pointer_left(&mut self, window: WindowId, pointer: PointerId) -> bool {
         self.handle_updates();
 
-        let Some(window) = self.state.get_window_mut(window) else {
+        let Some(window) = self.state.window_mut(window) else {
             return false;
         };
 
-        if let Some(index) = window.pointers.iter().position(|p| p.id == pointer_id) {
-            window.pointers.swap_remove(index);
-        }
+        let Some(index) = window.pointers.iter().position(|p| p.id == pointer) else {
+            return false;
+        };
 
-        if let Some(hovered) = query::find_hovered(&self.arena, window.contents)
+        let pointer = window.pointers.swap_remove(index);
+
+        if let Some(hovered) = pointer.hovering
             && let Some(mut widget) = self.get_widget_mut(hovered)
         {
             widget.set_hovered(false);
@@ -42,42 +46,32 @@ impl Root {
         false
     }
 
-    pub fn pointer_moved(
-        &mut self,
-        window: WindowId,
-        pointer_id: PointerId,
-        position: Point,
-    ) -> bool {
+    pub fn pointer_moved(&mut self, window: WindowId, pointer: PointerId, position: Point) -> bool {
         self.handle_updates();
 
         let window_id = window;
-        let Some(window) = self.state.get_window_mut(window) else {
-            return false;
+        let pointer_id = pointer;
+
+        let capturer = if let Some(window) = self.state.window_mut(window_id)
+            && let Some(pointer) = window.pointer_mut(pointer_id)
+        {
+            pointer.position = position;
+            pointer.capturer
+        } else {
+            None
         };
 
-        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == pointer_id) else {
-            return false;
-        };
-
-        pointer.position = position;
-
-        let window_contents = window.contents;
-        let hovered = update_hovered(
-            self,
-            window_id,
-            window_contents,
-            position,
-        );
+        let hovered = update_pointer_hovered(self, window_id, pointer_id);
 
         // if there is an active widget, target it with the event
-        if let Some(target) = query::find_active(&self.arena, window_contents) {
+        if let Some(target) = capturer {
             let event = PointerMoveEvent {
                 pointer: pointer_id,
                 position,
             };
             let event = PointerEvent::Move(event);
 
-            match send_pointer_event(self, window_contents, target, &event) {
+            match send_pointer_event(self, window_id, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Handled => true,
 
@@ -96,7 +90,7 @@ impl Root {
             };
             let event = PointerEvent::Move(event);
 
-            match send_pointer_event(self, window_contents, target, &event) {
+            match send_pointer_event(self, window_id, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Handled => true,
 
@@ -116,36 +110,26 @@ impl Root {
     pub fn pointer_pressed(
         &mut self,
         window: WindowId,
-        pointer_id: PointerId,
+        pointer: PointerId,
         button: PointerButton,
         pressed: bool,
     ) -> bool {
         self.handle_updates();
 
         let window_id = window;
-        let Some(window) = self.state.get_window_mut(window) else {
+        let pointer_id = pointer;
+
+        let Some(window) = self.state.window_mut(window) else {
             return false;
         };
 
-        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == pointer_id) else {
+        let Some(pointer) = window.pointer_mut(pointer) else {
             return false;
         };
 
-        let window_contents = window.contents;
         let pointer_position = pointer.position;
 
-        if button == PointerButton::Primary
-            && pressed
-            && let Some(focused) = query::find_focused(&self.arena, window_contents)
-            && self.get_widget(focused).is_some_and(|widget| {
-                let local = widget.cx.global_transform().inverse() * pointer_position;
-                !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
-            })
-        {
-            focus::set_focused(self, window_contents, None);
-        }
-
-        if let Some(target) = find_pointer_target(&self.arena, window_contents) {
+        let handled = if let Some(target) = pointer.target() {
             let event = PointerButtonEvent {
                 button,
                 position: pointer_position,
@@ -156,7 +140,7 @@ impl Root {
                 false => PointerEvent::Up(event),
             };
 
-            let handled = match send_pointer_event(self, window_contents, target, &event) {
+            let handled = match send_pointer_event(self, window_id, target, &event) {
                 PointerPropagate::Bubble => false,
                 PointerPropagate::Handled => true,
 
@@ -187,37 +171,50 @@ impl Root {
                     widget.set_active(false);
                 }
 
-                update_hovered(
-                    self,
-                    window_id,
-                    window_contents,
-                    pointer_position,
-                );
+                update_pointer_hovered(self, window_id, pointer_id);
             }
 
             handled
         } else {
             false
+        };
+
+        if button == PointerButton::Primary
+            && pressed
+            && !handled
+            && let Some(window) = self.window(window_id)
+            && let Some(focused) = window.focused
+            && self.get_widget(focused).is_some_and(|widget| {
+                let local = widget.cx.global_transform().inverse() * pointer_position;
+                !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
+            })
+        {
+            focus::set_focused(self, window_id, None);
         }
+
+        handled
     }
 
     pub fn pointer_scrolled(
         &mut self,
         window: WindowId,
-        pointer_id: PointerId,
+        pointer: PointerId,
         delta: ScrollDelta,
     ) -> bool {
         self.handle_updates();
 
-        let Some(window) = self.state.get_window_mut(window) else {
+        let window_id = window;
+        let pointer_id = pointer;
+
+        let Some(window) = self.state.window_mut(window_id) else {
             return false;
         };
 
-        let Some(pointer) = window.pointers.iter_mut().find(|p| p.id == pointer_id) else {
+        let Some(pointer) = window.pointer_mut(pointer_id) else {
             return false;
         };
 
-        let Some(target) = find_pointer_target(&self.arena, window.contents) else {
+        let Some(target) = pointer.target() else {
             return false;
         };
 
@@ -227,8 +224,7 @@ impl Root {
             delta,
         });
 
-        let window_contents = window.contents;
-        match send_pointer_event(self, window_contents, target, &event) {
+        match send_pointer_event(self, window_id, target, &event) {
             PointerPropagate::Bubble => false,
             PointerPropagate::Handled => true,
 
@@ -243,66 +239,92 @@ impl Root {
     }
 }
 
-fn find_pointer_target(arena: &Arena, root_widget: WidgetId) -> Option<WidgetId> {
-    if let Some(target) = query::find_active(arena, root_widget) {
-        Some(target)
-    } else {
-        query::find_hovered(arena, root_widget)
+pub fn update_window_hovered(world: &mut World, window: WindowId) {
+    let window_id = window;
+
+    let Some(window) = world.window(window) else {
+        return;
+    };
+
+    let pointers = window
+        .pointers
+        .iter()
+        .map(|pointer| pointer.id)
+        .collect::<Vec<_>>();
+
+    for pointer in pointers {
+        update_pointer_hovered(world, window_id, pointer);
     }
 }
 
-pub fn update_hovered(
-    root: &mut Root,
+pub fn update_pointer_hovered(
+    world: &mut World,
     window: WindowId,
-    id: WidgetId,
-    point: Point,
+    pointer: PointerId,
 ) -> Option<WidgetId> {
-    if let Some(active) = query::find_active(&root.arena, id)
-        && let Some(mut widget) = root.arena.get_mut(&mut root.state, active)
-    {
-        widget.cx.root.set_window_cursor(window, widget.cx.cursor());
+    let window_id = window;
+    let pointer_id = pointer;
 
-        let local = widget.cx.global_transform().inverse() * point;
-        let is_hovered = Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local);
+    let window = world.window(window_id)?;
+    let pointer = window.pointer(pointer_id)?;
 
-        if is_hovered != widget.cx.is_hovered() {
-            widget.set_hovered(is_hovered);
+    let position = pointer.position;
+
+    if let Some(active) = pointer.capturer {
+        if let Some(mut widget) = world.arena.get_mut(&mut world.state, active) {
+            (widget.cx.world).set_window_cursor(window_id, widget.cx.cursor());
+
+            let local = widget.cx.global_transform().inverse() * position;
+            let is_hovered = widget.cx.rect().contains(local);
+
+            if is_hovered != widget.cx.is_hovered() {
+                widget.set_hovered(is_hovered);
+            }
+
+            return is_hovered.then_some(active);
+        } else {
+            tracing::error!("failed getting active widget");
+
+            return None;
         }
-
-        return is_hovered.then_some(active);
     }
 
-    let current = query::find_hovered(&root.arena, id);
-    let hovered = query::find_widget_at(&root.arena, id, point);
+    let hovered = query::find_widget_at(world, window, position);
 
-    if current != hovered {
-        if let Some(current) = current
-            && let Some(mut widget) = root.arena.get_mut(&mut root.state, current)
+    if pointer.hovering != hovered {
+        if let Some(current) = pointer.hovering
+            && let Some(mut widget) = world.arena.get_mut(&mut world.state, current)
         {
             widget.set_hovered(false);
         }
 
         if let Some(hovered) = hovered
-            && let Some(mut widget) = root.arena.get_mut(&mut root.state, hovered)
+            && let Some(mut widget) = world.arena.get_mut(&mut world.state, hovered)
         {
             widget.set_hovered(true);
         }
     }
 
-    if let Some(hovered) = hovered
-        && let Some(widget) = root.get_widget_mut(hovered)
+    if let Some(window) = world.window_mut(window_id)
+        && let Some(pointer) = window.pointer_mut(pointer_id)
     {
-        widget.cx.root.set_window_cursor(window, widget.cx.cursor());
+        pointer.hovering = hovered;
+    }
+
+    if let Some(hovered) = hovered
+        && let Some(widget) = world.get_widget_mut(hovered)
+    {
+        (widget.cx.world).set_window_cursor(window_id, widget.cx.cursor());
     } else {
-        root.state.set_window_cursor(window, CursorIcon::Default);
+        (world.state).set_window_cursor(window_id, CursorIcon::Default);
     }
 
     hovered
 }
 
 fn send_pointer_event(
-    root: &mut Root,
-    root_widget: WidgetId,
+    world: &mut World,
+    window: WindowId,
     target: WidgetId,
     event: &PointerEvent,
 ) -> PointerPropagate {
@@ -313,11 +335,11 @@ fn send_pointer_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current
-        && let Some(widget) = root.get_widget_mut(id)
+        && let Some(widget) = world.get_widget_mut(id)
         && let PointerPropagate::Bubble = propagate
     {
         let mut cx = EventCx {
-            root:  widget.cx.root,
+            world: widget.cx.world,
             arena: widget.cx.arena,
             state: widget.cx.state,
             focus: &mut focus,
@@ -327,8 +349,8 @@ fn send_pointer_event(
         current = widget.cx.parent();
     }
 
-    root.propagate_state(target);
-    focus::update_focus(root, root_widget, focus);
+    world.propagate_state(target);
+    focus::update_focus(world, window, focus);
 
     propagate
 }

@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::{
-    Canvas, ComposeCx, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, PointerEvent,
-    PointerPropagate, Propagate, Rect, Size, Space, TextEvent, TouchEvent, TouchPropagate,
+    Canvas, Clip, ComposeCx, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, Point, PointerEvent,
+    PointerPropagate, Propagate, Rect, RefCx, Size, Space, TextEvent, TouchEvent, TouchPropagate,
     UpdateCx,
 };
 
@@ -70,6 +70,36 @@ pub trait Widget: Any {
         let _ = event;
 
         Propagate::Bubble
+    }
+
+    fn find_widget_at(&self, cx: &RefCx<'_>, point: Point) -> Option<WidgetId> {
+        let local = cx.global_transform().inverse() * point;
+
+        if !cx.rect().contains(local) || cx.is_stashed() {
+            return None;
+        }
+
+        match cx.clip() {
+            Some(Clip::Rect(rect, _)) => {
+                if !rect.contains(local) {
+                    return None;
+                }
+            }
+
+            None => {}
+        }
+
+        for child in cx.iter_children() {
+            if let Some(widget) = child.widget.find_widget_at(&child.cx, point) {
+                return Some(widget);
+            }
+        }
+
+        if cx.state.accepts_pointer {
+            Some(cx.id())
+        } else {
+            None
+        }
     }
 
     fn accepts_pointer() -> bool

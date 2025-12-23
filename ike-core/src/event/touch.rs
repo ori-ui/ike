@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{Offset, Point};
+use crate::{Offset, Point, WidgetId};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TouchEvent {
@@ -84,6 +84,7 @@ pub struct Touch {
     pub(crate) start_position:   Point,
     pub(crate) start_time:       Instant,
     pub(crate) state:            TouchState,
+    pub(crate) capturer:         Option<WidgetId>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

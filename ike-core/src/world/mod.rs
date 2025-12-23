@@ -2,13 +2,14 @@ use std::{
     collections::HashSet,
     hash::BuildHasherDefault,
     mem,
+    rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
 
 use crate::{
-    Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Recorder, Size, Update, WidgetId, Window,
-    WindowId, WindowSizing, event::TouchSettings,
+    Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Point, Recorder, Size, Update, WidgetId,
+    Window, WindowId, WindowSizing, debug::debug_panic, event::TouchSettings, window::Layer,
 };
 
 mod focus;
@@ -22,24 +23,24 @@ mod text;
 mod touch;
 
 use seahash::SeaHasher;
-pub use signal::{ImeSignal, RootSignal, WindowUpdate};
+pub use signal::{ImeSignal, Signal, WindowUpdate};
 
-pub struct Root {
+pub struct World {
     pub(crate) arena: Arena,
-    pub(crate) state: RootState,
+    pub(crate) state: WorldState,
 }
 
-pub struct RootState {
+pub struct WorldState {
     pub(crate) windows:        Vec<Window>,
     pub(crate) propagate:      HashSet<WidgetId, BuildHasherDefault<SeaHasher>>,
-    pub(crate) sink:           Box<dyn Fn(RootSignal)>,
+    pub(crate) sink:           Box<dyn Fn(Signal)>,
     pub(crate) trace:          bool,
     pub(crate) touch_settings: TouchSettings,
     pub(crate) recorder:       Recorder,
 }
 
-impl RootState {
-    pub(crate) fn signal(&self, signal: RootSignal) {
+impl WorldState {
+    pub(crate) fn signal(&self, signal: Signal) {
         tracing::trace!(
             signal = ?signal,
             "root signal emitted",
@@ -48,11 +49,31 @@ impl RootState {
         (self.sink)(signal);
     }
 
-    pub(crate) fn get_window(&self, id: WindowId) -> Option<&Window> {
+    pub(crate) fn window(&self, id: WindowId) -> Option<&Window> {
+        match self.get_window(id) {
+            Some(window) => Some(window),
+            None => {
+                debug_panic!("invalid window `{id:?}`");
+                None
+            }
+        }
+    }
+
+    pub(crate) fn window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
+        match self.get_window_mut(id) {
+            Some(window) => Some(window),
+            None => {
+                debug_panic!("invalid window `{id:?}`");
+                None
+            }
+        }
+    }
+
+    pub fn get_window(&self, id: WindowId) -> Option<&Window> {
         self.windows.iter().find(|w| w.id == id)
     }
 
-    pub(crate) fn get_window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
+    pub fn get_window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
         self.windows.iter_mut().find(|w| w.id == id)
     }
 
@@ -65,21 +86,21 @@ impl RootState {
     }
 
     pub(crate) fn request_redraw(&self, window: WindowId) {
-        self.signal(RootSignal::RequestRedraw(window));
+        self.signal(Signal::RequestRedraw(window));
     }
 
     pub(crate) fn request_animate(&self, window: WindowId) {
-        self.signal(RootSignal::RequestAnimate(
+        self.signal(Signal::RequestAnimate(
             window,
             Instant::now(),
         ));
     }
 
     pub(crate) fn set_window_cursor(&mut self, window: WindowId, cursor: CursorIcon) {
-        if let Some(win) = self.get_window_mut(window) {
+        if let Some(win) = self.window_mut(window) {
             win.cursor = cursor;
 
-            self.signal(RootSignal::UpdateWindow(
+            self.signal(Signal::UpdateWindow(
                 window,
                 WindowUpdate::Cursor(cursor),
             ));
@@ -87,10 +108,10 @@ impl RootState {
     }
 
     pub(crate) fn set_window_title(&mut self, window: WindowId, title: String) {
-        if let Some(win) = self.get_window_mut(window) {
+        if let Some(win) = self.window_mut(window) {
             win.title = title.clone();
 
-            self.signal(RootSignal::UpdateWindow(
+            self.signal(Signal::UpdateWindow(
                 window,
                 WindowUpdate::Title(title),
             ));
@@ -98,10 +119,10 @@ impl RootState {
     }
 
     pub(crate) fn set_window_sizing(&mut self, window: WindowId, sizing: WindowSizing) {
-        if let Some(win) = self.get_window_mut(window) {
+        if let Some(win) = self.window_mut(window) {
             win.sizing = sizing;
 
-            self.signal(RootSignal::UpdateWindow(
+            self.signal(Signal::UpdateWindow(
                 window,
                 WindowUpdate::Sizing(sizing),
             ));
@@ -109,10 +130,10 @@ impl RootState {
     }
 
     pub(crate) fn set_window_visible(&mut self, window: WindowId, visible: bool) {
-        if let Some(win) = self.get_window_mut(window) {
+        if let Some(win) = self.window_mut(window) {
             win.is_visible = visible;
 
-            self.signal(RootSignal::UpdateWindow(
+            self.signal(Signal::UpdateWindow(
                 window,
                 WindowUpdate::Visible(visible),
             ));
@@ -120,10 +141,10 @@ impl RootState {
     }
 
     pub(crate) fn set_window_decorated(&mut self, window: WindowId, decorated: bool) {
-        if let Some(win) = self.get_window_mut(window) {
+        if let Some(win) = self.window_mut(window) {
             win.is_decorated = decorated;
 
-            self.signal(RootSignal::UpdateWindow(
+            self.signal(Signal::UpdateWindow(
                 window,
                 WindowUpdate::Decorated(decorated),
             ));
@@ -131,18 +152,18 @@ impl RootState {
     }
 
     pub(crate) fn set_window_color(&mut self, window: WindowId, color: Color) {
-        if let Some(win) = self.get_window_mut(window) {
+        if let Some(win) = self.window_mut(window) {
             win.color = color;
-            self.signal(RootSignal::RequestRedraw(window));
+            self.signal(Signal::RequestRedraw(window));
         }
     }
 }
 
-impl Root {
-    pub fn new(sink: impl Fn(RootSignal) + 'static) -> Self {
+impl World {
+    pub fn new(sink: impl Fn(Signal) + 'static) -> Self {
         Self {
             arena: Arena::new(),
-            state: RootState {
+            state: WorldState {
                 windows:        Vec::new(),
                 propagate:      HashSet::default(),
                 sink:           Box::new(sink),
@@ -162,28 +183,37 @@ impl Root {
 
         self.state.windows.push(Window {
             id,
-            anchor: None,
-            scale: 1.0,
+            layers: Rc::new(vec![Layer {
+                root:     contents,
+                size:     Size::new(800.0, 600.0),
+                position: Point::ORIGIN,
+            }]),
+
+            modifiers: Modifiers::empty(),
             pointers: Vec::new(),
             touches: Vec::new(),
-            modifiers: Modifiers::empty(),
-            size: Size::new(800.0, 600.0),
+
+            focused: None,
+
             properties: Vec::new(),
+
+            scale: 1.0,
+            size: Size::new(800.0, 600.0),
+            is_visible: true,
+            is_focused: false,
+            is_decorated: true,
+
             cursor: CursorIcon::Default,
             title: String::new(),
-            contents,
             sizing: WindowSizing::Resizable {
                 default_size: Size::new(800.0, 600.0),
                 min_size:     Size::all(0.0),
                 max_size:     Size::all(f32::INFINITY),
             },
-            is_focused: false,
-            is_visible: true,
-            is_decorated: true,
             color: Color::WHITE,
         });
 
-        self.state.signal(RootSignal::CreateWindow(id));
+        self.state.signal(Signal::CreateWindow(id));
 
         if let Some(mut widget) = self.get_widget_mut(contents) {
             widget.cx.set_window_recursive(Some(id));
@@ -193,12 +223,23 @@ impl Root {
     }
 
     pub fn remove_window(&mut self, window: WindowId) {
-        if let Some(window) = self.get_window(window) {
-            self.remove_widget(window.contents);
+        if let Some(index) = self.state.windows.iter().position(|w| w.id == window) {
+            let window = self.state.windows.remove(index);
+
+            for layer in window.layers() {
+                self.remove_widget(layer.root);
+            }
         }
 
-        self.state.windows.retain(|w| w.id() != window);
-        self.state.signal(RootSignal::RemoveWindow(window));
+        self.state.signal(Signal::RemoveWindow(window));
+    }
+
+    pub(crate) fn window(&self, id: WindowId) -> Option<&Window> {
+        self.state.window(id)
+    }
+
+    pub(crate) fn window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
+        self.state.window_mut(id)
     }
 
     pub fn get_window(&self, id: WindowId) -> Option<&Window> {
@@ -213,12 +254,7 @@ impl Root {
         self.state.windows()
     }
 
-    #[must_use]
-    pub fn set_window_contents(
-        &mut self,
-        window: WindowId,
-        contents: WidgetId,
-    ) -> Option<WidgetId> {
+    pub fn set_window_layer(&mut self, window: WindowId, contents: WidgetId) {
         if let Some(mut widget) = self.get_widget_mut(contents) {
             widget.cx.set_window_recursive(Some(window));
             widget.cx.request_layout();
@@ -230,19 +266,19 @@ impl Root {
             );
         }
 
-        if let Some(window) = self.get_window_mut(window) {
-            Some(mem::replace(
-                &mut window.contents,
-                contents,
-            ))
+        if let Some(window) = self.window_mut(window) {
+            let layers = Rc::make_mut(&mut window.layers);
+
+            if let Some(layer) = layers.get_mut(0) {
+                let prev = mem::replace(&mut layer.root, contents);
+                self.remove_widget(prev);
+            }
         } else {
             tracing::error!(
                 window = ?window,
                 contents = ?contents,
                 "tried to set contents of a window that doens't exit",
             );
-
-            None
         }
     }
 
@@ -287,42 +323,18 @@ impl Root {
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
         self.handle_updates();
 
-        let window = self.state.get_window(window)?;
-        let window_id = window.id;
-        let sizing = window.sizing;
-        let contents = window.contents;
-        let pointer_position = window.pointers.first().map(|p| p.position);
+        let new_window_size = layout::layout_window(self, window, canvas.painter());
+        layout::compose_window(self, window);
+        pointer::update_window_hovered(self, window);
 
-        let (new_window_size, update_hovered) = if let Some(mut widget) =
-            self.arena.get_mut(&mut self.state, contents)
-        {
-            let needs_layout = widget.cx.state.needs_layout;
-            let new_window_size = layout::layout_window(&mut widget, window_id, canvas.painter());
-            let needs_compose = widget.cx.state.needs_compose;
+        let window = self.state.window(window)?;
 
-            layout::compose_window(&mut widget, window_id);
+        for layer in window.layers.clone().iter() {
+            let Some(mut widget) = self.arena.get_mut(&mut self.state, layer.root) else {
+                debug_panic!("invalid widget");
+                continue;
+            };
 
-            (
-                Some(new_window_size),
-                needs_layout || needs_compose,
-            )
-        } else {
-            tracing::error!(
-                window = ?window_id,
-                contents = ?contents,
-                "`draw` called, but window contents doesn't exist",
-            );
-
-            (None, false)
-        };
-
-        if let Some(position) = pointer_position
-            && update_hovered
-        {
-            pointer::update_hovered(self, window_id, contents, position);
-        }
-
-        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
             {
                 let _span = tracing::info_span!("draw");
                 widget.draw_recursive(canvas);
@@ -332,38 +344,32 @@ impl Root {
                 let _span = tracing::info_span!("record");
                 widget.record_recursive(canvas);
             }
-
-            {
-                let _span = tracing::info_span!("draw_over");
-                widget.draw_over_recursive(canvas);
-            }
         }
 
         self.state.recorder.frame(&self.arena);
 
-        matches!(sizing, WindowSizing::FitContent)
-            .then_some(new_window_size)
-            .flatten()
+        new_window_size
     }
 
     pub fn animate(&mut self, window: WindowId, delta_time: Duration) {
         self.handle_updates();
 
         let window_id = window;
-        let Some(window) = self.state.get_window_mut(window) else {
+        let Some(window) = self.state.window(window) else {
+            tracing::error!(
+                window = ?window_id,
+                "`animate` called a on window that doesn't exist",
+            );
+
             return;
         };
 
         let _span = tracing::info_span!("animate");
 
-        let contents = window.contents;
-        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
-            widget.animate_recursive(delta_time);
-        } else {
-            tracing::error!(
-                window = ?window_id,
-                "`animate` called a on window that doesn't exist",
-            );
+        for layer in window.layers.clone().iter() {
+            if let Some(mut widget) = self.arena.get_mut(&mut self.state, layer.root) {
+                widget.animate_recursive(delta_time);
+            }
         }
     }
 
@@ -371,30 +377,35 @@ impl Root {
         self.handle_updates();
 
         let window_id = window;
-        let Some(window) = self.state.get_window_mut(window) else {
+        let Some(window) = self.state.window_mut(window_id) else {
+            tracing::error!(
+                window = ?window_id,
+                "`window_focused` called on a window that doesn't exist",
+            );
+
             return;
         };
 
         window.is_focused = is_focused;
 
-        let contents = window.contents;
-        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
-            let update = Update::WindowFocused(is_focused);
-            widget.update_recursive(update);
-        } else {
-            tracing::error!(
-                window = ?window_id,
-                "`window_focused` called on a window that doesn't exist",
-            );
+        for layer in window.layers.clone().iter() {
+            if let Some(mut widget) = self.arena.get_mut(&mut self.state, layer.root) {
+                let update = Update::WindowFocused(is_focused);
+                widget.update_recursive(update);
+            }
         }
 
+        let Some(window) = self.state.window(window_id) else {
+            return;
+        };
+
         // if the window was left in an ime session, we need start it again
-        if let Some(focused) = query::find_focused(&self.arena, contents)
+        if let Some(focused) = window.focused
             && let Some(widget) = self.get_widget(focused)
             && widget.cx.state.accepts_text
             && is_focused
         {
-            widget.cx.root.signal(RootSignal::Ime(ImeSignal::Start));
+            widget.cx.world.signal(Signal::Ime(ImeSignal::Start));
         }
     }
 
@@ -402,22 +413,23 @@ impl Root {
         self.handle_updates();
 
         let window_id = window;
-        let Some(window) = self.state.get_window_mut(window) else {
+        let Some(window) = self.state.window_mut(window_id) else {
+            tracing::error!(
+                window = ?window_id,
+                "`window_resized` called on a window that doesn't exist",
+            );
+
             return;
         };
 
         window.size = new_size;
 
-        let contents = window.contents;
-        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
-            let update = Update::WindowResized(new_size);
-            widget.update_recursive(update);
-            widget.cx.request_layout();
-        } else {
-            tracing::error!(
-                window = ?window_id,
-                "`window_resized` called on a window that doesn't exist",
-            );
+        for layer in window.layers.clone().iter() {
+            if let Some(mut widget) = self.arena.get_mut(&mut self.state, layer.root) {
+                let update = Update::WindowResized(new_size);
+                widget.update_recursive(update);
+                widget.cx.request_layout();
+            }
         }
     }
 
@@ -425,33 +437,34 @@ impl Root {
         self.handle_updates();
 
         let window_id = window;
-        let Some(window) = self.state.get_window_mut(window) else {
+        let Some(window) = self.state.window_mut(window_id) else {
+            tracing::error!(
+                window = ?window_id,
+                "`window_scaled` called on a window that doesn't exist",
+            );
+
             return;
         };
 
         window.scale = new_scale;
         window.size = new_size;
 
-        let contents = window.contents;
-        if let Some(mut widget) = self.arena.get_mut(&mut self.state, contents) {
-            let update = Update::WindowScaleChanged(new_scale);
-            widget.update_recursive(update);
-            widget.cx.request_layout();
-        } else {
-            tracing::error!(
-                window = ?window_id,
-                "`window_scaled` called on a window that doesn't exist",
-            );
+        for layer in window.layers.clone().iter() {
+            if let Some(mut widget) = self.arena.get_mut(&mut self.state, layer.root) {
+                let update = Update::WindowScaleChanged(new_scale);
+                widget.update_recursive(update);
+                widget.cx.request_layout();
+            }
         }
     }
 }
 
-impl BuildCx for Root {
-    fn root(&self) -> &Root {
+impl BuildCx for World {
+    fn world(&self) -> &World {
         self
     }
 
-    fn root_mut(&mut self) -> &mut Root {
+    fn world_mut(&mut self) -> &mut World {
         self
     }
 }

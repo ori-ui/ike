@@ -2,7 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 pub use cursor_icon::CursorIcon;
 
-use crate::{Offset, Point};
+use crate::{Offset, Point, WidgetId};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PointerEvent {
@@ -61,6 +61,14 @@ pub enum PointerPropagate {
 pub struct Pointer {
     pub(crate) id:       PointerId,
     pub(crate) position: Point,
+    pub(crate) hovering: Option<WidgetId>,
+    pub(crate) capturer: Option<WidgetId>,
+}
+
+impl Pointer {
+    pub(crate) fn target(&self) -> Option<WidgetId> {
+        self.capturer.or(self.hovering)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

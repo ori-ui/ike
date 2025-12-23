@@ -43,7 +43,7 @@ where
             widget: T::upcast_mut(self.widget),
 
             cx: MutCx {
-                root:  self.cx.root,
+                world: self.cx.world,
                 arena: self.cx.arena,
                 state: self.cx.state,
             },
@@ -55,7 +55,7 @@ where
             widget: self.widget,
 
             cx: RefCx {
-                root:  self.cx.root,
+                world: self.cx.world,
                 arena: self.cx.arena,
                 state: self.cx.state,
             },
@@ -64,12 +64,12 @@ where
 
     pub fn set_stashed(&mut self, is_stashed: bool) {
         self.set_stashed_without_propagate(is_stashed);
-        self.cx.root.request_propagate(self.cx.state.id);
+        self.cx.world.request_propagate(self.cx.state.id);
     }
 
     pub fn set_disabled(&mut self, is_disabled: bool) {
         self.set_disabled_without_propagate(is_disabled);
-        self.cx.root.request_propagate(self.cx.state.id);
+        self.cx.world.request_propagate(self.cx.state.id);
     }
 
     /// Add a child to widget.
@@ -237,19 +237,19 @@ where
     pub(crate) fn set_hovered(&mut self, is_hovered: bool) {
         self.cx.state.is_hovered = is_hovered;
         self.update_without_propagate(Update::Hovered(is_hovered));
-        self.cx.root.request_propagate(self.cx.state.id);
+        self.cx.world.request_propagate(self.cx.state.id);
     }
 
     pub(crate) fn set_active(&mut self, is_active: bool) {
         self.cx.state.is_active = is_active;
         self.update_without_propagate(Update::Active(is_active));
-        self.cx.root.request_propagate(self.cx.state.id);
+        self.cx.world.request_propagate(self.cx.state.id);
     }
 
     pub(crate) fn set_focused(&mut self, is_focused: bool) {
         self.cx.state.is_focused = is_focused;
         self.update_without_propagate(Update::Focused(is_focused));
-        self.cx.root.request_propagate(self.cx.state.id);
+        self.cx.world.request_propagate(self.cx.state.id);
     }
 
     pub(crate) fn update_without_propagate(&mut self, update: Update) {
@@ -377,10 +377,10 @@ where
 
         if self.cx.state.needs_draw {
             self.cx.state.stable_draws = 0;
-            self.cx.root.recorder.remove(self.cx.id());
+            self.cx.world.recorder.remove(self.cx.id());
         }
 
-        if let Some(recording) = self.cx.root.recorder.get_marked(self.cx.id()) {
+        if let Some(recording) = self.cx.world.recorder.get_marked(self.cx.id()) {
             canvas.transform(self.cx.transform(), &mut |canvas| {
                 canvas.draw_recording(&recording);
             });
@@ -388,6 +388,11 @@ where
             let _span = self.cx.enter_span();
             self.draw_recursive_transformed(canvas);
         }
+
+        canvas.transform(self.cx.transform(), &mut |canvas| {
+            let mut cx = self.cx.as_draw_cx();
+            self.widget.draw_over(&mut cx, canvas);
+        });
     }
 
     fn draw_recursive_transformed(&mut self, canvas: &mut dyn Canvas) {
@@ -416,7 +421,7 @@ where
     }
 
     pub(crate) fn record_recursive(&mut self, canvas: &mut dyn Canvas) {
-        if self.cx.root.recorder.contains(self.cx.id()) {
+        if self.cx.world.recorder.contains(self.cx.id()) {
             return;
         }
 
@@ -428,12 +433,12 @@ where
             );
 
         let memory_estimate = (self.cx.size().area() * scale * scale * 4.0) as u64;
-        let total_memory_estimate = self.cx.root.recorder.memory_usage() + memory_estimate;
+        let total_memory_estimate = self.cx.world.recorder.memory_usage() + memory_estimate;
 
-        if draw_cost >= self.cx.root.recorder.cost_threshold
+        if draw_cost >= self.cx.world.recorder.cost_threshold
             && self.cx.state.stable_draws >= 3
             && self.cx.size().area() > 256.0
-            && total_memory_estimate < self.cx.root.recorder.max_memory_usage
+            && total_memory_estimate < self.cx.world.recorder.max_memory_usage
         {
             tracing::trace!(
                 widget = ?self.cx.id(),
@@ -446,46 +451,16 @@ where
             });
 
             if let Some(recording) = recording {
-                (self.cx.root.recorder).insert(self.cx.id(), draw_cost, recording);
+                (self.cx.world.recorder).insert(self.cx.id(), draw_cost, recording);
             }
 
             return;
         }
 
-        self.cx.root.recorder.remove(self.cx.id());
+        self.cx.world.recorder.remove(self.cx.id());
 
         self.cx.for_each_child(|child| {
             child.record_recursive(canvas);
-        });
-    }
-
-    pub(crate) fn draw_over_recursive(&mut self, canvas: &mut dyn Canvas) {
-        self.cx.state.needs_draw = false;
-
-        if self.cx.is_stashed() {
-            return;
-        }
-
-        let _span = self.cx.enter_span();
-
-        canvas.transform(self.cx.transform(), &mut |canvas| {
-            if let Some(ref clip) = self.cx.state.clip {
-                canvas.clip(&clip.clone(), &mut |canvas| {
-                    let mut cx = self.cx.as_draw_cx();
-                    self.widget.draw_over(&mut cx, canvas);
-
-                    self.cx.for_each_child(|child| {
-                        child.draw_over_recursive(canvas);
-                    });
-                });
-            } else {
-                let mut cx = self.cx.as_draw_cx();
-                self.widget.draw_over(&mut cx, canvas);
-
-                self.cx.for_each_child(|child| {
-                    child.draw_over_recursive(canvas);
-                });
-            }
         });
     }
 }

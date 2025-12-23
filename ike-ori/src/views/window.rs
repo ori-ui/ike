@@ -75,7 +75,7 @@ where
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
-        let id = cx.root_mut().create_window(contents.upcast());
+        let id = cx.world_mut().create_window(contents.upcast());
 
         cx.set_window_title(id, self.title.clone());
         cx.set_window_sizing(id, self.sizing);
@@ -107,11 +107,11 @@ where
 
         let palette = cx.get_or_default::<Palette>();
 
-        if let Some(window) = cx.root().get_window(*id)
-            && window.contents() != contents.upcast()
-            && let Some(prev) = cx.set_window_contents(*id, *contents)
+        if let Some(window) = cx.world().get_window(*id)
+            && let Some(layer) = window.layers().first()
+            && layer.root != contents.upcast()
         {
-            cx.remove_widget(prev)
+            cx.set_window_layer(*id, *contents);
         }
 
         if self.title != old.title {
@@ -145,7 +145,7 @@ where
         cx: &mut Context,
         _data: &mut T,
     ) {
-        cx.root_mut().remove_window(window);
+        cx.world_mut().remove_window(window);
     }
 
     fn event(
@@ -158,11 +158,11 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if let Some(window) = cx.root().get_window(*id)
-            && window.contents() != contents.upcast()
-            && let Some(prev) = cx.set_window_contents(*id, *contents)
+        if let Some(window) = cx.world().get_window(*id)
+            && let Some(layer) = window.layers().first()
+            && layer.root != contents.upcast()
         {
-            cx.remove_widget(prev)
+            cx.set_window_layer(*id, *contents);
         }
 
         action

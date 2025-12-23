@@ -1,14 +1,13 @@
 use keyboard_types::{Key, Modifiers, NamedKey};
 
 use crate::{
-    BuildCx, EventCx, KeyEvent, KeyPressEvent, Propagate, Root, WidgetId, WindowId,
-    context::FocusUpdate,
-    root::{focus, query},
+    BuildCx, EventCx, KeyEvent, KeyPressEvent, Propagate, WidgetId, WindowId, World,
+    context::FocusUpdate, world::focus,
 };
 
-impl Root {
+impl World {
     pub fn modifiers_changed(&mut self, window: WindowId, modifiers: Modifiers) {
-        if let Some(window) = self.get_window_mut(window) {
+        if let Some(window) = self.window_mut(window) {
             window.modifiers = modifiers;
         }
     }
@@ -22,8 +21,9 @@ impl Root {
         pressed: bool,
     ) -> bool {
         self.handle_updates();
+        let window_id = window;
 
-        let Some(window) = self.get_window(window) else {
+        let Some(window) = self.window(window) else {
             return false;
         };
 
@@ -39,16 +39,15 @@ impl Root {
             false => KeyEvent::Up(event),
         };
 
-        let contents = window.contents;
         let modifiers = window.modifiers;
 
-        let handled = match query::find_focused(&self.arena, contents) {
-            Some(target) => send_key_event(self, contents, target, &event) == Propagate::Handled,
+        let handled = match window.focused {
+            Some(target) => send_key_event(self, window_id, target, &event) == Propagate::Handled,
             None => false,
         };
 
         if key == Key::Named(NamedKey::Tab) && pressed && !handled {
-            focus::focus_next(self, contents, !modifiers.shift());
+            focus::focus_next(self, window_id, !modifiers.shift());
         }
 
         handled
@@ -56,8 +55,8 @@ impl Root {
 }
 
 fn send_key_event(
-    root: &mut Root,
-    root_widget: WidgetId,
+    world: &mut World,
+    window: WindowId,
     target: WidgetId,
     event: &KeyEvent,
 ) -> Propagate {
@@ -68,11 +67,11 @@ fn send_key_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current
-        && let Some(widget) = root.get_widget_mut(id)
+        && let Some(widget) = world.get_widget_mut(id)
         && let Propagate::Bubble = propagate
     {
         let mut cx = EventCx {
-            root:  widget.cx.root,
+            world: widget.cx.world,
             arena: widget.cx.arena,
             state: widget.cx.state,
             focus: &mut focus,
@@ -83,8 +82,8 @@ fn send_key_event(
         current = widget.cx.parent();
     }
 
-    root.propagate_state(target);
-    focus::update_focus(root, root_widget, focus);
+    world.propagate_state(target);
+    focus::update_focus(world, window, focus);
 
     propagate
 }

@@ -8,17 +8,18 @@ mod canvas;
 mod color;
 mod context;
 mod curve;
+mod debug;
 mod event;
 mod image;
 mod math;
 mod painter;
 mod record;
-mod root;
 mod svg;
 mod text;
 mod transition;
 mod widget;
 mod window;
+mod world;
 
 pub mod widgets;
 
@@ -39,7 +40,6 @@ pub use event::{
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
 pub use record::{Recorder, Recording, RecordingData, WeakRecording};
-pub use root::{ImeSignal, Root, RootSignal, WindowUpdate};
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{
     FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,
@@ -48,3 +48,4 @@ pub use text::{
 pub use transition::{Transition, TransitionCurve, Transitionable, Transitioned};
 pub use widget::{AnyWidget, AnyWidgetId, ChildUpdate, Update, Widget, WidgetId, WidgetState};
 pub use window::{Window, WindowId, WindowSizing};
+pub use world::{ImeSignal, Signal, WindowUpdate, World};

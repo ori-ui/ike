@@ -9,8 +9,8 @@ use std::{
 };
 
 use ike_core::{
-    Modifiers, Offset, Point, PointerButton, PointerId, RootSignal, ScrollDelta, Size,
-    WindowSizing, WindowUpdate,
+    Modifiers, Offset, Point, PointerButton, PointerId, ScrollDelta, Signal, Size, WindowSizing,
+    WindowUpdate,
 };
 use ike_skia::{SkiaPainter, vulkan::Surface};
 use ori::Proxyable;
@@ -71,7 +71,7 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     );
 
     let (sender, receiver) = std::sync::mpsc::channel();
-    let root = ike_core::Root::new({
+    let root = ike_core::World::new({
         let sender = sender.clone();
 
         move |signal| {
@@ -134,7 +134,7 @@ enum Event {
     Rebuild,
     Event(ori::Event),
     Spawn(Pin<Box<dyn Future<Output = ()> + Send>>),
-    Signal(RootSignal),
+    Signal(Signal),
 }
 
 struct AppState<'a, T> {
@@ -439,19 +439,15 @@ impl<T> AppState<'_, T> {
         Ok(())
     }
 
-    fn handle_signal(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        signal: RootSignal,
-    ) -> Result<(), Error> {
+    fn handle_signal(&mut self, event_loop: &ActiveEventLoop, signal: Signal) -> Result<(), Error> {
         match signal {
-            RootSignal::RequestRedraw(id) => {
+            Signal::RequestRedraw(id) => {
                 if let Some(window) = self.windows.iter().find(|w| w.id == id) {
                     window.window.request_redraw();
                 }
             }
 
-            RootSignal::RequestAnimate(id, last_frame) => {
+            Signal::RequestAnimate(id, last_frame) => {
                 if let Some(window) = self.windows.iter_mut().find(|w| w.id == id)
                     && window.animate.is_none()
                 {
@@ -460,22 +456,22 @@ impl<T> AppState<'_, T> {
                 }
             }
 
-            RootSignal::ClipboardSet(text) => {
+            Signal::ClipboardSet(text) => {
                 let _ = self.clipboard.set_contents(text);
             }
 
-            RootSignal::CreateWindow(id) => {
+            Signal::CreateWindow(id) => {
                 if let Some(window) = self.context.get_window(id) {
                     let window = WindowState::new(&mut self.vulkan, event_loop, window)?;
                     self.windows.push(window);
                 }
             }
 
-            RootSignal::RemoveWindow(id) => {
+            Signal::RemoveWindow(id) => {
                 self.windows.retain(|w| w.id != id);
             }
 
-            RootSignal::UpdateWindow(id, update) => {
+            Signal::UpdateWindow(id, update) => {
                 let Some(win) = self.windows.iter_mut().find(|w| w.id == id) else {
                     return Ok(());
                 };
@@ -514,7 +510,7 @@ impl<T> AppState<'_, T> {
                 }
             }
 
-            RootSignal::Ime(..) => {}
+            Signal::Ime(..) => {}
         }
 
         Ok(())
