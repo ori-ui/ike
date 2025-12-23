@@ -44,7 +44,7 @@ impl Entry {
     }
 
     pub fn set_placeholder(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        if let Some(mut placeholder) = this.cx.get_mut(this.widget.placeholder) {
+        if let Some(mut placeholder) = this.cx.get_widget_mut(this.widget.placeholder) {
             Label::set_text(&mut placeholder, paragraph);
         }
     }
@@ -90,49 +90,49 @@ impl Entry {
     }
 
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_text(&mut text_area, paragraph);
         }
     }
 
     pub fn set_selection_color(this: &mut WidgetMut<Self>, color: Color) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_selection_color(&mut text_area, color);
         }
     }
 
     pub fn set_cursor_color(this: &mut WidgetMut<Self>, color: Color) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_cursor_color(&mut text_area, color);
         }
     }
 
     pub fn set_blink_rate(this: &mut WidgetMut<Self>, rate: f32) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_blink_rate(&mut text_area, rate);
         }
     }
 
     pub fn set_newline_behaviour(this: &mut WidgetMut<Self>, behaviour: NewlineBehaviour) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_newline_behaviour(&mut text_area, behaviour);
         }
     }
 
     pub fn set_submit_behaviour(this: &mut WidgetMut<Self>, behaviour: SubmitBehaviour) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_submit_behaviour(&mut text_area, behaviour);
         }
     }
 
     pub fn set_on_change(this: &mut WidgetMut<Self>, on_change: impl FnMut(&str) + 'static) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_on_change(&mut text_area, on_change);
         }
     }
 
     pub fn set_on_submit(this: &mut WidgetMut<Self>, on_submit: impl FnMut(&str) + 'static) {
-        if let Some(mut text_area) = this.cx.get_mut(this.widget.text_area) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_on_submit(&mut text_area, on_submit);
         }
     }
@@ -140,13 +140,13 @@ impl Entry {
     pub fn get_text_area<'a>(
         this: &'a WidgetRef<'_, Self>,
     ) -> Option<WidgetRef<'a, TextArea<true>>> {
-        this.cx.get(this.widget.text_area)
+        this.cx.get_widget(this.widget.text_area)
     }
 
     pub fn get_text_area_mut<'a>(
         this: &'a mut WidgetMut<'a, Self>,
     ) -> Option<WidgetMut<'a, TextArea<true>>> {
-        this.cx.get_mut(this.widget.text_area)
+        this.cx.get_widget_mut(this.widget.text_area)
     }
 }
 
@@ -158,7 +158,7 @@ impl Widget for Entry {
         space.min.width = space.min.width.min(space.max.width);
 
         let has_text = cx
-            .get(self.text_area)
+            .get_widget(self.text_area)
             .is_some_and(|w| w.widget.text().is_empty());
 
         cx.set_child_stashed(1, !has_text);

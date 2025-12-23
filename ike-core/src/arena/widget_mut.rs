@@ -78,7 +78,7 @@ where
         self.cx.arena.debug_validate_id(child);
 
         let window = self.cx.state.window;
-        if let Some(mut child) = self.cx.get_mut(child) {
+        if let Some(mut child) = self.cx.get_widget_mut(child) {
             child.cx.set_window_recursive(window);
         }
 
@@ -111,7 +111,7 @@ where
         self.cx.arena.debug_validate_id(child);
 
         let window = self.cx.state.window;
-        if let Some(mut child) = self.cx.get_mut(child) {
+        if let Some(mut child) = self.cx.get_widget_mut(child) {
             child.cx.set_window_recursive(window);
         }
 
@@ -130,9 +130,8 @@ where
         self.update_without_propagate(update);
         self.cx.request_layout();
 
-        let window = self.cx.state.window;
-        if let Some(mut prev_child) = self.cx.get_mut(prev_child) {
-            prev_child.cx.set_window_recursive(window);
+        if let Some(mut prev_child) = self.cx.get_widget_mut(prev_child) {
+            prev_child.cx.set_window_recursive(None);
         }
 
         prev_child
@@ -153,7 +152,7 @@ where
         let update = Update::Children(ChildUpdate::Removed(index));
         self.update_without_propagate(update);
 
-        if !self.cx.arena.free_recursive(id) {
+        if !self.cx.arena.free_recursive(self.cx.world, id) {
             tracing::error!(
                 "`remove_child` was called, while a descendant of the removed widget was borrowed"
             );

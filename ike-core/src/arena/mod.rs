@@ -10,7 +10,7 @@ pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
 
 use crate::{
-    AnyWidgetId, ImeSignal, LayoutCx, Painter, Signal, Size, Space, Update, Widget, WidgetId,
+    AnyWidgetId, LayoutCx, Painter, Size, Space, Update, Widget, WidgetId,
     context::{MutCx, RefCx},
     widget::{AnyWidget, ChildUpdate, WidgetState},
     world::WorldState,
@@ -126,44 +126,7 @@ impl Arena {
             return;
         };
 
-        if let Some(window) = widget.cx.state.window
-            && let Some(window) = widget.cx.world.window_mut(window)
-        {
-            if widget.cx.state.is_active
-                && let Some(pointer) = window
-                    .pointers
-                    .iter_mut()
-                    .find(|p| p.capturer == Some(id.upcast()))
-            {
-                pointer.capturer = None;
-            }
-
-            if widget.cx.state.is_hovered
-                && let Some(pointer) = window
-                    .pointers
-                    .iter_mut()
-                    .find(|p| p.hovering == Some(id.upcast()))
-            {
-                pointer.hovering = None;
-            }
-
-            if widget.cx.state.is_active
-                && let Some(touch) = window
-                    .touches
-                    .iter_mut()
-                    .find(|t| t.capturer == Some(id.upcast()))
-            {
-                touch.capturer = None;
-            }
-
-            if window.focused == Some(id.upcast()) {
-                window.focused = None;
-
-                if widget.cx.state.accepts_text {
-                    widget.cx.world.signal(Signal::Ime(ImeSignal::End));
-                }
-            }
-        }
+        widget.cx.set_window_recursive(None);
 
         if let Some(mut parent) = widget.cx.get_parent_mut()
             && let Some(index) = parent.cx.state.children.iter().position(|x| *x == id)
@@ -187,22 +150,20 @@ impl Arena {
         self.free.push(id.index);
     }
 
-    pub(crate) fn free_recursive(&mut self, id: WidgetId) -> bool {
-        let Some(entry) = self.entries.get_mut(id.index as usize) else {
+    pub(crate) fn free_recursive(&mut self, world: &mut WorldState, id: WidgetId) -> bool {
+        let Some(mut widget) = self.get_mut(world, id) else {
             return false;
         };
 
-        if entry.borrowed.get() {
-            return false;
-        }
+        widget.cx.set_window_recursive(None);
 
-        entry.borrowed.set(true);
-        let state = unsafe { &*entry.state.get() };
         let mut freed = true;
 
-        for &child in &state.children {
-            freed |= self.free_recursive(child);
+        for &child in &widget.cx.state.children {
+            freed |= widget.cx.arena.free_recursive(widget.cx.world, child);
         }
+
+        drop(widget);
 
         if let Some(entry) = self.entries.get_mut(id.index as usize) {
             entry.borrowed.set(false);
@@ -384,12 +345,12 @@ mod tests {
         let mut widget_mut = arena.get_mut(&mut world.state, a).expect("inserted");
 
         // getting a widget while it's borrowed mutable is not possible
-        assert!(widget_mut.cx.get(a).is_none());
-        assert!(widget_mut.cx.get_mut(a).is_none());
+        assert!(widget_mut.cx.get_widget(a).is_none());
+        assert!(widget_mut.cx.get_widget_mut(a).is_none());
 
         // but getting others is
-        assert!(widget_mut.cx.get(b).is_some());
-        assert!(widget_mut.cx.get_mut(b).is_some());
+        assert!(widget_mut.cx.get_widget(b).is_some());
+        assert!(widget_mut.cx.get_widget_mut(b).is_some());
 
         widget_mut.widget.0 = 10.0;
         drop(widget_mut);

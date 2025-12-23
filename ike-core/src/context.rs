@@ -64,7 +64,7 @@ impl MutCx<'_> {
         self.arena.remove(self.world, id.upcast());
     }
 
-    pub fn get_mut<U>(&mut self, id: WidgetId<U>) -> Option<WidgetMut<'_, U>>
+    pub fn get_widget_mut<U>(&mut self, id: WidgetId<U>) -> Option<WidgetMut<'_, U>>
     where
         U: ?Sized + AnyWidget,
     {
@@ -207,7 +207,44 @@ impl MutCx<'_> {
     }
 
     pub(crate) fn set_window_recursive(&mut self, window: Option<WindowId>) {
-        self.state.window = window;
+        if self.state.window != window {
+            let id = self.id();
+
+            if let Some(window) = self.state.window
+                && let Some(window) = self.world.window_mut(window)
+            {
+                if self.state.is_active
+                    && let Some(pointer) =
+                        window.pointers.iter_mut().find(|p| p.capturer == Some(id))
+                {
+                    pointer.capturer = None;
+                }
+
+                if self.state.is_hovered
+                    && let Some(pointer) =
+                        window.pointers.iter_mut().find(|p| p.hovering == Some(id))
+                {
+                    pointer.hovering = None;
+                }
+
+                if self.state.is_active
+                    && let Some(touch) = window.touches.iter_mut().find(|t| t.capturer == Some(id))
+                {
+                    touch.capturer = None;
+                }
+
+                if window.focused == Some(id) {
+                    window.focused = None;
+
+                    if self.state.accepts_text {
+                        self.world.signal(Signal::Ime(ImeSignal::End));
+                    }
+                }
+            }
+
+            self.state.window = window;
+        }
+
         self.for_each_child(|child| child.cx.set_window_recursive(window));
     }
 }
@@ -347,7 +384,7 @@ impl_contexts! {
     LayoutCx<'_>,
     ComposeCx<'_>,
     DrawCx<'_> {
-        pub fn get<U>(&self, id: WidgetId<U>) -> Option<WidgetRef<'_, U>>
+        pub fn get_widget<U>(&self, id: WidgetId<U>) -> Option<WidgetRef<'_, U>>
         where
             U: ?Sized + AnyWidget,
         {
@@ -365,7 +402,7 @@ impl_contexts! {
         }
 
         pub fn is_child(&self, id: impl AnyWidgetId) -> bool {
-            self.get(id.upcast()).is_some_and(|w| w.cx.state.parent == Some(self.id().upcast()))
+            self.get_widget(id.upcast()).is_some_and(|w| w.cx.state.parent == Some(self.id().upcast()))
         }
 
         pub fn get_child(&self, index: usize) -> Option<WidgetRef<'_>> {
