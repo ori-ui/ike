@@ -1,5 +1,5 @@
 use crate::{
-    BuildCx, CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent,
+    CursorIcon, EventCx, Point, Pointer, PointerButton, PointerButtonEvent, PointerEvent,
     PointerId, PointerMoveEvent, PointerPropagate, PointerScrollEvent, Rect, ScrollDelta, WidgetId,
     WindowId, World,
     context::FocusUpdate,
@@ -38,7 +38,7 @@ impl World {
         let pointer = window.pointers.swap_remove(index);
 
         if let Some(hovered) = pointer.hovering
-            && let Some(mut widget) = self.get_widget_mut(hovered)
+            && let Some(mut widget) = self.widget_mut(hovered)
         {
             widget.set_hovered(false);
         }
@@ -145,7 +145,7 @@ impl World {
                 PointerPropagate::Handled => true,
 
                 PointerPropagate::Capture if pressed => {
-                    if let Some(mut widget) = self.get_widget_mut(target) {
+                    if let Some(mut widget) = self.widget_mut(target) {
                         widget.set_active(true);
                     }
 
@@ -167,7 +167,7 @@ impl World {
                 .is_some_and(|s| s.is_active);
 
             if !pressed && target_is_active {
-                if let Some(mut widget) = self.get_widget_mut(target) {
+                if let Some(mut widget) = self.widget_mut(target) {
                     widget.set_active(false);
                 }
 
@@ -184,7 +184,7 @@ impl World {
             && !handled
             && let Some(window) = self.window(window_id)
             && let Some(focused) = window.focused
-            && self.get_widget(focused).is_some_and(|widget| {
+            && self.widget(focused).is_some_and(|widget| {
                 let local = widget.cx.global_transform().inverse() * pointer_position;
                 !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
             })
@@ -312,7 +312,7 @@ pub fn update_pointer_hovered(
     }
 
     if let Some(hovered) = hovered
-        && let Some(widget) = world.get_widget_mut(hovered)
+        && let Some(widget) = world.widget_mut(hovered)
     {
         (widget.cx.world).set_window_cursor(window_id, widget.cx.cursor());
     } else {
@@ -335,7 +335,7 @@ fn send_pointer_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current
-        && let Some(widget) = world.get_widget_mut(id)
+        && let Some(widget) = world.widget_mut(id)
         && let PointerPropagate::Bubble = propagate
     {
         let mut cx = EventCx {

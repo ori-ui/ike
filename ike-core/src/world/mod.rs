@@ -9,7 +9,8 @@ use std::{
 
 use crate::{
     Arena, BuildCx, Canvas, Color, CursorIcon, Modifiers, Point, Recorder, Size, Update, WidgetId,
-    Window, WindowId, WindowSizing, debug::debug_panic, event::TouchSettings, window::Layer,
+    WidgetMut, WidgetRef, Window, WindowId, WindowSizing, debug::debug_panic, event::TouchSettings,
+    window::Layer,
 };
 
 mod focus;
@@ -215,7 +216,7 @@ impl World {
 
         self.state.signal(Signal::CreateWindow(id));
 
-        if let Some(mut widget) = self.get_widget_mut(contents) {
+        if let Some(mut widget) = self.widget_mut(contents) {
             widget.cx.set_window_recursive(Some(id));
         }
 
@@ -255,15 +256,9 @@ impl World {
     }
 
     pub fn set_window_layer(&mut self, window: WindowId, contents: WidgetId) {
-        if let Some(mut widget) = self.get_widget_mut(contents) {
+        if let Some(mut widget) = self.widget_mut(contents) {
             widget.cx.set_window_recursive(Some(window));
             widget.cx.request_layout();
-        } else {
-            tracing::error!(
-                window = ?window,
-                contents = ?contents,
-                "tried to set window contents to a widget that doesn't exist",
-            );
         }
 
         if let Some(window) = self.window_mut(window) {
@@ -273,12 +268,6 @@ impl World {
                 let prev = mem::replace(&mut layer.root, contents);
                 self.remove_widget(prev);
             }
-        } else {
-            tracing::error!(
-                window = ?window,
-                contents = ?contents,
-                "tried to set contents of a window that doens't exit",
-            );
         }
     }
 
@@ -312,7 +301,7 @@ impl World {
         let mut current = Some(widget);
 
         while let Some(widget) = current
-            && let Some(mut widget) = self.get_widget_mut(widget)
+            && let Some(mut widget) = self.widget_mut(widget)
         {
             widget.cx.update_state();
             current = widget.cx.parent();
@@ -389,7 +378,7 @@ impl World {
         window.is_focused = is_focused;
 
         for layer in window.layers.clone().iter() {
-            if let Some(mut widget) = self.arena.get_mut(&mut self.state, layer.root) {
+            if let Some(mut widget) = self.get_widget_mut(layer.root) {
                 let update = Update::WindowFocused(is_focused);
                 widget.update_recursive(update);
             }
@@ -401,7 +390,7 @@ impl World {
 
         // if the window was left in an ime session, we need start it again
         if let Some(focused) = window.focused
-            && let Some(widget) = self.get_widget(focused)
+            && let Some(widget) = self.widget(focused)
             && widget.cx.state.accepts_text
             && is_focused
         {
@@ -454,6 +443,28 @@ impl World {
                 let update = Update::WindowScaleChanged(new_scale);
                 widget.update_recursive(update);
                 widget.cx.request_layout();
+            }
+        }
+    }
+
+    fn widget(&self, id: WidgetId) -> Option<WidgetRef<'_>> {
+        match self.get_widget(id) {
+            Some(widget) => Some(widget),
+            None => {
+                debug_panic!("invalid widget {id:?}");
+
+                None
+            }
+        }
+    }
+
+    fn widget_mut(&mut self, id: WidgetId) -> Option<WidgetMut<'_>> {
+        match self.get_widget_mut(id) {
+            Some(widget) => Some(widget),
+            None => {
+                debug_panic!("invalid widget {id:?}");
+
+                None
             }
         }
     }

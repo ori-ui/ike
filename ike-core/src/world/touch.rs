@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::{
-    BuildCx, EventCx, Gesture, PanGesture, Point, Rect, TapGesture, Touch, TouchEvent, TouchId,
+    EventCx, Gesture, PanGesture, Point, Rect, TapGesture, Touch, TouchEvent, TouchId,
     TouchMoveEvent, TouchPressEvent, TouchPropagate, WidgetId, Window, WindowId, World,
     context::FocusUpdate,
     event::TouchState,
@@ -51,7 +51,7 @@ impl World {
                 TouchPropagate::Handled => true,
 
                 TouchPropagate::Capture => {
-                    if let Some(mut widget) = self.get_widget_mut(target) {
+                    if let Some(mut widget) = self.widget_mut(target) {
                         widget.set_active(true);
                     }
 
@@ -139,7 +139,7 @@ impl World {
             && !handled
             && let Some(window) = self.window(window_id)
             && let Some(focused) = window.focused
-            && self.get_widget(focused).is_some_and(|widget| {
+            && self.widget(focused).is_some_and(|widget| {
                 let local = widget.cx.global_transform().inverse() * position;
                 !Rect::min_size(Point::ORIGIN, widget.cx.size()).contains(local)
             })
@@ -150,7 +150,7 @@ impl World {
         if let Some(window) = self.window(window_id)
             && let Some(touch) = window.touch(touch_id)
             && let Some(target) = find_touch_target(self, window, touch, position)
-            && let Some(mut widget) = self.get_widget_mut(target)
+            && let Some(mut widget) = self.widget_mut(target)
         {
             widget.set_active(false);
         }
@@ -199,7 +199,7 @@ impl World {
                     TouchPropagate::Handled => true,
 
                     TouchPropagate::Capture => {
-                        if let Some(mut widget) = self.get_widget_mut(target) {
+                        if let Some(mut widget) = self.widget_mut(target) {
                             widget.set_active(true);
                         }
 
@@ -272,7 +272,7 @@ fn send_touch_event(
     let _span = tracing::info_span!("touch_event");
 
     while let Some(id) = current
-        && let Some(widget) = world.get_widget_mut(id)
+        && let Some(widget) = world.widget_mut(id)
         && let TouchPropagate::Bubble = propagate
     {
         let mut cx = EventCx {

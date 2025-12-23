@@ -1,8 +1,8 @@
 use keyboard_types::{Key, Modifiers, NamedKey};
 
 use crate::{
-    BuildCx, EventCx, KeyEvent, KeyPressEvent, Propagate, WidgetId, WindowId, World,
-    context::FocusUpdate, world::focus,
+    EventCx, KeyEvent, KeyPressEvent, Propagate, WidgetId, WindowId, World, context::FocusUpdate,
+    world::focus,
 };
 
 impl World {
@@ -67,7 +67,7 @@ fn send_key_event(
     let _span = tracing::info_span!("key_event");
 
     while let Some(id) = current
-        && let Some(widget) = world.get_widget_mut(id)
+        && let Some(widget) = world.widget_mut(id)
         && let Propagate::Bubble = propagate
     {
         let mut cx = EventCx {

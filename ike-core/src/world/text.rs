@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use crate::{
-    BuildCx, EventCx, ImeEvent, Propagate, WidgetId, WindowId, World,
+    EventCx, ImeEvent, Propagate, WidgetId, WindowId, World,
     context::FocusUpdate,
     event::{TextEvent, TextPasteEvent},
     world::focus,
@@ -61,7 +61,7 @@ pub(super) fn send_text_event(
     let _span = tracing::info_span!("text_event");
 
     while let Some(id) = current
-        && let Some(widget) = world.get_widget_mut(id)
+        && let Some(widget) = world.widget_mut(id)
         && let Propagate::Bubble = propagate
     {
         let mut cx = EventCx {

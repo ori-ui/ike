@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{Affine, BuildCx, Offset, Painter, Size, Space, WindowId, WindowSizing, World};
+use crate::{Affine, Offset, Painter, Size, Space, WindowId, WindowSizing, World};
 
 pub(super) fn layout_window(
     world: &mut World,
@@ -22,7 +22,7 @@ pub(super) fn layout_window(
     let space = Space::new(Size::all(0.0), max_size);
 
     let size = if let Some(layer) = window.layers().first()
-        && let Some(mut widget) = world.get_widget_mut(layer.root)
+        && let Some(mut widget) = world.widget_mut(layer.root)
     {
         widget.layout_recursive(scale, painter, space)
     } else {
@@ -42,7 +42,7 @@ pub(super) fn layout_window(
     for i in 1..window.layers.len() {
         let size = if let Some(window) = world.window(window_id)
             && let Some(layer) = window.layers.get(i)
-            && let Some(mut widget) = world.get_widget_mut(layer.root)
+            && let Some(mut widget) = world.widget_mut(layer.root)
         {
             let space = Space::new(Size::ZERO, Size::INFINITY);
             widget.layout_recursive(scale, painter, space)
@@ -79,7 +79,7 @@ pub(super) fn compose_window(world: &mut World, window: WindowId) {
         {
             let position = layer.position;
 
-            if let Some(mut widget) = world.get_widget_mut(layer.root) {
+            if let Some(mut widget) = world.widget_mut(layer.root) {
                 let transform = Affine::translate(Offset::new(position.x, position.y));
                 widget.compose_recursive(scale, transform);
             }

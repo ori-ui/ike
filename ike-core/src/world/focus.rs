@@ -1,6 +1,5 @@
 use crate::{
-    Arena, BuildCx, ImeEvent, ImeSignal, Point, Rect, Signal, TextEvent, WidgetId, Window,
-    WindowId, World,
+    Arena, ImeEvent, ImeSignal, Point, Rect, Signal, TextEvent, WidgetId, Window, WindowId, World,
     context::FocusUpdate,
     debug::debug_panic,
     world::{scroll, text},
@@ -52,7 +51,7 @@ pub fn set_focused(world: &mut World, window: WindowId, target: Option<WidgetId>
 
     // remove focus from the currently focused widget
     if let Some(current) = current
-        && let Some(mut widget) = world.get_widget_mut(current)
+        && let Some(mut widget) = world.widget_mut(current)
     {
         widget.set_focused(false);
 
@@ -65,7 +64,7 @@ pub fn set_focused(world: &mut World, window: WindowId, target: Option<WidgetId>
     // emit an ime end event for the currently focused widget
     if let Some(current) = current
         && world
-            .get_widget(current)
+            .widget(current)
             .is_some_and(|widget| widget.cx.state.accepts_text)
     {
         let event = TextEvent::Ime(ImeEvent::End);
@@ -74,7 +73,7 @@ pub fn set_focused(world: &mut World, window: WindowId, target: Option<WidgetId>
 
     if let Some(target) = target {
         // set focused for the new target
-        let rect = if let Some(mut widget) = world.get_widget_mut(target) {
+        let rect = if let Some(mut widget) = world.widget_mut(target) {
             widget.set_focused(true);
 
             // if the target accepts text start an ime session, this will serve to restart it if
@@ -93,7 +92,7 @@ pub fn set_focused(world: &mut World, window: WindowId, target: Option<WidgetId>
 
         // if the target accepts text we send it an ime start event
         if world
-            .get_widget(target)
+            .widget(target)
             .is_some_and(|widget| widget.cx.state.accepts_text)
         {
             let event = TextEvent::Ime(ImeEvent::Start);

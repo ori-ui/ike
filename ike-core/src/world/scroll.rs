@@ -1,4 +1,4 @@
-use crate::{BuildCx, Rect, Update, WidgetId, World};
+use crate::{Rect, Update, WidgetId, World};
 
 pub(crate) fn scroll_to(world: &mut World, target: WidgetId, mut rect: Rect) {
     world.handle_updates();
@@ -6,7 +6,7 @@ pub(crate) fn scroll_to(world: &mut World, target: WidgetId, mut rect: Rect) {
     let mut current = Some(target);
 
     while let Some(id) = current {
-        if let Some(mut widget) = world.get_widget_mut(id) {
+        if let Some(mut widget) = world.widget_mut(id) {
             widget.update_without_propagate(Update::ScrollTo(rect));
             rect.min = widget.cx.transform() * rect.min;
             rect.max = widget.cx.transform() * rect.max;
