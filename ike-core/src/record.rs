@@ -9,7 +9,7 @@ use std::{
 
 use seahash::SeaHasher;
 
-use crate::{Arena, Size, WidgetId};
+use crate::{Size, WidgetId, Widgets};
 
 #[derive(Debug)]
 pub struct Recorder {
@@ -58,8 +58,8 @@ impl Recorder {
         self.memory_usage
     }
 
-    pub fn cleanup(&mut self, arena: &Arena) {
-        self.entries.retain(|id, _| arena.contains(*id));
+    pub fn cleanup(&mut self, widgets: &Widgets) {
+        self.entries.retain(|id, _| widgets.contains(*id));
     }
 
     pub fn insert(&mut self, widget: WidgetId, cost: f32, recording: Recording) {
@@ -96,8 +96,8 @@ impl Recorder {
         self.entries.contains_key(&widget)
     }
 
-    pub fn frame(&mut self, arena: &Arena) {
-        self.cleanup(arena);
+    pub fn frame(&mut self, widgets: &Widgets) {
+        self.cleanup(widgets);
         self.frame_count += 1;
 
         self.entries.retain(|widget, entry| {

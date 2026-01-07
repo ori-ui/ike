@@ -60,7 +60,7 @@ where
     V: ori::ViewSeq<C, T, Flex<WidgetId>>,
 {
     type Element = WidgetId<widgets::Stack>;
-    type State = (V::Elements, V::States);
+    type State = (V::Elements, V::State);
 
     fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (children, states) = self.contents.seq_build(cx, data);
@@ -72,12 +72,13 @@ where
         widgets::Stack::set_align(&mut widget, self.align);
         widgets::Stack::set_gap(&mut widget, self.gap);
 
-        for (i, child) in children.iter().enumerate() {
-            widget.add_child(child.contents);
-            widgets::Stack::set_flex(&mut widget, i, child.flex, child.tight);
+        let id = widget.id();
+
+        for child in children.iter() {
+            cx.add_child(id, child.contents);
         }
 
-        (widget.id(), (children, states))
+        (widget, (children, states))
     }
 
     fn rebuild(
@@ -154,13 +155,13 @@ fn update_children(
 ) {
     for child in children.iter() {
         if !widget.cx.is_child(child.contents) {
-            widget.add_child(child.contents);
+            widget.cx.add_child(child.contents);
         }
     }
 
     for (i, child) in children.iter().enumerate() {
         if widget.cx.children()[i] != child.contents {
-            widget.swap_children(i, i + 1);
+            widget.cx.swap_children(i, i + 1);
         }
 
         let (flex, tight) = widget.widget.get_flex(i);
@@ -173,7 +174,7 @@ fn update_children(
     let count = widget.cx.children().len();
 
     for i in (children.count()..count).rev() {
-        widget.remove_child(i);
+        widget.cx.remove_child(i);
     }
 }
 

@@ -1,9 +1,10 @@
-use std::{mem, ops::Range};
+use std::ops::Range;
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Arena, Clip, CursorIcon, ImeSignal, Painter, Point, Rect,
-    Signal, Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Window, WindowId,
-    widget::WidgetState, world::WorldState,
+    Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, ImeSignal, Painter, Point, Rect, Signal,
+    Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Widgets, Window, passes,
+    widget::{WidgetHierarchy, WidgetState},
+    world::WorldState,
 };
 
 pub(crate) enum FocusUpdate {
@@ -15,115 +16,116 @@ pub(crate) enum FocusUpdate {
 }
 
 pub struct RefCx<'a> {
-    pub(crate) world: &'a WorldState,
-    pub(crate) arena: &'a Arena,
-    pub(crate) state: &'a WidgetState,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a WorldState,
+    pub(crate) state:     &'a WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
 }
 
 pub struct MutCx<'a> {
-    pub(crate) world: &'a mut WorldState,
-    pub(crate) arena: &'a mut Arena,
-    pub(crate) state: &'a mut WidgetState,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a mut WorldState,
+    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
 }
 
 pub struct EventCx<'a> {
-    pub(crate) world: &'a mut WorldState,
-    pub(crate) arena: &'a mut Arena,
-    pub(crate) state: &'a mut WidgetState,
-    pub(crate) focus: &'a mut FocusUpdate,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a mut WorldState,
+    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
+    pub(crate) focus:     &'a mut FocusUpdate,
 }
 
 pub struct UpdateCx<'a> {
-    pub(crate) world: &'a mut WorldState,
-    pub(crate) arena: &'a mut Arena,
-    pub(crate) state: &'a mut WidgetState,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a mut WorldState,
+    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
 }
 
 pub struct LayoutCx<'a> {
-    pub(crate) scale: f32,
-    pub(crate) world: &'a mut WorldState,
-    pub(crate) arena: &'a mut Arena,
-    pub(crate) state: &'a mut WidgetState,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a mut WorldState,
+    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
+    pub(crate) scale:     f32,
 }
 
 pub struct ComposeCx<'a> {
-    pub(crate) scale: f32,
-    pub(crate) world: &'a mut WorldState,
-    pub(crate) arena: &'a mut Arena,
-    pub(crate) state: &'a mut WidgetState,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a mut WorldState,
+    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
+    pub(crate) scale:     f32,
 }
 
 pub struct DrawCx<'a> {
-    pub(crate) world: &'a mut WorldState,
-    pub(crate) arena: &'a mut Arena,
-    pub(crate) state: &'a mut WidgetState,
+    pub(crate) widgets:   &'a Widgets,
+    pub(crate) world:     &'a mut WorldState,
+    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) hierarchy: &'a WidgetHierarchy,
 }
 
 impl MutCx<'_> {
-    pub fn remove(&mut self, id: impl AnyWidgetId) {
-        self.arena.remove(self.world, id.upcast());
-    }
-
     pub fn get_widget_mut<U>(&mut self, id: WidgetId<U>) -> Option<WidgetMut<'_, U>>
     where
         U: ?Sized + AnyWidget,
     {
-        self.arena.get_mut(self.world, id)
+        self.widgets.get_mut(self.world, id)
     }
 
     pub fn get_child_mut(&mut self, index: usize) -> Option<WidgetMut<'_, dyn Widget>> {
-        self.arena.get_mut(
+        self.widgets.get_mut(
             self.world,
-            *self.state.children.get(index)?,
+            *self.hierarchy.children.get(index)?,
         )
     }
 
     pub fn get_parent_mut(&mut self) -> Option<WidgetMut<'_>> {
-        self.arena.get_mut(self.world, self.state.parent?)
+        self.widgets.get_mut(self.world, self.hierarchy.parent?)
     }
 
-    pub fn for_each_child(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
-        for &child in &self.state.children {
-            if let Some(mut child) = self.arena.get_mut(self.world, child) {
+    pub fn for_each_child_mut(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
+        for &child in &self.hierarchy.children {
+            if let Some(mut child) = self.widgets.get_mut(self.world, child) {
                 f(&mut child);
             }
         }
     }
 
-    pub fn request_animate(&mut self) {
-        self.state.needs_animate = true;
-        self.world.request_propagate(self.state.id);
+    pub fn request_compose(&mut self) {
+        self.hierarchy.request_compose();
+        passes::propagate::propagate_down(&self.widgets, self.id());
 
-        if let Some(window) = self.state.window {
+        if let Some(window) = self.hierarchy.window {
+            self.world.request_redraw(window);
+        }
+    }
+
+    pub fn request_animate(&mut self) {
+        self.hierarchy.request_animate();
+        passes::propagate::propagate_down(&self.widgets, self.id());
+
+        if let Some(window) = self.hierarchy.window {
             self.world.request_animate(window);
         }
     }
 
     pub fn request_layout(&mut self) {
-        self.state.needs_layout = true;
-        self.state.needs_draw = true;
-        self.world.request_propagate(self.state.id);
+        self.hierarchy.request_layout();
+        passes::propagate::propagate_down(&self.widgets, self.id());
 
-        if let Some(window) = self.state.window {
-            self.world.request_redraw(window);
-        }
-    }
-
-    pub fn request_compose(&mut self) {
-        self.state.needs_compose = true;
-        self.state.needs_draw = true;
-        self.world.request_propagate(self.state.id);
-
-        if let Some(window) = self.state.window {
+        if let Some(window) = self.hierarchy.window {
             self.world.request_redraw(window);
         }
     }
 
     pub fn request_draw(&mut self) {
-        self.state.needs_draw = true;
-        self.world.request_propagate(self.state.id);
+        self.hierarchy.request_draw();
+        passes::propagate::propagate_down(&self.widgets, self.id());
 
-        if let Some(window) = self.state.window {
+        if let Some(window) = self.hierarchy.window {
             self.world.request_redraw(window);
         }
     }
@@ -139,112 +141,46 @@ impl MutCx<'_> {
         self.state.cursor = cursor;
     }
 
-    pub(crate) fn split(
-        &mut self,
-    ) -> (
-        &mut WorldState,
-        &mut Arena,
-        &mut WidgetState,
-    ) {
-        (self.world, self.arena, self.state)
-    }
-
     pub(crate) fn as_update_cx(&mut self) -> UpdateCx<'_> {
-        let (world, arena, state) = self.split();
         UpdateCx {
-            world,
-            arena,
-            state,
+            widgets:   self.widgets,
+            world:     self.world,
+            state:     self.state,
+            hierarchy: self.hierarchy,
         }
     }
 
     pub(crate) fn as_layout_cx(&mut self, scale: f32) -> LayoutCx<'_> {
-        let (world, arena, state) = self.split();
-
         LayoutCx {
+            widgets: self.widgets,
+            world: self.world,
+            state: self.state,
+            hierarchy: self.hierarchy,
             scale,
-            world,
-            arena,
-            state,
         }
     }
 
     pub(crate) fn as_compose_cx(&mut self, scale: f32) -> ComposeCx<'_> {
-        let (world, arena, state) = self.split();
-
         ComposeCx {
+            widgets: self.widgets,
+            world: self.world,
+            state: self.state,
+            hierarchy: self.hierarchy,
             scale,
-            world,
-            arena,
-            state,
         }
     }
 
     pub(crate) fn as_draw_cx(&mut self) -> DrawCx<'_> {
-        let (world, arena, state) = self.split();
         DrawCx {
-            world,
-            arena,
-            state,
+            widgets:   self.widgets,
+            world:     self.world,
+            state:     self.state,
+            hierarchy: self.hierarchy,
         }
     }
 
     pub(crate) fn enter_span(&self) -> Option<tracing::span::EnteredSpan> {
-        (self.world.trace).then(|| self.state.tracing_span.clone().entered())
-    }
-
-    pub(crate) fn update_state(&mut self) {
-        self.state.reset();
-
-        let children = mem::take(&mut self.state.children);
-        for &child in &children {
-            if let Some(child_state) = self.arena.get_state(child.index) {
-                self.state.merge(child_state);
-            }
-        }
-
-        self.state.children = children;
-    }
-
-    pub(crate) fn set_window_recursive(&mut self, window: Option<WindowId>) {
-        if self.state.window != window {
-            let id = self.id();
-
-            if let Some(window) = self.state.window
-                && let Some(window) = self.world.window_mut(window)
-            {
-                if self.state.is_active
-                    && let Some(pointer) =
-                        window.pointers.iter_mut().find(|p| p.capturer == Some(id))
-                {
-                    pointer.capturer = None;
-                }
-
-                if self.state.is_hovered
-                    && let Some(pointer) =
-                        window.pointers.iter_mut().find(|p| p.hovering == Some(id))
-                {
-                    pointer.hovering = None;
-                }
-
-                if self.state.is_active
-                    && let Some(touch) = window.touches.iter_mut().find(|t| t.capturer == Some(id))
-                {
-                    touch.capturer = None;
-                }
-
-                if window.focused == Some(id) {
-                    window.focused = None;
-
-                    if self.state.accepts_text {
-                        self.world.signal(Signal::Ime(ImeSignal::End));
-                    }
-                }
-            }
-
-            self.state.window = window;
-            self.for_each_child(|child| child.cx.set_window_recursive(window));
-        }
+        (self.world.should_trace).then(|| self.state.tracing_span.clone().entered())
     }
 }
 
@@ -266,26 +202,26 @@ impl EventCx<'_> {
     }
 
     pub fn set_clipboard(&mut self, contents: String) {
-        self.world.signal(Signal::ClipboardSet(contents));
+        self.world.emit_signal(Signal::ClipboardSet(contents));
     }
 }
 
 impl LayoutCx<'_> {
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
-        let child = self.state.children[index];
+        let child = self.hierarchy.children[index];
 
-        if let Some(mut child) = self.arena.get_mut(self.world, child) {
-            child.set_stashed_without_propagate(is_stashed);
+        if let Some(mut child) = self.widgets.get_mut(self.world, child) {
+            passes::propagate::set_stashed(&mut child, is_stashed);
         } else {
             tracing::error!("`LayoutCx::set_child_stashed` called on invalid child");
         }
     }
 
     pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
-        if let Some(child) = self.state.children.get(index)
-            && let Some(mut child) = self.arena.get_mut(self.world, *child)
+        if let Some(child) = self.hierarchy.children.get(index)
+            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
         {
-            child.layout_recursive(self.scale, painter, space)
+            passes::layout::layout_widget(&mut child, painter, space, self.scale)
         } else {
             tracing::error!("`LayoutCx::layout_child` called on invalid child");
 
@@ -294,29 +230,20 @@ impl LayoutCx<'_> {
     }
 
     pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
-        if let Some(child) = self.state.children.get(index)
-            && let Some(state) = self.arena.get_state_mut(child.index)
+        if let Some(child) = self.hierarchy.children.get(index)
+            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
         {
-            let mut transform = transform.into();
-
-            if self.state.is_pixel_perfect {
-                transform.offset = transform.offset.round_to_scale(self.scale);
-            }
-
-            if state.transform != transform {
-                state.transform = transform;
-                state.needs_compose = true;
-            }
+            passes::layout::place_widget(&mut child, transform.into(), self.scale);
         } else {
             tracing::error!("`LayoutCx::place_child` called on invalid child");
         }
     }
 
     pub fn child_size(&self, index: usize) -> Size {
-        let child = &self.state.children[index];
+        let child = self.hierarchy.children[index];
 
-        if let Some(state) = self.arena.get_state(child.index) {
-            state.size
+        if let Some(child) = self.get_widget(child) {
+            child.cx.state.size
         } else {
             Size::ZERO
         }
@@ -329,16 +256,10 @@ impl LayoutCx<'_> {
 
 impl ComposeCx<'_> {
     pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
-        if let Some(child) = self.state.children.get(index)
-            && let Some(state) = self.arena.get_state_mut(child.index)
+        if let Some(child) = self.hierarchy.children.get(index)
+            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
         {
-            let mut transform = transform.into();
-
-            if self.state.is_pixel_perfect {
-                transform.offset = transform.offset.round_to_scale(self.scale);
-            }
-
-            state.transform = transform;
+            passes::compose::place_widget(&mut child, transform.into(), self.scale);
         } else {
             tracing::error!("`ComposeCx::place_child` called on invalid child");
         }
@@ -387,37 +308,37 @@ impl_contexts! {
         where
             U: ?Sized + AnyWidget,
         {
-            self.arena.get(self.world, id)
+            self.widgets.get(self.world, id)
         }
 
         pub fn children(&self) -> &[WidgetId] {
-            &self.state.children
+            &self.hierarchy.children
         }
 
         pub fn iter_children(&self) -> impl DoubleEndedIterator<Item = WidgetRef<'_>> {
-            self.state.children.iter().filter_map(|child| {
-                self.arena.get(self.world, *child)
+            self.hierarchy.children.iter().filter_map(|child| {
+                self.widgets.get(self.world, *child)
             })
         }
 
         pub fn is_child(&self, id: impl AnyWidgetId) -> bool {
-            self.get_widget(id.upcast()).is_some_and(|w| w.cx.state.parent == Some(self.id().upcast()))
+            self.get_widget(id.upcast()).is_some_and(|w| w.cx.hierarchy.parent == Some(self.id().upcast()))
         }
 
         pub fn get_child(&self, index: usize) -> Option<WidgetRef<'_>> {
-            self.arena.get(self.world, self.state.children[index])
+            self.widgets.get(self.world, self.hierarchy.children[index])
         }
 
         pub fn parent(&self) -> Option<WidgetId> {
-            self.state.parent
+            self.hierarchy.parent
         }
 
         pub fn get_parent(&self) -> Option<WidgetRef<'_>> {
-            self.arena.get(self.world, self.state.parent?)
+            self.widgets.get(self.world, self.hierarchy.parent?)
         }
 
         pub fn get_window(&self) -> Option<&Window> {
-            self.world.window(self.state.window?)
+            self.world.get_window(self.hierarchy.window?)
         }
 
         pub fn is_window_focused(&self) -> bool {
@@ -429,35 +350,35 @@ impl_contexts! {
         }
 
         pub fn is_hovered(&self) -> bool {
-            self.state.is_hovered
+            self.hierarchy.is_hovered()
         }
 
         pub fn is_active(&self) -> bool {
-            self.state.is_active
+            self.hierarchy.is_active()
         }
 
         pub fn is_focused(&self) -> bool {
-            self.state.is_focused
+            self.hierarchy.is_focused()
         }
 
         pub fn is_stashed(&self) -> bool {
-            self.state.is_stashed
+            self.hierarchy.is_stashed()
         }
 
         pub fn is_disabled(&self) -> bool {
-            self.state.is_disabled
+            self.hierarchy.is_disabled()
         }
 
         pub fn has_hovered(&self) -> bool {
-            self.state.has_hovered
+            self.hierarchy.has_hovered()
         }
 
         pub fn has_active(&self) -> bool {
-            self.state.has_active
+            self.hierarchy.has_active()
         }
 
         pub fn has_focused(&self) -> bool {
-            self.state.has_focused
+            self.hierarchy.has_focused()
         }
 
         pub fn clip(&self) -> Option<&Clip> {
@@ -473,36 +394,35 @@ impl_contexts! {
 impl_contexts! {
     EventCx<'_>,
     UpdateCx<'_> {
-        pub fn request_animate(&mut self) {
-            self.state.needs_animate = true;
+        pub fn request_compose(&mut self) {
+            self.hierarchy.request_compose();
 
-            if let Some(window) = self.state.window {
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_redraw(window);
+            }
+        }
+
+        pub fn request_animate(&mut self) {
+            self.hierarchy.request_animate();
+
+            if let Some(window) = self.hierarchy.window {
                 self.world.request_animate(window);
             }
         }
 
         pub fn request_layout(&mut self) {
-            self.state.needs_layout = true;
-            self.state.needs_draw = true;
+            self.hierarchy.request_layout();
 
-            if let Some(window) = self.state.window {
+            if let Some(window) = self.hierarchy.window {
                 self.world.request_redraw(window);
             }
         }
 
-        pub fn request_compose(&mut self) {
-            self.state.needs_compose = true;
-            self.state.needs_draw = true;
-
-            if let Some(window) = self.state.window {
-                self.world.request_redraw(window);
-            }
-        }
 
         pub fn request_draw(&mut self) {
-            self.state.needs_draw = true;
+            self.hierarchy.request_draw();
 
-            if let Some(window) = self.state.window {
+            if let Some(window) = self.hierarchy.window {
                 self.world.request_redraw(window);
             }
         }
@@ -525,21 +445,21 @@ impl_contexts! {
     EventCx<'_>,
     UpdateCx<'_> {
         pub fn restart_ime(&mut self) {
-            if !self.is_focused() || !self.state.accepts_text {
+            if !self.is_focused() || !self.hierarchy.accepts_text() {
                 tracing::warn!("`restart_ime` can only be called on a focused view that accepts text");
                 return;
             }
 
-            self.world.signal(Signal::Ime(ImeSignal::Start));
+            self.world.emit_signal(Signal::Ime(ImeSignal::Start));
         }
 
         pub fn set_ime_text(&mut self, text: String) {
-            if !self.is_focused() || !self.state.accepts_text {
+            if !self.is_focused() || !self.hierarchy.accepts_text() {
                 tracing::warn!("`set_ime_text` can only be called on a focused view that accepts text");
                 return;
             }
 
-            self.world.signal(Signal::Ime(ImeSignal::Text(text)));
+            self.world.emit_signal(Signal::Ime(ImeSignal::Text(text)));
         }
 
         pub fn set_ime_selection(
@@ -547,12 +467,12 @@ impl_contexts! {
             selection: Range<usize>,
             composing: Option<Range<usize>>,
         ) {
-            if !self.is_focused() || !self.state.accepts_text {
+            if !self.is_focused() || !self.hierarchy.accepts_text() {
                 tracing::warn!("`set_ime_selection` can only be called on a focused view that accepts text");
                 return;
             }
 
-            self.world.signal(Signal::Ime(ImeSignal::Selection {
+            self.world.emit_signal(Signal::Ime(ImeSignal::Selection {
                 selection,
                 composing,
             }));

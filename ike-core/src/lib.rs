@@ -1,6 +1,5 @@
 #![warn(clippy::unwrap_used)]
 
-mod arena;
 mod axis;
 mod border;
 mod build;
@@ -21,9 +20,10 @@ mod widget;
 mod window;
 mod world;
 
+pub(crate) mod passes;
+
 pub mod widgets;
 
-pub use arena::{Arena, WidgetMut, WidgetRef};
 pub use axis::Axis;
 pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::BuildCx;
@@ -46,6 +46,8 @@ pub use text::{
     TextLayoutLine, TextStyle, TextWrap, WeakParagraph,
 };
 pub use transition::{Transition, TransitionCurve, Transitionable, Transitioned};
-pub use widget::{AnyWidget, AnyWidgetId, ChildUpdate, Update, Widget, WidgetId, WidgetState};
-pub use window::{Window, WindowId, WindowSizing};
-pub use world::{ImeSignal, Signal, WindowUpdate, World};
+pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
+pub use window::{Layer, Window, WindowId, WindowSizing};
+pub use world::{
+    AnyWidget, ImeSignal, Signal, WidgetMut, WidgetRef, Widgets, WindowUpdate, World, WorldState,
+};

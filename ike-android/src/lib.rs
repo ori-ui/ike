@@ -147,13 +147,17 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
         unsafe { ndk_sys::ALooper_prepare(ndk_sys::ALOOPER_PREPARE_ALLOW_NON_CALLBACKS as i32) };
 
     let proxy = Proxy::new(global_state.sender.clone(), looper);
-
-    let world = World::new({
+    let signaller = Box::new({
         let proxy = proxy.clone();
 
         move |signal| proxy.send(Event::Signal(signal))
     });
-    let mut context = ike_ori::Context::new(world, Arc::new(proxy.clone()));
+
+    let mut context = ike_ori::Context {
+        world:     World::new(signaller),
+        proxy:     Arc::new(proxy.clone()),
+        resources: ike_ori::Resources::new(),
+    };
 
     *global_state.waker.lock() = Some(Box::new({
         let proxy = proxy.clone();
@@ -363,13 +367,13 @@ impl<'a, T> EventLoop<'a, T> {
 
     fn handle_signal(&mut self, signal: Signal) {
         match signal {
-            Signal::RequestRedraw(..) => {
+            Signal::RequestRedraw { .. } => {
                 self.proxy.send(Event::Window(WindowEvent::Redraw));
             }
 
-            Signal::RequestAnimate(_, last_frame) => {
+            Signal::RequestAnimate { start, .. } => {
                 if self.animate.is_none() {
-                    self.animate = Some(last_frame);
+                    self.animate = Some(start);
                     self.proxy.send(Event::Window(WindowEvent::Redraw));
                 }
             }
@@ -388,8 +392,8 @@ impl<'a, T> EventLoop<'a, T> {
                     );
 
                     window.id = Some(window_id);
-                    (self.context).window_scaled(window_id, self.scale_factor, size);
-                    (self.context).window_focused(window_id, window.focused);
+                    (self.context.world).window_scaled(window_id, size, self.scale_factor);
+                    (self.context.world).window_focused(window_id, window.focused);
                 }
 
                 _ => {

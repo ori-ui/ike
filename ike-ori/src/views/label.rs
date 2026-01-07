@@ -4,7 +4,7 @@ use ike_core::{
 };
 use ori::Providable;
 
-use crate::{Context, Palette, views::TextTheme};
+use crate::{Palette, views::TextTheme};
 
 pub fn label(text: impl ToString) -> Label {
     Label::new(text)
@@ -114,11 +114,14 @@ impl Label {
 }
 
 impl ori::ViewMarker for Label {}
-impl<T> ori::View<Context, T> for Label {
+impl<C, T> ori::View<C, T> for Label
+where
+    C: BuildCx + Providable,
+{
     type Element = WidgetId<widgets::Label>;
     type State = ();
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<TextTheme>();
 
@@ -132,7 +135,7 @@ impl<T> ori::View<Context, T> for Label {
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -157,13 +160,7 @@ impl<T> ori::View<Context, T> for Label {
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        _state: Self::State,
-        cx: &mut Context,
-        _data: &mut T,
-    ) {
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C, _data: &mut T) {
         cx.remove_widget(element);
     }
 
@@ -171,7 +168,7 @@ impl<T> ori::View<Context, T> for Label {
         &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
-        _cx: &mut Context,
+        _cx: &mut C,
         _data: &mut T,
         _event: &mut ori::Event,
     ) -> ori::Action {

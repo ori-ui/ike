@@ -1,9 +1,10 @@
 use ike_core::{
-    Axis, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
+    AnyWidgetId, Axis, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId,
+    widgets,
 };
 use ori::Providable;
 
-use crate::{Context, Palette, View};
+use crate::Palette;
 
 pub fn vscroll<V>(contents: V) -> Scroll<V> {
     Scroll::new(Axis::Vertical, contents)
@@ -161,14 +162,15 @@ impl<V> Scroll<V> {
 }
 
 impl<V> ori::ViewMarker for Scroll<V> {}
-impl<T, V> ori::View<Context, T> for Scroll<V>
+impl<C, T, V> ori::View<C, T> for Scroll<V>
 where
-    V: View<T>,
+    C: BuildCx + Providable,
+    V: ori::View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Scroll>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -204,7 +206,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -281,7 +283,7 @@ where
         &mut self,
         element: Self::Element,
         (contents, state): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
@@ -292,7 +294,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

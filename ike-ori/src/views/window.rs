@@ -1,7 +1,7 @@
 use ike_core::{AnyWidgetId, BuildCx, Color, Size, WindowId, WindowSizing};
 use ori::Providable;
 
-use crate::{Context, Palette, View};
+use crate::Palette;
 
 pub fn window<V>(contents: V) -> Window<V> {
     Window::new(contents)
@@ -64,14 +64,15 @@ impl<V> Window<V> {
 }
 
 impl<V> ori::ViewMarker for Window<V> {}
-impl<T, V> ori::View<Context, T> for Window<V>
+impl<C, T, V> ori::View<C, T> for Window<V>
 where
-    V: View<T>,
+    C: BuildCx + Providable,
+    V: ori::View<C, T, Element: AnyWidgetId>,
 {
     type Element = ori::NoElement;
     type State = (WindowId, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -93,7 +94,7 @@ where
         &mut self,
         _element: &mut Self::Element,
         (id, contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -109,9 +110,9 @@ where
 
         if let Some(window) = cx.world().get_window(*id)
             && let Some(layer) = window.layers().first()
-            && layer.root != contents.upcast()
+            && layer.widget != contents.upcast()
         {
-            cx.set_window_layer(*id, *contents);
+            cx.set_window_base_layer(*id, *contents);
         }
 
         if self.title != old.title {
@@ -142,7 +143,7 @@ where
         &mut self,
         _element: Self::Element,
         (window, _, _): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         _data: &mut T,
     ) {
         cx.world_mut().remove_window(window);
@@ -152,7 +153,7 @@ where
         &mut self,
         _element: &mut Self::Element,
         (id, contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {
@@ -160,9 +161,9 @@ where
 
         if let Some(window) = cx.world().get_window(*id)
             && let Some(layer) = window.layers().first()
-            && layer.root != contents.upcast()
+            && layer.widget != contents.upcast()
         {
-            cx.set_window_layer(*id, *contents);
+            cx.set_window_base_layer(*id, *contents);
         }
 
         action

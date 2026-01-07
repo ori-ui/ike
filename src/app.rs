@@ -1,6 +1,5 @@
+use ike_ori::Effect;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
-
-use crate::Effect;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

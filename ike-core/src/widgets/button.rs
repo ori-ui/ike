@@ -4,7 +4,7 @@ use crate::{
     AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Gesture, Key,
     KeyEvent, LayoutCx, NamedKey, Padding, Paint, Painter, PointerEvent, PointerPropagate,
     Propagate, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget,
-    WidgetMut, context::UpdateCx, widget::Update,
+    WidgetMut, build::SingleChild, context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
@@ -22,26 +22,21 @@ pub struct Button {
 
 impl Button {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert_widget(Button {
-            padding:       Padding::all(8.0),
-            border_width:  BorderWidth::all(1.0),
-            corner_radius: CornerRadius::all(8.0),
-            color:         Transitioned::new(Color::GREEN, Transition::INSTANT),
-            idle_color:    Color::GREEN,
-            hovered_color: Color::RED,
-            active_color:  Color::BLUE,
-            border_color:  Color::BLACK,
-            focus_color:   Color::BLUE,
-            on_click:      Box::new(|| {}),
-        });
-
-        this.add_child(child);
-
-        this
-    }
-
-    pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        this.set_child(0, child);
+        cx.insert_widget(
+            Button {
+                padding:       Padding::all(8.0),
+                border_width:  BorderWidth::all(1.0),
+                corner_radius: CornerRadius::all(8.0),
+                color:         Transitioned::new(Color::GREEN, Transition::INSTANT),
+                idle_color:    Color::GREEN,
+                hovered_color: Color::RED,
+                active_color:  Color::BLUE,
+                border_color:  Color::BLACK,
+                focus_color:   Color::BLUE,
+                on_click:      Box::new(|| {}),
+            },
+            child,
+        )
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
@@ -108,6 +103,8 @@ impl Button {
         this.widget.on_click = Box::new(on_click);
     }
 }
+
+impl SingleChild for Button {}
 
 impl Widget for Button {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {

@@ -1,4 +1,3 @@
-use crate::Context;
 use ike_core::{
     BuildCx, Color, WidgetId,
     widgets::{self, Fit, Picturable},
@@ -30,11 +29,14 @@ impl Picture {
 }
 
 impl ori::ViewMarker for Picture {}
-impl<T> ori::View<Context, T> for Picture {
+impl<C, T> ori::View<C, T> for Picture
+where
+    C: BuildCx,
+{
     type Element = WidgetId<widgets::Picture>;
     type State = ();
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
         let mut widget = widgets::Picture::new(cx, self.contents.clone());
         widgets::Picture::set_fit(&mut widget, self.fit);
         widgets::Picture::set_color(&mut widget, self.color);
@@ -46,7 +48,7 @@ impl<T> ori::View<Context, T> for Picture {
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -67,13 +69,7 @@ impl<T> ori::View<Context, T> for Picture {
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        _state: Self::State,
-        cx: &mut Context,
-        _data: &mut T,
-    ) {
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C, _data: &mut T) {
         cx.remove_widget(element);
     }
 
@@ -81,7 +77,7 @@ impl<T> ori::View<Context, T> for Picture {
         &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
-        _cx: &mut Context,
+        _cx: &mut C,
         _data: &mut T,
         _event: &mut ori::Event,
     ) -> ori::Action {

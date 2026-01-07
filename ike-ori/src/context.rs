@@ -1,49 +1,14 @@
-use std::{
-    any::{Any, TypeId},
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::{any::Any, sync::Arc};
 
 use ike_core::{AnyWidgetId, BuildCx, WidgetId, World};
 use ori::{Providable, Proxy, Proxyable, Super};
 
+use crate::Resources;
+
 pub struct Context {
-    world:     World,
-    proxy:     Arc<dyn Proxy>,
-    resources: Vec<Resouce>,
-
-    use_type_names_unsafe: bool,
-}
-
-impl Context {
-    pub fn new(world: World, proxy: Arc<dyn Proxy>) -> Self {
-        Self {
-            world,
-            proxy,
-            resources: Vec::new(),
-            use_type_names_unsafe: false,
-        }
-    }
-}
-
-impl Deref for Context {
-    type Target = World;
-
-    fn deref(&self) -> &Self::Target {
-        &self.world
-    }
-}
-
-impl DerefMut for Context {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.world
-    }
-}
-
-struct Resouce {
-    value:     Box<dyn Any>,
-    type_id:   TypeId,
-    type_name: &'static str,
+    pub world:     World,
+    pub proxy:     Arc<dyn Proxy>,
+    pub resources: Resources,
 }
 
 impl BuildCx for Context {
@@ -60,63 +25,32 @@ impl Proxyable for Context {
     type Proxy = Arc<dyn Proxy>;
 
     fn proxy(&mut self) -> Self::Proxy {
-        self.proxy.clone()
+        self.proxy.cloned()
     }
 }
 
 impl Providable for Context {
-    fn push<T: Any>(&mut self, context: Box<T>) {
-        self.resources.push(Resouce {
-            value:     context,
-            type_id:   TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
-        })
+    fn push<T: Any>(&mut self, resource: Box<T>) {
+        self.resources.push(resource);
     }
 
     fn pop<T: Any>(&mut self) -> Option<Box<T>> {
-        self.resources.pop()?.value.downcast().ok()
+        self.resources.pop()
     }
 
     fn get<T: Any>(&self) -> Option<&T> {
-        let entry = match self.use_type_names_unsafe {
-            true => self
-                .resources
-                .iter()
-                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
-            false => self
-                .resources
-                .iter()
-                .rfind(|e| e.type_id == TypeId::of::<T>())?,
-        };
-
-        Some(unsafe { &*(entry.value.as_ref() as *const _ as *const T) })
+        self.resources.get()
     }
 
     fn get_mut<T: Any>(&mut self) -> Option<&mut T> {
-        let entry = match self.use_type_names_unsafe {
-            true => self
-                .resources
-                .iter_mut()
-                .rfind(|e| e.type_name == std::any::type_name::<T>())?,
-            false => self
-                .resources
-                .iter_mut()
-                .rfind(|e| e.type_id == TypeId::of::<T>())?,
-        };
-
-        Some(unsafe { &mut *(entry.value.as_mut() as *mut _ as *mut T) })
+        self.resources.get_mut()
     }
 }
 
 pub trait View<T>: ori::View<Context, T, Element: AnyWidgetId> {}
 pub trait Effect<T>: ori::Effect<Context, T> {}
 
-impl<T, V> View<T> for V
-where
-    V: ori::View<Context, T>,
-    V::Element: AnyWidgetId,
-{
-}
+impl<T, V> View<T> for V where V: ori::View<Context, T, Element: AnyWidgetId> {}
 impl<T, V> Effect<T> for V where V: ori::Effect<Context, T> {}
 
 impl<S> Super<Context, S> for WidgetId

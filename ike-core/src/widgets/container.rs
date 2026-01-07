@@ -1,6 +1,6 @@
 use crate::{
     AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding,
-    Paint, Painter, Size, Space, Widget, WidgetMut,
+    Paint, Painter, Size, Space, Widget, WidgetMut, build::SingleChild,
 };
 
 pub struct Container {
@@ -13,19 +13,16 @@ pub struct Container {
 
 impl Container {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        let mut this = cx.insert_widget(Container {
-            padding:          Padding::all(8.0),
-            border_width:     BorderWidth::all(1.0),
-            corner_radius:    CornerRadius::all(8.0),
-            background_color: Color::rgb(0.9, 0.9, 0.9),
-            border_color:     Color::BLACK,
-        });
-        this.add_child(child);
-        this
-    }
-
-    pub fn set_child(this: &mut WidgetMut<Self>, child: impl AnyWidgetId) {
-        this.set_child(0, child);
+        cx.insert_widget(
+            Container {
+                padding:          Padding::all(8.0),
+                border_width:     BorderWidth::all(1.0),
+                corner_radius:    CornerRadius::all(8.0),
+                background_color: Color::rgb(0.9, 0.9, 0.9),
+                border_color:     Color::BLACK,
+            },
+            child,
+        )
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
@@ -53,6 +50,8 @@ impl Container {
         this.cx.request_draw();
     }
 }
+
+impl SingleChild for Container {}
 
 impl Widget for Container {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {

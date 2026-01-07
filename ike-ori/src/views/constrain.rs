@@ -1,6 +1,4 @@
-use ike_core::{BuildCx, Size, Transition, WidgetId, widgets};
-
-use crate::{Context, View};
+use ike_core::{AnyWidgetId, BuildCx, Size, Transition, WidgetId, widgets};
 
 pub fn constrain<V>(contents: V) -> Constrain<V> {
     Constrain::new(contents)
@@ -139,14 +137,15 @@ impl<V> Constrain<V> {
 }
 
 impl<V> ori::ViewMarker for Constrain<V> {}
-impl<T, V> ori::View<Context, T> for Constrain<V>
+impl<C, T, V> ori::View<C, T> for Constrain<V>
 where
-    V: View<T>,
+    C: BuildCx,
+    V: ori::View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Constrain>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let mut widget = widgets::Constrain::new(cx, contents);
@@ -163,7 +162,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -204,7 +203,7 @@ where
         &mut self,
         element: Self::Element,
         (contents, state): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
@@ -215,7 +214,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

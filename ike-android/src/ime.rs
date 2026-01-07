@@ -108,7 +108,7 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     };
 
-                    self.context.ime_commit_text(id, text);
+                    self.context.world.ime_commit_text(id, text);
                 }
             }
 
@@ -123,20 +123,20 @@ impl<'a, T> EventLoop<'a, T> {
                     let selection = self.ime.selection();
 
                     if selection.start != selection.end {
-                        self.context.ime_commit_text(id, String::new());
+                        self.context.world.ime_commit_text(id, String::new());
                         return;
                     }
 
                     if before != 0 {
                         let start = self.ime.index_n_chars_before(before);
-                        self.context.ime_select(id, start..selection.start);
-                        self.context.ime_commit_text(id, String::new());
+                        self.context.world.ime_select(id, start..selection.start);
+                        self.context.world.ime_commit_text(id, String::new());
                     }
 
                     if after != 0 {
                         let end = self.ime.index_n_chars_after(after);
-                        self.context.ime_select(id, selection.end..end);
-                        self.context.ime_commit_text(id, String::new());
+                        self.context.world.ime_select(id, selection.end..end);
+                        self.context.world.ime_commit_text(id, String::new());
                     }
                 }
             }
@@ -149,7 +149,7 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     };
 
-                    (self.context).key_pressed(id, key, false, None, pressed);
+                    (self.context.world).key_pressed(id, key, false, None, pressed);
                 }
             }
 
@@ -162,7 +162,7 @@ impl<'a, T> EventLoop<'a, T> {
                     };
 
                     self.ime.set_selection(start..end);
-                    self.context.ime_select(id, start..end);
+                    self.context.world.ime_select(id, start..end);
                 }
             }
         }

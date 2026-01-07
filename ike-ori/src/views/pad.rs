@@ -1,6 +1,4 @@
-use ike_core::{BuildCx, Padding, WidgetId, widgets};
-
-use crate::{Context, View};
+use ike_core::{AnyWidgetId, BuildCx, Padding, WidgetId, widgets};
 
 pub fn pad<V>(padding: impl Into<Padding>, contents: V) -> Pad<V> {
     Pad::new(padding, contents)
@@ -21,14 +19,15 @@ impl<V> Pad<V> {
 }
 
 impl<V> ori::ViewMarker for Pad<V> {}
-impl<T, V> ori::View<Context, T> for Pad<V>
+impl<C, T, V> ori::View<C, T> for Pad<V>
 where
-    V: View<T>,
+    C: BuildCx,
+    V: ori::View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Pad>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let mut widget = widgets::Pad::new(cx, contents);
@@ -42,7 +41,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -71,7 +70,7 @@ where
         &mut self,
         element: Self::Element,
         (contents, state): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
@@ -82,7 +81,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

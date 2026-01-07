@@ -1,13 +1,11 @@
 use std::{ops::Range, time::Instant};
 
-use cursor_icon::CursorIcon;
-
-use crate::{Rect, WindowId, WindowSizing};
+use crate::{CursorIcon, Rect, WindowId, WindowSizing};
 
 #[derive(Clone, Debug)]
 pub enum Signal {
-    RequestRedraw(WindowId),
-    RequestAnimate(WindowId, Instant),
+    RequestRedraw { window: WindowId },
+    RequestAnimate { window: WindowId, start: Instant },
 
     ClipboardSet(String),
 

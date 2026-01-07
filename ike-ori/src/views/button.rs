@@ -1,12 +1,13 @@
-use ike_core::{BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets};
+use ike_core::{
+    AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
+};
 use ori::{Providable, Proxy, Proxyable};
 
-use crate::{Context, Palette, View};
+use crate::Palette;
 
-pub fn button<T, A, I, V>(contents: V, on_click: impl FnMut(&mut T) -> A + 'static) -> Button<T, V>
+pub fn button<T, V, A, I>(contents: V, on_click: impl FnMut(&mut T) -> A + 'static) -> Button<T, V>
 where
     A: ori::IntoAction<I>,
-    V: View<T>,
 {
     Button::new(contents, on_click)
 }
@@ -175,14 +176,15 @@ enum ButtonEvent {
 }
 
 impl<T, V> ori::ViewMarker for Button<T, V> {}
-impl<T, V> ori::View<Context, T> for Button<T, V>
+impl<C, T, V> ori::View<C, T> for Button<T, V>
 where
-    V: View<T>,
+    C: BuildCx + Proxyable + Providable,
+    V: ori::View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Button>;
     type State = (ori::ViewId, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -226,7 +228,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (_id, contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -299,7 +301,7 @@ where
         &mut self,
         element: Self::Element,
         (_id, contents, state): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
@@ -310,7 +312,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (id, contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

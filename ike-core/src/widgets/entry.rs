@@ -1,7 +1,6 @@
 use crate::{
     BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Painter,
-    Paragraph, Size, Space, TextAlign, TextWrap, Widget, WidgetId,
-    arena::{WidgetMut, WidgetRef},
+    Paragraph, Size, Space, TextAlign, TextWrap, Widget, WidgetId, WidgetMut, WidgetRef,
     widgets::{Label, NewlineBehaviour, SubmitBehaviour, TextArea},
 };
 
@@ -25,22 +24,22 @@ impl Entry {
         let placeholder = Paragraph::new(16.0, TextAlign::Start, TextWrap::None);
         let placeholder = Label::new(cx, placeholder).id();
 
-        let mut this = cx.insert_widget(Entry {
-            text_area,
-            placeholder,
+        cx.insert_widget(
+            Entry {
+                text_area,
+                placeholder,
 
-            min_width: 100.0,
-            max_width: f32::INFINITY,
-            padding: Padding::all(8.0),
-            border_width: BorderWidth::all(1.0),
-            corner_radius: CornerRadius::all(8.0),
-            background_color: Color::WHITE,
-            border_color: Color::BLACK,
-            focus_color: Color::BLUE,
-        });
-        this.add_child(text_area);
-        this.add_child(placeholder);
-        this
+                min_width: 100.0,
+                max_width: f32::INFINITY,
+                padding: Padding::all(8.0),
+                border_width: BorderWidth::all(1.0),
+                corner_radius: CornerRadius::all(8.0),
+                background_color: Color::WHITE,
+                border_color: Color::BLACK,
+                focus_color: Color::BLUE,
+            },
+            (text_area, placeholder),
+        )
     }
 
     pub fn set_placeholder(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
@@ -144,7 +143,7 @@ impl Entry {
     }
 
     pub fn get_text_area_mut<'a>(
-        this: &'a mut WidgetMut<'a, Self>,
+        this: &'a mut WidgetMut<'_, Self>,
     ) -> Option<WidgetMut<'a, TextArea<true>>> {
         this.cx.get_widget_mut(this.widget.text_area)
     }

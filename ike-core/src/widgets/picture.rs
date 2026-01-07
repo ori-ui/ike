@@ -38,12 +38,15 @@ pub struct Picture {
 
 impl Picture {
     pub fn new(cx: &mut impl BuildCx, contents: Picturable) -> WidgetMut<'_, Self> {
-        cx.insert_widget(Self {
-            contents,
-            fit: Fit::None,
-            color: None,
-            recording: None,
-        })
+        cx.insert_widget(
+            Self {
+                contents,
+                fit: Fit::None,
+                color: None,
+                recording: None,
+            },
+            (),
+        )
     }
 
     pub fn set_contents(this: &mut WidgetMut<Self>, contents: Picturable) {

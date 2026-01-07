@@ -1,7 +1,5 @@
 use ike_core::{AnyWidgetId, BuildCx, WidgetId, widgets};
 
-use crate::{Context, View};
-
 pub fn align<V>(x: f32, y: f32, contents: V) -> Aligned<V> {
     Aligned { contents, x, y }
 }
@@ -49,14 +47,15 @@ pub struct Aligned<V> {
 }
 
 impl<V> ori::ViewMarker for Aligned<V> {}
-impl<T, V> ori::View<Context, T> for Aligned<V>
+impl<C, T, V> ori::View<C, T> for Aligned<V>
 where
-    V: View<T>,
+    C: BuildCx,
+    V: ori::View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Aligned>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let element = widgets::Aligned::new(cx, self.x, self.y, contents.upcast());
@@ -68,7 +67,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -97,7 +96,7 @@ where
         &mut self,
         element: Self::Element,
         (contents, state): Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
     ) {
         self.contents.teardown(contents, state, cx, data);
@@ -108,7 +107,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

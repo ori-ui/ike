@@ -31,7 +31,8 @@ ike-winit   = { path = "ike-winit"   }
 ike         = { path = "."           }
 
 [workspace.dependencies.ori]
-git = "https://github.com/ori-ui/ori"
+#git = "https://github.com/ori-ui/ori"
+path = "../ori"
 
 [workspace.dependencies.tokio]
 version = "1"

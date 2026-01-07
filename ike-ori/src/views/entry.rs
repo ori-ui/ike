@@ -5,7 +5,7 @@ use ike_core::{
 };
 use ori::{Providable, Proxy, Proxyable};
 
-use crate::{Context, Palette, views::TextTheme};
+use crate::{Palette, views::TextTheme};
 
 #[derive(Clone, Debug)]
 pub struct EntryTheme {
@@ -384,11 +384,14 @@ enum EntryEvent {
 }
 
 impl<T> ori::ViewMarker for Entry<T> {}
-impl<T> ori::View<Context, T> for Entry<T> {
+impl<C, T> ori::View<C, T> for Entry<T>
+where
+    C: BuildCx + Proxyable + Providable,
+{
     type Element = WidgetId<widgets::Entry>;
     type State = ori::ViewId;
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<EntryTheme>();
@@ -437,7 +440,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
         widgets::Entry::set_submit_behaviour(&mut widget, self.submit_behaviour);
 
         widgets::Entry::set_on_change(&mut widget, {
-            let proxy = Clone::clone(&proxy);
+            let proxy = proxy.cloned();
 
             move |text| {
                 proxy.event(ori::Event::new(
@@ -461,7 +464,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
         &mut self,
         element: &mut Self::Element,
         _id: &mut Self::State,
-        cx: &mut Context,
+        cx: &mut C,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -486,7 +489,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
         {
             let text = match self.text {
                 Some(ref text) => text.clone(),
-                None => widgets::Entry::get_text_area(&widget.to_ref())
+                None => widgets::Entry::get_text_area_mut(&mut widget)
                     .map_or(String::new(), |widget| {
                         widget.widget.text().to_owned()
                     }),
@@ -572,13 +575,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        _id: Self::State,
-        cx: &mut Context,
-        _data: &mut T,
-    ) {
+    fn teardown(&mut self, element: Self::Element, _id: Self::State, cx: &mut C, _data: &mut T) {
         cx.remove_widget(element);
     }
 
@@ -586,7 +583,7 @@ impl<T> ori::View<Context, T> for Entry<T> {
         &mut self,
         _element: &mut Self::Element,
         id: &mut Self::State,
-        _cx: &mut Context,
+        _cx: &mut C,
         data: &mut T,
         event: &mut ori::Event,
     ) -> ori::Action {

@@ -85,7 +85,7 @@ impl<'a, T> EventLoop<'a, T> {
                 );
 
                 if let Some(id) = id {
-                    self.context.window_scaled(id, self.scale_factor, size);
+                    (self.context.world).window_scaled(id, size, self.scale_factor);
                 }
             }
 
@@ -115,10 +115,10 @@ impl<'a, T> EventLoop<'a, T> {
 
                     if let Some(animate) = self.animate.take() {
                         let delta_time = animate.elapsed();
-                        self.context.animate(id, delta_time);
+                        self.context.world.animate(id, delta_time);
                     }
 
-                    let Some(win) = self.context.get_window(id) else {
+                    let Some(win) = self.context.world.get_window(id) else {
                         tracing::error!("window not registered with ike");
                         return;
                     };
@@ -140,7 +140,7 @@ impl<'a, T> EventLoop<'a, T> {
                         win.color(),
                         self.scale_factor,
                         || {},
-                        |canvas| self.context.draw(id, canvas),
+                        |canvas| self.context.world.draw(id, canvas),
                     );
 
                     if let Err(err) = result {
@@ -173,7 +173,7 @@ impl<'a, T> EventLoop<'a, T> {
                         height as f32 / self.scale_factor,
                     );
 
-                    self.context.window_resized(id, size);
+                    self.context.world.window_resized(id, size);
                 }
             }
 
@@ -187,7 +187,7 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     };
 
-                    self.context.window_focused(id, focused);
+                    self.context.world.window_focused(id, focused);
                 }
             }
 

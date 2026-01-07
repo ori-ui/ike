@@ -15,7 +15,7 @@ use crate::{
 
 mod state;
 
-pub use state::WidgetState;
+pub use state::{WidgetHierarchy, WidgetState};
 
 pub trait Widget: Any {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size;
@@ -95,7 +95,7 @@ pub trait Widget: Any {
             }
         }
 
-        if cx.state.accepts_pointer {
+        if cx.hierarchy.accepts_pointer() {
             Some(cx.id())
         } else {
             None
@@ -132,9 +132,11 @@ pub enum Update {
     Stashed(bool),
     Disabled(bool),
     ScrollTo(Rect),
+
     WindowFocused(bool),
     WindowResized(Size),
-    WindowScaleChanged(f32),
+    WindowScaled(f32),
+
     Children(ChildUpdate),
 }
 
@@ -142,47 +144,7 @@ pub enum Update {
 pub enum ChildUpdate {
     Added(usize),
     Removed(usize),
-    Replaced(usize),
     Swapped(usize, usize),
-}
-
-pub trait AnyWidget: Widget {
-    fn upcast_mut(&mut self) -> &mut dyn Widget;
-
-    fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self;
-
-    fn is(widget: &dyn Widget) -> bool;
-}
-
-impl AnyWidget for dyn Widget {
-    fn upcast_mut(&mut self) -> &mut dyn Widget {
-        self
-    }
-
-    fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
-        ptr
-    }
-
-    fn is(_widget: &dyn Widget) -> bool {
-        true
-    }
-}
-
-impl<T> AnyWidget for T
-where
-    T: Widget,
-{
-    fn upcast_mut(&mut self) -> &mut dyn Widget {
-        self
-    }
-
-    fn downcast_ptr(ptr: *mut dyn Widget) -> *mut Self {
-        ptr as *mut Self
-    }
-
-    fn is(widget: &dyn Widget) -> bool {
-        (widget as &dyn Any).is::<T>()
-    }
 }
 
 // we want to be able to cast by reference, so a stable layout is required

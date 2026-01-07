@@ -28,7 +28,7 @@ pub enum WindowSizing {
 
 #[derive(Clone, Debug)]
 pub struct Layer {
-    pub root:     WidgetId,
+    pub widget:   WidgetId,
     pub size:     Size,
     pub position: Point,
 }
@@ -67,7 +67,7 @@ impl Window {
         self.scale
     }
 
-    pub fn current_size(&self) -> Size {
+    pub fn size(&self) -> Size {
         self.size
     }
 
@@ -87,10 +87,6 @@ impl Window {
         self.sizing
     }
 
-    pub fn layers(&self) -> &[Layer] {
-        &self.layers
-    }
-
     pub fn is_focused(&self) -> bool {
         self.is_focused
     }
@@ -105,6 +101,22 @@ impl Window {
 
     pub fn color(&self) -> Color {
         self.color
+    }
+
+    pub fn layers(&self) -> &[Layer] {
+        &self.layers
+    }
+
+    pub fn layers_mut(&mut self) -> &mut [Layer] {
+        Rc::make_mut(&mut self.layers).as_mut_slice()
+    }
+
+    pub fn base_layer(&self) -> Option<&Layer> {
+        self.layers().first()
+    }
+
+    pub fn base_layer_mut(&mut self) -> Option<&mut Layer> {
+        self.layers_mut().first_mut()
     }
 
     pub(crate) fn pointer(&self, id: PointerId) -> Option<&Pointer> {
