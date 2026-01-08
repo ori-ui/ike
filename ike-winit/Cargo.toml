@@ -19,8 +19,8 @@ features = ["vulkan"]
 workspace = true
 features = ["rt-multi-thread"]
 
-[dependencies.copypasta]
-version = "0.10"
+[dependencies.clipboard-rs]
+version = "0.3"
 
 [dependencies.winit]
 version = "0.30"

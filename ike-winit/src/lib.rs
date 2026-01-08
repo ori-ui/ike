@@ -8,6 +8,7 @@ use std::{
     time::Instant,
 };
 
+use clipboard_rs::{Clipboard, ClipboardContext};
 use ike_core::{
     Modifiers, Offset, Point, PointerButton, PointerId, ScrollDelta, Signal, Size, WindowSizing,
     WindowUpdate, World,
@@ -88,29 +89,6 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
 
     let view = build(data);
 
-    #[cfg(target_os = "linux")]
-    let clipboard = {
-        use copypasta::{
-            wayland_clipboard::create_clipboards_from_external,
-            x11_clipboard::{Clipboard, X11ClipboardContext},
-        };
-        use winit::raw_window_handle::RawDisplayHandle;
-
-        if let RawDisplayHandle::Wayland(handle) = display_handle.as_raw() {
-            unsafe {
-                let display = handle.display.as_ptr();
-                let (_primary, clipboard) = create_clipboards_from_external(display);
-                Box::new(clipboard) as Box<_>
-            }
-        } else {
-            let clipboard = X11ClipboardContext::<Clipboard>::new().map_err(Error::Clipboard)?;
-            Box::new(clipboard) as Box<_>
-        }
-    };
-
-    #[cfg(not(target_os = "linux"))]
-    let clipboard = Box::new(copypasta::ClipboardContext::new().map_err(Error::Clipboard));
-
     let mut state = AppState {
         data,
 
@@ -121,7 +99,7 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
         runtime,
         receiver,
 
-        clipboard,
+        clipboard: ClipboardContext::new().map_err(Error::Clipboard)?,
         painter,
         windows: Vec::new(),
 
@@ -153,14 +131,14 @@ struct AppState<'a, T> {
     runtime:  tokio::runtime::Handle,
     receiver: Receiver<Event>,
 
-    vulkan:  ike_skia::vulkan::Context,
-    painter: SkiaPainter,
-
     context:   ike_ori::Context,
-    clipboard: Box<dyn copypasta::ClipboardProvider>,
+    clipboard: ClipboardContext,
 
     windows: Vec<WindowState>,
     result:  Result<(), Error>,
+
+    painter: SkiaPainter,
+    vulkan:  ike_skia::vulkan::Context,
 }
 
 struct WindowState {
@@ -337,7 +315,7 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                         target_os = "windows"
                     ))
                 {
-                    if let Ok(text) = self.clipboard.get_contents() {
+                    if let Ok(text) = self.clipboard.get_text() {
                         self.context.world.text_pasted(window.id, text);
                     }
                 } else {
@@ -462,7 +440,7 @@ impl<T> AppState<'_, T> {
             }
 
             Signal::ClipboardSet(text) => {
-                let _ = self.clipboard.set_contents(text);
+                let _ = self.clipboard.set_text(text);
             }
 
             Signal::CreateWindow(id) => {
