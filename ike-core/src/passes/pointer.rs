@@ -114,6 +114,12 @@ pub(crate) fn pressed(
                     widget.set_active(true);
                 }
 
+                if let Some(window) = world.window_mut(window_id)
+                    && let Some(pointer) = window.pointer_mut(pointer_id)
+                {
+                    pointer.capturer = Some(target);
+                }
+
                 true
             }
 
@@ -129,6 +135,12 @@ pub(crate) fn pressed(
         if !pressed && target_is_active {
             if let Some(mut widget) = world.widget_mut(target) {
                 widget.set_active(false);
+            }
+
+            if let Some(window) = world.window_mut(window_id)
+                && let Some(pointer) = window.pointer_mut(pointer_id)
+            {
+                pointer.capturer = None;
             }
 
             update_pointer_hovered(world, window_id, pointer_id);

@@ -62,8 +62,33 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
 
     let id = widget.cx.id();
     let parent = widget.cx.parent();
+    let window = widget.cx.hierarchy.window;
 
     drop(widget);
+
+    if let Some(window_id) = window
+        && let Some(window) = world.window_mut(window_id)
+    {
+        for pointer in window.pointers.iter_mut() {
+            if pointer.hovering == Some(id) {
+                pointer.hovering = None;
+            }
+
+            if pointer.capturer == Some(id) {
+                pointer.capturer = None;
+            }
+        }
+
+        for touch in window.touches.iter_mut() {
+            if touch.capturer == Some(id) {
+                touch.capturer = None;
+            }
+        }
+
+        if window.focused == Some(id) {
+            passes::focus::next(world, window_id, true);
+        }
+    }
 
     if let Some(parent) = parent
         && let Some(hierarchy) = world.widgets.get_hierarchy_mut(parent)
