@@ -91,6 +91,11 @@ impl<T, V> Button<T, V> {
         self
     }
 
+    pub fn transition(mut self, transition: Transition) -> Self {
+        self.transition = Some(transition);
+        self
+    }
+
     pub fn color(mut self, color: Color) -> Self {
         self.idle_color = Some(color);
         self.hovered_color = Some(color.lighten(0.04).desaturate(0.02));
