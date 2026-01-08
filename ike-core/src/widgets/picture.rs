@@ -1,6 +1,6 @@
 use crate::{
-    Affine, Blend, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Painter, Recording,
-    Shader, Size, Space, Svg, SvgData, Widget, WidgetMut,
+    Affine, Blend, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Recording, Shader,
+    Size, Space, Svg, SvgData, Widget, WidgetMut,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,9 +66,9 @@ impl Picture {
 }
 
 impl Widget for Picture {
-    fn layout(&mut self, _cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let size = match self.contents {
-            Picturable::Svg(ref svg) => painter.measure_svg(svg),
+            Picturable::Svg(ref svg) => cx.measure_svg(svg),
         };
 
         if size.has_zero_area() {

@@ -2,6 +2,7 @@ mod aligned;
 mod button;
 mod constrain;
 mod container;
+mod divider;
 mod entry;
 mod label;
 mod pad;
@@ -22,6 +23,7 @@ pub use constrain::{
     min_height, min_size, min_width, size, width,
 };
 pub use container::{Container, ContainerTheme, container};
+pub use divider::{Divider, DividerTheme, divider, hdivider, vdivider};
 pub use entry::{Entry, EntryTheme, entry};
 pub use label::{Label, label};
 pub use pad::{Pad, pad};

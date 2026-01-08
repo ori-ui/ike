@@ -25,7 +25,7 @@ pub(crate) fn layout_window(
         && let Some(mut widget) = world.widget_mut(layer.widget)
     {
         let space = Space::new(Size::ZERO, max_size);
-        layout_widget(&mut widget, painter, space, scale)
+        layout_widget(&mut widget, space, painter, scale)
     } else {
         return None;
     };
@@ -50,7 +50,7 @@ pub(crate) fn layout_window(
             && let Some(mut widget) = world.widget_mut(layer.widget)
         {
             let space = Space::new(Size::ZERO, Size::INFINITY);
-            layout_widget(&mut widget, painter, space, scale)
+            layout_widget(&mut widget, space, painter, scale)
         } else {
             continue;
         };
@@ -68,8 +68,8 @@ pub(crate) fn layout_window(
 
 pub(crate) fn layout_widget(
     widget: &mut WidgetMut<'_>,
-    painter: &mut dyn Painter,
     space: Space,
+    painter: &mut dyn Painter,
     scale: f32,
 ) -> Size {
     if widget.cx.is_stashed() {
@@ -84,8 +84,8 @@ pub(crate) fn layout_widget(
     let _span = widget.cx.enter_span();
     widget.cx.hierarchy.mark_laid_out();
 
-    let mut cx = widget.cx.as_layout_cx(scale);
-    let mut size = widget.widget.layout(&mut cx, painter, space);
+    let mut cx = widget.cx.as_layout_cx(painter, scale);
+    let mut size = widget.widget.layout(&mut cx, space);
 
     if widget.cx.state.is_pixel_perfect {
         size = size.ceil_to_scale(scale);

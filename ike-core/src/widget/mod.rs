@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    Canvas, Clip, ComposeCx, DrawCx, EventCx, KeyEvent, LayoutCx, Painter, Point, PointerEvent,
+    Canvas, Clip, ComposeCx, DrawCx, EventCx, KeyEvent, LayoutCx, Point, PointerEvent,
     PointerPropagate, Propagate, Rect, RefCx, Size, Space, TextEvent, TouchEvent, TouchPropagate,
     UpdateCx,
 };
@@ -18,7 +18,7 @@ mod state;
 pub use state::{WidgetHierarchy, WidgetState};
 
 pub trait Widget: Any {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size;
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size;
 
     fn compose(&mut self, cx: &mut ComposeCx<'_>) {
         let _ = cx;

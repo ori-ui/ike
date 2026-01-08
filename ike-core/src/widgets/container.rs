@@ -1,6 +1,6 @@
 use crate::{
     AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding,
-    Paint, Painter, Size, Space, Widget, WidgetMut,
+    Paint, Size, Space, Widget, WidgetMut,
 };
 
 pub struct Container {
@@ -51,9 +51,9 @@ impl Container {
 }
 
 impl Widget for Container {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let space = space.shrink(self.padding.size() + self.border_width.size());
-        let size = cx.layout_child(0, painter, space);
+        let size = cx.layout_child(0, space);
 
         cx.place_child(
             0,

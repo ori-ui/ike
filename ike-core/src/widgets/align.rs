@@ -1,4 +1,4 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Offset, Painter, Size, Space, Widget, WidgetMut};
+use crate::{AnyWidgetId, BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetMut};
 
 pub struct Aligned {
     x: f32,
@@ -25,14 +25,9 @@ impl Aligned {
 }
 
 impl Widget for Aligned {
-    fn layout(
-        &mut self,
-        cx: &mut LayoutCx<'_>,
-        painter: &mut dyn Painter,
-        mut space: Space,
-    ) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, mut space: Space) -> Size {
         space.min = Size::ZERO;
-        let child_size = cx.layout_child(0, painter, space);
+        let child_size = cx.layout_child(0, space);
 
         let mut size = child_size;
 

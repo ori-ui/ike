@@ -4,9 +4,9 @@ use keyboard_types::NamedKey;
 
 use crate::{
     BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Gesture, ImeEvent, Key,
-    KeyEvent, LayoutCx, MutCx, Offset, Paint, Painter, Paragraph, Point, PointerEvent,
-    PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine, TouchEvent, TouchPropagate,
-    Update, UpdateCx, Widget, WidgetMut, event::TextEvent,
+    KeyEvent, LayoutCx, MutCx, Offset, Paint, Paragraph, Point, PointerEvent, PointerPropagate,
+    Propagate, Rect, Size, Space, TextLayoutLine, TouchEvent, TouchPropagate, Update, UpdateCx,
+    Widget, WidgetMut, event::TextEvent,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -474,9 +474,9 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
 }
 
 impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
-    fn layout(&mut self, _cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
-        self.lines = painter.layout_text(&self.paragraph, space.max.width);
-        let size = painter.measure_text(&self.paragraph, space.max.width);
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
+        self.lines = cx.layout_text(&self.paragraph, space.max.width);
+        let size = cx.measure_text(&self.paragraph, space.max.width);
         space.constrain(size)
     }
 

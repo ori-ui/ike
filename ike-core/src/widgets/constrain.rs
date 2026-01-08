@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use crate::{
-    AnyWidgetId, BuildCx, LayoutCx, Painter, Size, Space, Transition, Transitioned, UpdateCx,
-    Widget, WidgetMut,
+    AnyWidgetId, BuildCx, LayoutCx, Size, Space, Transition, Transitioned, UpdateCx, Widget,
+    WidgetMut,
 };
 
 pub struct Constrain {
@@ -49,12 +49,7 @@ impl Constrain {
 }
 
 impl Widget for Constrain {
-    fn layout(
-        &mut self,
-        cx: &mut LayoutCx<'_>,
-        painter: &mut dyn Painter,
-        mut space: Space,
-    ) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, mut space: Space) -> Size {
         if self.min_size.width.is_finite() || space.max.width.is_finite() {
             space.min.width = space.min.width.max(self.min_size.width);
         }
@@ -66,7 +61,7 @@ impl Widget for Constrain {
         space.max = space.max.min(*self.max_size);
         space.min = space.min.min(space.max);
 
-        cx.layout_child(0, painter, space)
+        cx.layout_child(0, space)
     }
 
     fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {

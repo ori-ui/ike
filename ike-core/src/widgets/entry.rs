@@ -1,6 +1,6 @@
 use crate::{
-    BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Painter,
-    Paragraph, Size, Space, TextAlign, TextWrap, Widget, WidgetId, WidgetMut, WidgetRef,
+    BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Paragraph,
+    Size, Space, TextAlign, TextWrap, Widget, WidgetId, WidgetMut, WidgetRef,
     widgets::{Label, NewlineBehaviour, SubmitBehaviour, TextArea},
 };
 
@@ -150,7 +150,7 @@ impl Entry {
 }
 
 impl Widget for Entry {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let mut space = space.shrink(self.padding.size() + self.border_width.size());
         space.min.width = space.min.width.max(self.min_width);
         space.max.width = space.max.width.min(self.max_width);
@@ -162,9 +162,9 @@ impl Widget for Entry {
 
         cx.set_child_stashed(1, !has_text);
 
-        let placeholder_size = cx.layout_child(1, painter, space);
+        let placeholder_size = cx.layout_child(1, space);
         space.min.width = space.min.width.max(placeholder_size.width);
-        let text_size = cx.layout_child(0, painter, space);
+        let text_size = cx.layout_child(0, space);
 
         cx.place_child(
             0,

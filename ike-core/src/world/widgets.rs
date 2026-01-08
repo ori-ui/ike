@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    LayoutCx, MutCx, Painter, RefCx, Size, Space, Widget, WidgetId, WidgetRef, WidgetState,
+    LayoutCx, MutCx, RefCx, Size, Space, Widget, WidgetId, WidgetRef, WidgetState,
     widget::WidgetHierarchy,
     world::{WidgetMut, WorldState},
 };
@@ -220,12 +220,7 @@ impl Widgets {
 struct Tombstone;
 
 impl Widget for Tombstone {
-    fn layout(
-        &mut self,
-        _cx: &mut LayoutCx<'_>,
-        _painter: &mut dyn Painter,
-        _space: Space,
-    ) -> Size {
+    fn layout(&mut self, _cx: &mut LayoutCx<'_>, _space: Space) -> Size {
         unreachable!()
     }
 }

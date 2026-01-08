@@ -1,7 +1,7 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
-use ori::{Providable, Proxy, Proxyable};
+use ori::{Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
 
 use crate::Palette;
 
@@ -180,14 +180,14 @@ enum ButtonEvent {
     Clicked,
 }
 
-impl<T, V> ori::ViewMarker for Button<T, V> {}
-impl<C, T, V> ori::View<C, T> for Button<T, V>
+impl<T, V> ViewMarker for Button<T, V> {}
+impl<C, T, V> View<C, T> for Button<T, V>
 where
     C: BuildCx + Proxyable + Providable,
-    V: ori::View<C, T, Element: AnyWidgetId>,
+    V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Button>;
-    type State = (ori::ViewId, V::Element, V::State);
+    type State = (ViewId, V::Element, V::State);
 
     fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
@@ -195,7 +195,7 @@ where
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ButtonTheme>();
         let proxy = cx.proxy();
-        let id = ori::ViewId::next();
+        let id = ViewId::next();
 
         let mut widget = widgets::Button::new(cx, contents);
 

@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use crate::{
     AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Gesture, Key,
-    KeyEvent, LayoutCx, NamedKey, Padding, Paint, Painter, PointerEvent, PointerPropagate,
-    Propagate, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget,
-    WidgetMut, context::UpdateCx, widget::Update,
+    KeyEvent, LayoutCx, NamedKey, Padding, Paint, PointerEvent, PointerPropagate, Propagate, Size,
+    Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget, WidgetMut,
+    context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
@@ -104,9 +104,9 @@ impl Button {
 }
 
 impl Widget for Button {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let space = space.shrink(self.padding.size() + self.border_width.size());
-        let size = cx.layout_child(0, painter, space);
+        let size = cx.layout_child(0, space);
 
         cx.place_child(
             0,

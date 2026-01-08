@@ -1,4 +1,4 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Padding, Painter, Size, Space, Widget, WidgetMut};
+use crate::{AnyWidgetId, BuildCx, LayoutCx, Padding, Size, Space, Widget, WidgetMut};
 
 pub struct Pad {
     padding: Padding,
@@ -20,9 +20,9 @@ impl Pad {
 }
 
 impl Widget for Pad {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let space = space.shrink(self.padding.size());
-        let size = cx.layout_child(0, painter, space);
+        let size = cx.layout_child(0, space);
         cx.place_child(0, self.padding.offset());
         size + self.padding.size()
     }

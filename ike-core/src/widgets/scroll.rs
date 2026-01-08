@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use crate::{
     AnyWidgetId, Axis, BorderWidth, BuildCx, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
-    EventCx, Gesture, LayoutCx, Padding, Paint, Painter, Point, PointerEvent, PointerPropagate,
-    Rect, ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Update,
+    EventCx, Gesture, LayoutCx, Padding, Paint, Point, PointerEvent, PointerPropagate, Rect,
+    ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Update,
     UpdateCx, Widget, WidgetMut,
 };
 
@@ -152,7 +152,7 @@ impl Scroll {
 }
 
 impl Widget for Scroll {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let (min_major, min_minor) = self.axis.unpack_size(space.min);
         let (_, max_minor) = self.axis.unpack_size(space.max);
 
@@ -167,7 +167,7 @@ impl Widget for Scroll {
             ),
         };
 
-        let child_size = cx.layout_child(0, painter, child_space);
+        let child_size = cx.layout_child(0, child_space);
         let size = space.constrain(child_size + self.axis.pack_size(0.0, self.bar_width));
 
         let (child_major, _) = self.axis.unpack_size(child_size);

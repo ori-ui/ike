@@ -1,8 +1,9 @@
 use std::ops::Range;
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, ImeSignal, Painter, Point, Rect, Signal,
-    Size, Space, Widget, WidgetId, WidgetMut, WidgetRef, Widgets, Window, passes,
+    Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, ImeSignal, Painter, Paragraph, Point, Rect,
+    Signal, Size, Space, Svg, TextLayoutLine, Widget, WidgetId, WidgetMut, WidgetRef, Widgets,
+    Window, passes,
     widget::{WidgetHierarchy, WidgetState},
     world::WorldState,
 };
@@ -49,6 +50,7 @@ pub struct LayoutCx<'a> {
     pub(crate) world:     &'a mut WorldState,
     pub(crate) state:     &'a mut WidgetState,
     pub(crate) hierarchy: &'a WidgetHierarchy,
+    pub(crate) painter:   &'a mut dyn Painter,
     pub(crate) scale:     f32,
 }
 
@@ -150,12 +152,17 @@ impl MutCx<'_> {
         }
     }
 
-    pub(crate) fn as_layout_cx(&mut self, scale: f32) -> LayoutCx<'_> {
+    pub(crate) fn as_layout_cx<'a>(
+        &'a mut self,
+        painter: &'a mut dyn Painter,
+        scale: f32,
+    ) -> LayoutCx<'a> {
         LayoutCx {
             widgets: self.widgets,
             world: self.world,
             state: self.state,
             hierarchy: self.hierarchy,
+            painter,
             scale,
         }
     }
@@ -207,6 +214,18 @@ impl EventCx<'_> {
 }
 
 impl LayoutCx<'_> {
+    pub fn measure_text(&mut self, paragraph: &Paragraph, max_width: f32) -> Size {
+        self.painter.measure_text(paragraph, max_width)
+    }
+
+    pub fn layout_text(&mut self, paragraph: &Paragraph, max_width: f32) -> Vec<TextLayoutLine> {
+        self.painter.layout_text(paragraph, max_width)
+    }
+
+    pub fn measure_svg(&mut self, svg: &Svg) -> Size {
+        self.painter.measure_svg(svg)
+    }
+
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
         if let Some(child) = self.hierarchy.children.get(index)
             && let Some(mut child) = self.widgets.get_mut(self.world, *child)
@@ -217,11 +236,16 @@ impl LayoutCx<'_> {
         }
     }
 
-    pub fn layout_child(&mut self, index: usize, painter: &mut dyn Painter, space: Space) -> Size {
+    pub fn layout_child(&mut self, index: usize, space: Space) -> Size {
         if let Some(child) = self.hierarchy.children.get(index)
             && let Some(mut child) = self.widgets.get_mut(self.world, *child)
         {
-            passes::layout::layout_widget(&mut child, painter, space, self.scale)
+            passes::layout::layout_widget(
+                &mut child,
+                space,
+                self.painter,
+                self.scale,
+            )
         } else {
             tracing::error!("`LayoutCx::layout_child` called on invalid child");
 
