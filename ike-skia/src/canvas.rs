@@ -207,6 +207,8 @@ impl Canvas for SkiaCanvas<'_> {
                 ),
                 &skia_safe::Paint::default(),
             );
+        } else {
+            tracing::error!("invalid recording drawn");
         }
     }
 }
