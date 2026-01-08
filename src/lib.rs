@@ -23,7 +23,7 @@ pub mod prelude {
     };
 
     pub use ike_ori::{Effect, Palette, View, views::*};
-    pub use ori::{Action, Event, Proxy, ViewId};
+    pub use ori::{Action, Event, Keyed, Proxy, ViewId, keyed};
 
     pub use tracing::{
         debug, debug_span, error, error_span, info, info_span, span, trace, trace_span, warn,
