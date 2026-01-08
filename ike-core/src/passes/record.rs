@@ -21,6 +21,8 @@ fn record_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
         return;
     }
 
+    let _span = widget.cx.enter_span();
+
     let scale = widget.cx.get_window().map_or(1.0, |x| x.scale);
     let draw_cost = (widget.cx.size().area() * scale * scale).sqrt()
         + f32::min(

@@ -25,8 +25,6 @@ pub(crate) fn compose_widget(widget: &mut WidgetMut<'_>, transform: Affine, scal
         return;
     }
 
-    let _span = widget.cx.enter_span();
-
     let global_transform = transform * widget.cx.state.transform;
 
     if !widget.cx.hierarchy.needs_compose() && widget.cx.state.global_transform == global_transform
@@ -34,8 +32,10 @@ pub(crate) fn compose_widget(widget: &mut WidgetMut<'_>, transform: Affine, scal
         return;
     }
 
-    widget.cx.state.global_transform = global_transform;
+    let _span = widget.cx.enter_span();
     widget.cx.hierarchy.mark_composed();
+
+    widget.cx.state.global_transform = global_transform;
 
     let mut cx = widget.cx.as_compose_cx(scale);
     widget.widget.compose(&mut cx);

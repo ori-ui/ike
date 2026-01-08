@@ -13,6 +13,8 @@ pub(crate) fn window(world: &mut World, window: WindowId, update: &Update) {
 }
 
 pub(crate) fn widget_recursive(widget: &mut WidgetMut<'_>, update: &Update) {
+    let _span = widget.cx.enter_span();
+
     widget.cx.for_each_child_mut(|child| {
         widget_recursive(child, update);
     });

@@ -19,6 +19,8 @@ pub(crate) fn draw_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
         return;
     }
 
+    let _span = widget.cx.enter_span();
+
     widget.cx.state.stable_draws += 1;
 
     if widget.cx.hierarchy.needs_draw() {
