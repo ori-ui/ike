@@ -13,10 +13,11 @@ pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
 
     propagate_up(world, parent);
 
-    if let Some(mut widget) = world.widget_mut(parent) {
-        let index = widget.cx.hierarchy.children.len() - 1;
+    if let Some(mut parent) = world.widget_mut(parent) {
+        let index = parent.cx.hierarchy.children.len() - 1;
         let update = Update::Children(ChildUpdate::Added(index));
-        passes::update::widget(&mut widget, update);
+        passes::update::widget(&mut parent, update);
+        parent.cx.request_layout();
     }
 }
 
@@ -50,7 +51,34 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
     if let Some(mut parent) = world.widget_mut(parent_id) {
         let update = Update::Children(ChildUpdate::Replaced(index));
         passes::update::widget(&mut parent, update);
+        parent.cx.request_layout();
     }
+}
+
+pub(crate) fn remove(world: &mut World, widget: WidgetId) {
+    let Some(widget) = world.widget(widget) else {
+        return;
+    };
+
+    let id = widget.cx.id();
+    let parent = widget.cx.parent();
+
+    drop(widget);
+
+    if let Some(parent) = parent
+        && let Some(hierarchy) = world.widgets.get_hierarchy_mut(parent)
+        && let Some(index) = hierarchy.children.iter().position(|child| *child == id)
+    {
+        hierarchy.children.remove(index);
+
+        if let Some(mut parent) = world.widget_mut(parent) {
+            let update = Update::Children(ChildUpdate::Removed(index));
+            passes::update::widget(&mut parent, update);
+            parent.cx.request_layout();
+        }
+    }
+
+    world.widgets.remove(id);
 }
 
 /// Set the `window` of a `widget` and its descendants.
@@ -84,29 +112,4 @@ pub(crate) fn propagate_up(world: &mut World, widget: WidgetId) {
         debug_assert!(hierarchy.children.is_empty());
         hierarchy.children = children;
     }
-}
-
-pub(crate) fn remove(world: &mut World, widget: WidgetId) {
-    let Some(widget) = world.widget(widget) else {
-        return;
-    };
-
-    let id = widget.cx.id();
-    let parent = widget.cx.parent();
-
-    drop(widget);
-
-    if let Some(parent) = parent
-        && let Some(hierarchy) = world.widgets.get_hierarchy_mut(parent)
-        && let Some(index) = hierarchy.children.iter().position(|child| *child == id)
-    {
-        hierarchy.children.remove(index);
-
-        if let Some(mut parent) = world.widget_mut(parent) {
-            let update = Update::Children(ChildUpdate::Removed(index));
-            passes::update::widget(&mut parent, update);
-        }
-    }
-
-    world.widgets.remove(id);
 }
