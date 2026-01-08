@@ -1,5 +1,5 @@
 use ike_core::{AnyWidgetId, BuildCx, Color, Size, WindowId, WindowSizing};
-use ori::Providable;
+use ori::{Action, Event, NoElement, Providable, View, ViewMarker};
 
 use crate::Palette;
 
@@ -63,13 +63,13 @@ impl<V> Window<V> {
     }
 }
 
-impl<V> ori::ViewMarker for Window<V> {}
-impl<C, T, V> ori::View<C, T> for Window<V>
+impl<V> ViewMarker for Window<V> {}
+impl<C, T, V> View<C, T> for Window<V>
 where
     C: BuildCx + Providable,
-    V: ori::View<C, T, Element: AnyWidgetId>,
+    V: View<C, T, Element: AnyWidgetId>,
 {
-    type Element = ori::NoElement;
+    type Element = NoElement;
     type State = (WindowId, V::Element, V::State);
 
     fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
@@ -87,7 +87,7 @@ where
             self.color.unwrap_or(palette.background),
         );
 
-        (ori::NoElement, (id, contents, state))
+        (NoElement, (id, contents, state))
     }
 
     fn rebuild(
@@ -155,8 +155,8 @@ where
         (id, contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
         if let Some(window) = cx.world().get_window(*id)

@@ -2,7 +2,7 @@ use ike_core::{
     AnyWidgetId, Axis, BuildCx, WidgetId,
     widgets::{self, Align, Justify},
 };
-use ori::{ElementSeq, View, ViewMarker};
+use ori::{Action, ElementSeq, Event, Super, View, ViewMarker, ViewSeq};
 
 use crate::context::Context;
 
@@ -57,7 +57,7 @@ impl<V> ViewMarker for Stack<V> {}
 impl<C, T, V> View<C, T> for Stack<V>
 where
     C: BuildCx,
-    V: ori::ViewSeq<C, T, Flex<WidgetId>>,
+    V: ViewSeq<C, T, Flex<WidgetId>>,
 {
     type Element = WidgetId<widgets::Stack>;
     type State = (V::Elements, V::State);
@@ -141,8 +141,8 @@ where
         (children, states): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.seq_event(children, states, cx, data, event);
 
         update_children(cx, *element, children);
@@ -282,8 +282,8 @@ where
         state: &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         self.contents.event(
             &mut element.contents,
             state,
@@ -294,7 +294,7 @@ where
     }
 }
 
-impl<S> ori::Super<Context, S> for Flex<WidgetId>
+impl<S> Super<Context, S> for Flex<WidgetId>
 where
     S: AnyWidgetId,
 {
@@ -315,7 +315,7 @@ where
     }
 }
 
-impl<S> ori::Super<Context, Flex<S>> for Flex<WidgetId>
+impl<S> Super<Context, Flex<S>> for Flex<WidgetId>
 where
     S: AnyWidgetId,
 {

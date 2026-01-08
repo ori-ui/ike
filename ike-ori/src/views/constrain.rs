@@ -1,4 +1,5 @@
 use ike_core::{AnyWidgetId, BuildCx, Size, Transition, WidgetId, widgets};
+use ori::{Action, Event, View, ViewMarker};
 
 pub fn constrain<V>(contents: V) -> Constrain<V> {
     Constrain::new(contents)
@@ -136,11 +137,11 @@ impl<V> Constrain<V> {
     }
 }
 
-impl<V> ori::ViewMarker for Constrain<V> {}
-impl<C, T, V> ori::View<C, T> for Constrain<V>
+impl<V> ViewMarker for Constrain<V> {}
+impl<C, T, V> View<C, T> for Constrain<V>
 where
     C: BuildCx,
-    V: ori::View<C, T, Element: AnyWidgetId>,
+    V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Constrain>;
     type State = (V::Element, V::State);
@@ -216,8 +217,8 @@ where
         (contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
         if !cx.is_child(*element, *contents) {

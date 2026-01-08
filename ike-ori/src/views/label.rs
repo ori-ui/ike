@@ -2,7 +2,7 @@ use ike_core::{
     BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::Providable;
+use ori::{Action, Providable, View, ViewMarker};
 
 use crate::{Palette, views::TextTheme};
 
@@ -113,8 +113,8 @@ impl Label {
     }
 }
 
-impl ori::ViewMarker for Label {}
-impl<C, T> ori::View<C, T> for Label
+impl ViewMarker for Label {}
+impl<C, T> View<C, T> for Label
 where
     C: BuildCx + Providable,
 {
@@ -171,7 +171,7 @@ where
         _cx: &mut C,
         _data: &mut T,
         _event: &mut ori::Event,
-    ) -> ori::Action {
-        ori::Action::new()
+    ) -> Action {
+        Action::new()
     }
 }

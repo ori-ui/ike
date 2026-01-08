@@ -1,4 +1,5 @@
 use ike_core::{AnyWidgetId, BuildCx, WidgetId, widgets};
+use ori::{Action, Event, View, ViewMarker};
 
 pub fn align<V>(x: f32, y: f32, contents: V) -> Aligned<V> {
     Aligned { contents, x, y }
@@ -46,11 +47,11 @@ pub struct Aligned<V> {
     y:        f32,
 }
 
-impl<V> ori::ViewMarker for Aligned<V> {}
-impl<C, T, V> ori::View<C, T> for Aligned<V>
+impl<V> ViewMarker for Aligned<V> {}
+impl<C, T, V> View<C, T> for Aligned<V>
 where
     C: BuildCx,
-    V: ori::View<C, T, Element: AnyWidgetId>,
+    V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Aligned>;
     type State = (V::Element, V::State);
@@ -109,8 +110,8 @@ where
         (contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
         if !cx.is_child(*element, *contents) {

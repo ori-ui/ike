@@ -1,13 +1,13 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
-use ori::{Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
+use ori::{Action, Event, IntoAction, Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
 
 use crate::Palette;
 
 pub fn button<T, V, A, I>(contents: V, on_click: impl FnMut(&mut T) -> A + 'static) -> Button<T, V>
 where
-    A: ori::IntoAction<I>,
+    A: IntoAction<I>,
 {
     Button::new(contents, on_click)
 }
@@ -43,7 +43,7 @@ impl Default for ButtonTheme {
 
 pub struct Button<T, V> {
     contents: V,
-    on_click: Box<dyn FnMut(&mut T) -> ori::Action>,
+    on_click: Box<dyn FnMut(&mut T) -> Action>,
 
     padding:       Option<Padding>,
     border_width:  Option<BorderWidth>,
@@ -59,7 +59,7 @@ pub struct Button<T, V> {
 impl<T, V> Button<T, V> {
     pub fn new<A, I>(contents: V, mut on_click: impl FnMut(&mut T) -> A + 'static) -> Self
     where
-        A: ori::IntoAction<I>,
+        A: IntoAction<I>,
     {
         Button {
             contents,
@@ -220,10 +220,7 @@ where
         widgets::Button::set_transition(&mut widget, transition);
 
         widgets::Button::set_on_click(&mut widget, move || {
-            proxy.event(ori::Event::new(
-                ButtonEvent::Clicked,
-                id,
-            ));
+            proxy.event(Event::new(ButtonEvent::Clicked, id));
         });
 
         (widget.id(), (id, contents, state))
@@ -319,8 +316,8 @@ where
         (id, contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
         if !cx.is_child(*element, *contents) {

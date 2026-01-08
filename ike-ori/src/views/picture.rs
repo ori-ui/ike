@@ -2,6 +2,7 @@ use ike_core::{
     BuildCx, Color, WidgetId,
     widgets::{self, Fit, Picturable},
 };
+use ori::{Action, Event, View, ViewMarker};
 
 pub fn picture(fit: Fit, content: impl Into<Picturable>) -> Picture {
     Picture::new(fit, content)
@@ -28,8 +29,8 @@ impl Picture {
     }
 }
 
-impl ori::ViewMarker for Picture {}
-impl<C, T> ori::View<C, T> for Picture
+impl ViewMarker for Picture {}
+impl<C, T> View<C, T> for Picture
 where
     C: BuildCx,
 {
@@ -79,8 +80,8 @@ where
         _state: &mut Self::State,
         _cx: &mut C,
         _data: &mut T,
-        _event: &mut ori::Event,
-    ) -> ori::Action {
-        ori::Action::new()
+        _event: &mut Event,
+    ) -> Action {
+        Action::new()
     }
 }

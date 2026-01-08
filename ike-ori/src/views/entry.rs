@@ -3,7 +3,7 @@ use ike_core::{
     Paragraph, TextAlign, TextStyle, TextWrap, WidgetId,
     widgets::{self, NewlineBehaviour, SubmitBehaviour},
 };
-use ori::{Providable, Proxy, Proxyable};
+use ori::{Action, Event, IntoAction, Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
 
 use crate::{Palette, views::TextTheme};
 
@@ -92,9 +92,9 @@ pub struct Entry<T> {
     submit_behaviour:  SubmitBehaviour,
 
     #[allow(clippy::type_complexity)]
-    on_change: Box<dyn FnMut(&mut T, String) -> ori::Action>,
+    on_change: Box<dyn FnMut(&mut T, String) -> Action>,
     #[allow(clippy::type_complexity)]
-    on_submit: Box<dyn FnMut(&mut T, String) -> ori::Action>,
+    on_submit: Box<dyn FnMut(&mut T, String) -> Action>,
 }
 
 impl<T> Default for Entry<T> {
@@ -132,8 +132,8 @@ impl<T> Entry<T> {
             newline_behaviour: NewlineBehaviour::Never,
             submit_behaviour:  SubmitBehaviour::default(),
 
-            on_change: Box::new(|_, _| ori::Action::new()),
-            on_submit: Box::new(|_, _| ori::Action::new()),
+            on_change: Box::new(|_, _| Action::new()),
+            on_submit: Box::new(|_, _| Action::new()),
         }
     }
 
@@ -267,7 +267,7 @@ impl<T> Entry<T> {
         mut on_change: impl FnMut(&mut T, String) -> A + 'static,
     ) -> Self
     where
-        A: ori::IntoAction<I>,
+        A: IntoAction<I>,
     {
         self.on_change = Box::new(move |data, text| on_change(data, text).into_action());
         self
@@ -278,7 +278,7 @@ impl<T> Entry<T> {
         mut on_submit: impl FnMut(&mut T, String) -> A + 'static,
     ) -> Self
     where
-        A: ori::IntoAction<I>,
+        A: IntoAction<I>,
     {
         self.on_submit = Box::new(move |data, text| on_submit(data, text).into_action());
         self
@@ -383,20 +383,20 @@ enum EntryEvent {
     Submit(String),
 }
 
-impl<T> ori::ViewMarker for Entry<T> {}
-impl<C, T> ori::View<C, T> for Entry<T>
+impl<T> ViewMarker for Entry<T> {}
+impl<C, T> View<C, T> for Entry<T>
 where
     C: BuildCx + Proxyable + Providable,
 {
     type Element = WidgetId<widgets::Entry>;
-    type State = ori::ViewId;
+    type State = ViewId;
 
     fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<EntryTheme>();
         let proxy = cx.proxy();
-        let id = ori::ViewId::next();
+        let id = ViewId::next();
 
         let color = self.get_color(&palette, &text_theme, &theme);
         let placeholder_color = self.get_placeholder_color(&palette, &theme);
@@ -443,7 +443,7 @@ where
             let proxy = proxy.cloned();
 
             move |text| {
-                proxy.event(ori::Event::new(
+                proxy.event(Event::new(
                     EntryEvent::Change(text.into()),
                     id,
                 ))
@@ -451,7 +451,7 @@ where
         });
 
         widgets::Entry::set_on_submit(&mut widget, move |text| {
-            proxy.event(ori::Event::new(
+            proxy.event(Event::new(
                 EntryEvent::Submit(text.into()),
                 id,
             ))
@@ -585,12 +585,12 @@ where
         id: &mut Self::State,
         _cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         match event.take_targeted(*id) {
             Some(EntryEvent::Change(text)) => (self.on_change)(data, text),
             Some(EntryEvent::Submit(text)) => (self.on_submit)(data, text),
-            None => ori::Action::new(),
+            None => Action::new(),
         }
     }
 }

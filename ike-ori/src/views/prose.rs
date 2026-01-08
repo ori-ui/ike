@@ -2,7 +2,7 @@ use ike_core::{
     BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::Providable;
+use ori::{Action, Providable, View, ViewId, ViewMarker};
 
 use crate::{Palette, views::TextTheme};
 
@@ -211,19 +211,19 @@ impl Prose {
     }
 }
 
-impl ori::ViewMarker for Prose {}
-impl<C, T> ori::View<C, T> for Prose
+impl ViewMarker for Prose {}
+impl<C, T> View<C, T> for Prose
 where
     C: BuildCx + Providable,
 {
     type Element = WidgetId<widgets::TextArea<false>>;
-    type State = ori::ViewId;
+    type State = ViewId;
 
     fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<ProseTheme>();
-        let id = ori::ViewId::next();
+        let id = ViewId::next();
 
         let paragraph = self.build_paragraph(
             &self.text,
@@ -309,7 +309,7 @@ where
         _cx: &mut C,
         _data: &mut T,
         _event: &mut ori::Event,
-    ) -> ori::Action {
-        ori::Action::new()
+    ) -> Action {
+        Action::new()
     }
 }

@@ -1,4 +1,5 @@
 use ike_core::{AnyWidgetId, BuildCx, Padding, WidgetId, widgets};
+use ori::{Action, Event, View, ViewMarker};
 
 pub fn pad<V>(padding: impl Into<Padding>, contents: V) -> Pad<V> {
     Pad::new(padding, contents)
@@ -18,11 +19,11 @@ impl<V> Pad<V> {
     }
 }
 
-impl<V> ori::ViewMarker for Pad<V> {}
-impl<C, T, V> ori::View<C, T> for Pad<V>
+impl<V> ViewMarker for Pad<V> {}
+impl<C, T, V> View<C, T> for Pad<V>
 where
     C: BuildCx,
-    V: ori::View<C, T, Element: AnyWidgetId>,
+    V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Pad>;
     type State = (V::Element, V::State);
@@ -83,8 +84,8 @@ where
         (contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
         if !cx.is_child(*element, *contents) {

@@ -2,7 +2,7 @@ use ike_core::{
     AnyWidgetId, Axis, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId,
     widgets,
 };
-use ori::Providable;
+use ori::{Action, Event, Providable, View, ViewMarker};
 
 use crate::Palette;
 
@@ -161,11 +161,11 @@ impl<V> Scroll<V> {
     }
 }
 
-impl<V> ori::ViewMarker for Scroll<V> {}
-impl<C, T, V> ori::View<C, T> for Scroll<V>
+impl<V> ViewMarker for Scroll<V> {}
+impl<C, T, V> View<C, T> for Scroll<V>
 where
     C: BuildCx + Providable,
-    V: ori::View<C, T, Element: AnyWidgetId>,
+    V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Scroll>;
     type State = (V::Element, V::State);
@@ -296,8 +296,8 @@ where
         (contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
-        event: &mut ori::Event,
-    ) -> ori::Action {
+        event: &mut Event,
+    ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
         if !cx.is_child(*element, *contents) {
