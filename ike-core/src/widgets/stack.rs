@@ -214,6 +214,10 @@ impl Widget for Stack {
                 ChildUpdate::Replaced(index) => {
                     self.flex[index] = (0.0, false);
                 }
+
+                ChildUpdate::Swapped(a, b) => {
+                    self.flex.swap(a, b);
+                }
             }
         }
     }

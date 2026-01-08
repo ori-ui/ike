@@ -69,6 +69,18 @@ pub trait BuildCx {
         );
     }
 
+    fn swap_children(&mut self, parent: impl AnyWidgetId, index_a: usize, index_b: usize)
+    where
+        Self: Sized,
+    {
+        passes::hierarchy::swap_children(
+            self.world_mut(),
+            parent.upcast(),
+            index_a,
+            index_b,
+        );
+    }
+
     fn children(&self, parent: impl AnyWidgetId) -> &[WidgetId]
     where
         Self: Sized,

@@ -145,6 +145,7 @@ pub enum ChildUpdate {
     Added(usize),
     Removed(usize),
     Replaced(usize),
+    Swapped(usize, usize),
 }
 
 // we want to be able to cast by reference, so a stable layout is required

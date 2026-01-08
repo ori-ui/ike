@@ -156,25 +156,34 @@ fn update_children(
     widget: WidgetId<widgets::Stack>,
     children: &mut impl ElementSeq<Flex<WidgetId>>,
 ) {
-    for (i, child) in children.iter().enumerate() {
-        match cx.children(widget).get(i) {
-            Some(current) => {
-                if *current != child.contents {
-                    cx.set_child(widget, i, child.contents);
-                }
-            }
+    for child in children.iter() {
+        if !cx.is_parent(widget, child.contents) {
+            cx.add_child(widget, child.contents);
+        }
+    }
 
-            None => {
-                cx.add_child(widget, child.contents);
-            }
+    for (i, child) in children.iter().enumerate() {
+        let children = cx.children(widget);
+
+        if children[i] != child.contents {
+            let index = children
+                .iter()
+                .position(|c| *c == child.contents)
+                .expect("child should not have been removed");
+
+            cx.swap_children(widget, i, index);
         }
     }
 
     let cur_len = cx.children(widget).len();
     let new_len = children.count();
 
-    for i in new_len..cur_len {
-        let child = cx.children(widget)[i];
+    for _ in new_len..cur_len {
+        let child = *cx
+            .children(widget)
+            .last()
+            .expect("there should be at least one child");
+
         cx.remove_widget(child);
     }
 

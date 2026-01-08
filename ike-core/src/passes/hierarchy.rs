@@ -1,6 +1,8 @@
 use std::mem;
 
-use crate::{Update, WidgetId, WindowId, World, debug::debug_panic, passes, widget::ChildUpdate};
+use crate::{
+    BuildCx, Update, WidgetId, WindowId, World, debug::debug_panic, passes, widget::ChildUpdate,
+};
 
 pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
     if let Some(child) = world.widgets.get_hierarchy_mut(child) {
@@ -22,6 +24,8 @@ pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
 }
 
 pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child: WidgetId) {
+    debug_assert!(!world.is_parent(parent, child));
+
     let parent_id = parent;
 
     let Some(parent) = world.widgets.get_hierarchy_mut(parent) else {
@@ -47,9 +51,26 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
         child.parent = Some(parent_id);
     }
 
+    propagate_up(world, parent_id);
+
     // run update pass on the parent widget
     if let Some(mut parent) = world.widget_mut(parent_id) {
         let update = Update::Children(ChildUpdate::Replaced(index));
+        passes::update::widget(&mut parent, update);
+        parent.cx.request_layout();
+    }
+}
+
+pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize, index_b: usize) {
+    let parent_id = parent;
+
+    if let Some(parent) = world.widgets.get_hierarchy_mut(parent) {
+        parent.children.swap(index_a, index_b);
+    }
+
+    // run update pass on the parent widget
+    if let Some(mut parent) = world.widget_mut(parent_id) {
+        let update = Update::Children(ChildUpdate::Swapped(index_a, index_b));
         passes::update::widget(&mut parent, update);
         parent.cx.request_layout();
     }
