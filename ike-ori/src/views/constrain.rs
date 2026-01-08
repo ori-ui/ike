@@ -174,13 +174,13 @@ where
             &mut old.contents,
         );
 
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
+        }
+
         let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Constrain::set_child(&mut widget, *contents);
-        }
 
         if self.min_size != old.min_size {
             widgets::Constrain::set_min_size(&mut widget, self.min_size);
@@ -220,12 +220,8 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
-            return action;
-        };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Constrain::set_child(&mut widget, *contents);
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
         }
 
         action

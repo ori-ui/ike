@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     AnyWidgetId, BuildCx, LayoutCx, Painter, Size, Space, Transition, Transitioned, UpdateCx,
-    Widget, WidgetMut, build::SingleChild,
+    Widget, WidgetMut,
 };
 
 pub struct Constrain {
@@ -12,16 +12,15 @@ pub struct Constrain {
 
 impl Constrain {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        cx.insert_widget(
-            Self {
-                min_size: Transitioned::new(Size::all(0.0), Transition::INSTANT),
-                max_size: Transitioned::new(
-                    Size::all(f32::INFINITY),
-                    Transition::INSTANT,
-                ),
-            },
-            child,
-        )
+        cx.build_widget(Self {
+            min_size: Transitioned::new(Size::all(0.0), Transition::INSTANT),
+            max_size: Transitioned::new(
+                Size::all(f32::INFINITY),
+                Transition::INSTANT,
+            ),
+        })
+        .with_child(child)
+        .finish()
     }
 
     pub fn set_min_size(this: &mut WidgetMut<Self>, min_size: Size) {
@@ -48,8 +47,6 @@ impl Constrain {
         this.widget.max_size.set_transition(transition);
     }
 }
-
-impl SingleChild for Constrain {}
 
 impl Widget for Constrain {
     fn layout(

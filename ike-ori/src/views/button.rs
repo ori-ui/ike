@@ -243,13 +243,13 @@ where
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ButtonTheme>();
 
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
+        }
+
         let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Button::set_child(&mut widget, *contents);
-        }
 
         if self.padding != old.padding {
             let padding = self.get_padding(&theme);
@@ -318,12 +318,8 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
-            return action;
-        };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Button::set_child(&mut widget, *contents);
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
         }
 
         match event.get_targeted(*id) {

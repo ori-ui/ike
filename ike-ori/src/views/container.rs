@@ -3,7 +3,7 @@ use ike_core::{
 };
 use ori::Providable;
 
-use crate::{Context, Palette};
+use crate::Palette;
 
 pub fn container<V>(contents: V) -> Container<V> {
     Container::new(contents)
@@ -151,13 +151,13 @@ where
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ContainerTheme>();
 
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
+        }
+
         let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Container::set_child(&mut widget, *contents);
-        }
 
         if self.padding != old.padding {
             let padding = self.get_padding(&theme);
@@ -206,12 +206,8 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
-            return action;
-        };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Container::set_child(&mut widget, *contents);
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
         }
 
         action

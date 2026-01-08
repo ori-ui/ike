@@ -139,7 +139,7 @@ impl World {
         window.size = new_size;
 
         let update = Update::WindowResized(new_size);
-        passes::update::update_window(self, window_id, &update);
+        passes::update::window(self, window_id, &update);
     }
 
     pub fn window_scaled(&mut self, window: WindowId, new_size: Size, new_scale: f32) {
@@ -153,39 +153,48 @@ impl World {
         window.scale = new_scale;
 
         let update = Update::WindowResized(new_size);
-        passes::update::update_window(self, window_id, &update);
+        passes::update::window(self, window_id, &update);
 
         let update = Update::WindowScaled(new_scale);
-        passes::update::update_window(self, window_id, &update);
+        passes::update::window(self, window_id, &update);
     }
 
     pub fn window_focused(&mut self, window: WindowId, is_focused: bool) {
         let window_id = window;
 
-        todo!()
+        let Some(window) = self.state.window_mut(window_id) else {
+            return;
+        };
+
+        window.is_focused = is_focused;
+
+        passes::update::window(
+            self,
+            window_id,
+            &Update::WindowFocused(is_focused),
+        );
+
+        if let Some(window) = self.state.window_mut(window_id)
+            && let Some(focused) = window.focused
+            && let Some(widget) = self.widget(focused)
+            && widget.cx.hierarchy.accepts_text()
+        {
+            widget.cx.world.emit_signal(Signal::Ime(ImeSignal::Start));
+        }
     }
 }
 
 impl World {
     pub fn pointer_entered(&mut self, window: WindowId, pointer: PointerId) -> bool {
-        todo!()
+        passes::pointer::entered(self, window, pointer)
     }
 
     pub fn pointer_left(&mut self, window: WindowId, pointer: PointerId) -> bool {
-        todo!()
+        passes::pointer::left(self, window, pointer)
     }
 
     pub fn pointer_moved(&mut self, window: WindowId, pointer: PointerId, position: Point) -> bool {
-        todo!()
-    }
-
-    pub fn pointer_scrolled(
-        &mut self,
-        window: WindowId,
-        pointer: PointerId,
-        delta: ScrollDelta,
-    ) -> bool {
-        todo!()
+        passes::pointer::moved(self, window, pointer, position)
     }
 
     pub fn pointer_pressed(
@@ -195,13 +204,22 @@ impl World {
         button: PointerButton,
         pressed: bool,
     ) -> bool {
-        todo!()
+        passes::pointer::pressed(self, window, pointer, button, pressed)
+    }
+
+    pub fn pointer_scrolled(
+        &mut self,
+        window: WindowId,
+        pointer: PointerId,
+        delta: ScrollDelta,
+    ) -> bool {
+        passes::pointer::scrolled(self, window, pointer, delta)
     }
 }
 
 impl World {
     pub fn modifiers_changed(&mut self, window: WindowId, modifiers: Modifiers) -> bool {
-        todo!()
+        passes::key::modifiers_changed(self, window, modifiers)
     }
 
     pub fn key_pressed(
@@ -212,35 +230,35 @@ impl World {
         text: Option<&str>,
         pressed: bool,
     ) -> bool {
-        todo!()
+        passes::key::pressed(self, window, key, repeat, text, pressed)
     }
 }
 
 impl World {
     pub fn text_pasted(&mut self, window: WindowId, text: String) -> bool {
-        todo!()
+        passes::text::pasted(self, window, text)
     }
 
     pub fn ime_commit_text(&mut self, window: WindowId, text: String) -> bool {
-        todo!()
+        passes::text::ime_commit(self, window, text)
     }
 
     pub fn ime_select(&mut self, window: WindowId, selection: Range<usize>) -> bool {
-        todo!()
+        passes::text::ime_select(self, window, selection)
     }
 }
 
 impl World {
     pub fn touch_down(&mut self, window: WindowId, touch: TouchId, position: Point) -> bool {
-        todo!()
+        passes::touch::down(self, window, touch, position)
     }
 
     pub fn touch_up(&mut self, window: WindowId, touch: TouchId, position: Point) -> bool {
-        todo!()
+        passes::touch::up(self, window, touch, position)
     }
 
     pub fn touch_move(&mut self, window: WindowId, touch: TouchId, position: Point) -> bool {
-        todo!()
+        passes::touch::moved(self, window, touch, position)
     }
 }
 
@@ -252,6 +270,7 @@ impl World {
     pub fn draw(&mut self, window: WindowId, canvas: &mut dyn Canvas) -> Option<Size> {
         let size = passes::layout::layout_window(self, window, canvas.painter());
         passes::compose::compose_window(self, window);
+        passes::pointer::update_window_hovered(self, window);
         passes::draw::draw_window(self, window, canvas);
         passes::record::record_window(self, window, canvas);
 

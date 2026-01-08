@@ -44,7 +44,7 @@ pub(crate) fn compose_widget(widget: &mut WidgetMut<'_>, transform: Affine, scal
         compose_widget(child, global_transform, scale);
     });
 
-    passes::propagate::update_hirarchy(widget);
+    passes::propagate::update(widget);
 }
 
 pub(crate) fn place_widget(widget: &mut WidgetMut<'_>, mut transform: Affine, scale: f32) {

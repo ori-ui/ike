@@ -1,7 +1,4 @@
-use crate::{
-    AnyWidgetId, BuildCx, LayoutCx, Padding, Painter, Size, Space, Widget, WidgetMut,
-    build::SingleChild,
-};
+use crate::{AnyWidgetId, BuildCx, LayoutCx, Padding, Painter, Size, Space, Widget, WidgetMut};
 
 pub struct Pad {
     padding: Padding,
@@ -9,12 +6,11 @@ pub struct Pad {
 
 impl Pad {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        cx.insert_widget(
-            Pad {
-                padding: Padding::all(8.0),
-            },
-            child,
-        )
+        cx.build_widget(Pad {
+            padding: Padding::all(8.0),
+        })
+        .with_child(child)
+        .finish()
     }
 
     pub fn set_padding(this: &mut WidgetMut<Self>, padding: Padding) {
@@ -22,8 +18,6 @@ impl Pad {
         this.cx.request_layout();
     }
 }
-
-impl SingleChild for Pad {}
 
 impl Widget for Pad {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {

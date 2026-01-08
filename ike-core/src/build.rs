@@ -25,7 +25,7 @@ pub trait BuildCx {
         world.widgets.get_mut(&mut world.state, id)
     }
 
-    fn insert_widget<T>(&mut self, widget: T) -> WidgetMut<'_, T>
+    fn build_widget<T>(&mut self, widget: T) -> WidgetBuilder<'_, T>
     where
         Self: Sized,
         T: Widget,
@@ -33,18 +33,17 @@ pub trait BuildCx {
         let world = self.world_mut();
         let id = world.widgets.insert(widget);
 
-        world
-            .widgets
-            .get_mut(&mut world.state, id)
-            .expect("just above")
+        WidgetBuilder { world, id }
     }
 
-    fn remove_widget(&mut self, id: impl AnyWidgetId)
+    fn remove_widget(&mut self, widget: impl AnyWidgetId)
     where
         Self: Sized,
     {
         let world = self.world_mut();
-        world.widgets.remove(id.upcast());
+        let widget = widget.upcast();
+
+        passes::hierarchy::remove(world, widget);
     }
 
     fn add_child(&mut self, parent: impl AnyWidgetId, child: impl AnyWidgetId)
@@ -68,6 +67,18 @@ pub trait BuildCx {
             index,
             child.upcast(),
         );
+    }
+
+    fn children(&self, parent: impl AnyWidgetId) -> &[WidgetId]
+    where
+        Self: Sized,
+    {
+        let parent = parent.upcast();
+
+        self.world()
+            .widgets
+            .get_hierarchy(parent)
+            .map_or(&[], |hierarchy| &hierarchy.children)
     }
 
     fn is_parent(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
@@ -111,5 +122,39 @@ pub trait BuildCx {
     fn set_window_color(&mut self, window: WindowId, color: Color) {
         let state = &mut self.world_mut().state;
         state.set_window_color(window, color);
+    }
+}
+
+impl<T> BuildCx for &mut T
+where
+    T: BuildCx,
+{
+    fn world(&self) -> &World {
+        T::world(self)
+    }
+
+    fn world_mut(&mut self) -> &mut World {
+        T::world_mut(self)
+    }
+}
+
+pub struct WidgetBuilder<'a, T> {
+    world: &'a mut World,
+    id:    WidgetId<T>,
+}
+
+impl<'a, T> WidgetBuilder<'a, T> {
+    pub fn with_child(self, child: impl AnyWidgetId) -> Self {
+        self.world.add_child(self.id, child);
+        self
+    }
+
+    pub fn finish(self) -> WidgetMut<'a, T>
+    where
+        T: Widget,
+    {
+        self.world
+            .get_widget_mut(self.id)
+            .expect("widget cannot not have been removed")
     }
 }

@@ -53,13 +53,13 @@ where
             &mut old.contents,
         );
 
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
+        }
+
         let Some(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
-
-        if !widget.cx.is_child(*contents) {
-            widgets::Pad::set_child(&mut widget, *contents);
-        }
 
         if self.padding != old.padding {
             widgets::Pad::set_padding(&mut widget, self.padding);
@@ -87,11 +87,9 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if let Some(mut widget) = cx.get_widget_mut(*element)
-            && !widget.cx.is_child(*contents)
-        {
-            widgets::Pad::set_child(&mut widget, *contents);
-        };
+        if !cx.is_parent(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
+        }
 
         action
     }

@@ -1,6 +1,9 @@
 use core::f32;
 
-use crate::{Axis, BuildCx, LayoutCx, Painter, Size, Space, Widget, WidgetMut, build::Childless};
+use crate::{
+    Axis, BuildCx, LayoutCx, Painter, Size, Space, Update, UpdateCx, Widget, WidgetMut,
+    widget::ChildUpdate,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Justify {
@@ -31,17 +34,15 @@ pub struct Stack {
 
 impl Stack {
     pub fn new(cx: &mut impl BuildCx) -> WidgetMut<'_, Self> {
-        cx.insert_widget(
-            Self {
-                axis:    Axis::Vertical,
-                justify: Justify::Start,
-                align:   Align::Center,
-                gap:     0.0,
+        cx.build_widget(Self {
+            axis:    Axis::Vertical,
+            justify: Justify::Start,
+            align:   Align::Center,
+            gap:     0.0,
 
-                flex: Vec::new(),
-            },
-            (),
-        )
+            flex: Vec::new(),
+        })
+        .finish()
     }
 
     pub fn set_flex(this: &mut WidgetMut<Self>, index: usize, flex: f32, tight: bool) {
@@ -73,8 +74,6 @@ impl Stack {
         this.cx.request_layout();
     }
 }
-
-impl Childless for Stack {}
 
 impl Widget for Stack {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {
@@ -199,5 +198,23 @@ impl Widget for Stack {
         }
 
         self.axis.pack_size(major, minor)
+    }
+
+    fn update(&mut self, _cx: &mut UpdateCx<'_>, update: Update) {
+        if let Update::Children(update) = update {
+            match update {
+                ChildUpdate::Added(_) => {
+                    self.flex.push((0.0, false));
+                }
+
+                ChildUpdate::Removed(index) => {
+                    self.flex.remove(index);
+                }
+
+                ChildUpdate::Replaced(index) => {
+                    self.flex[index] = (0.0, false);
+                }
+            }
+        }
     }
 }

@@ -9,7 +9,7 @@ pub struct Label {
 
 impl Label {
     pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
-        cx.insert_widget(Self { paragraph }, ())
+        cx.build_widget(Self { paragraph }).finish()
     }
 
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {

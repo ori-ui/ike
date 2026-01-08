@@ -66,26 +66,24 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
     pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
         let cursor = paragraph.text.len();
 
-        cx.insert_widget(
-            Self {
-                paragraph,
-                selection_color: Color::BLUE,
-                cursor_color: Color::BLACK,
-                blink_rate: 5.0,
-                newline_behaviour: NewlineBehaviour::Enter,
-                submit_behaviour: SubmitBehaviour::default(),
+        cx.build_widget(Self {
+            paragraph,
+            selection_color: Color::BLUE,
+            cursor_color: Color::BLACK,
+            blink_rate: 5.0,
+            newline_behaviour: NewlineBehaviour::Enter,
+            submit_behaviour: SubmitBehaviour::default(),
 
-                on_change: None,
-                on_submit: None,
+            on_change: None,
+            on_submit: None,
 
-                lines: Vec::new(),
-                cursor,
-                selection: None,
-                blink: 0.0,
-                cursor_anchor: None,
-            },
-            (),
-        )
+            lines: Vec::new(),
+            cursor,
+            selection: None,
+            blink: 0.0,
+            cursor_anchor: None,
+        })
+        .finish()
     }
 
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {

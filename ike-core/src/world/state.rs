@@ -1,7 +1,10 @@
 use std::time::Instant;
 
+use cursor_icon::CursorIcon;
+
 use crate::{
     Color, Recorder, Signal, Window, WindowId, WindowSizing, WindowUpdate, debug::debug_panic,
+    event::TouchSettings,
 };
 
 pub struct WorldState {
@@ -9,10 +12,9 @@ pub struct WorldState {
 
     pub(super) windows: Vec<Window>,
 
-    pub should_trace: bool,
-    pub recorder:     Recorder,
-
-    pub(super) in_pass: bool,
+    pub should_trace:   bool,
+    pub touch_settings: TouchSettings,
+    pub recorder:       Recorder,
 }
 
 impl WorldState {
@@ -23,9 +25,8 @@ impl WorldState {
             windows: Vec::new(),
 
             should_trace: cfg!(debug_assertions),
+            touch_settings: TouchSettings::default(),
             recorder: Recorder::new(),
-
-            in_pass: false,
         }
     }
 }
@@ -90,6 +91,12 @@ impl WorldState {
     pub fn set_window_color(&mut self, window: WindowId, color: Color) {
         if let Some(window) = self.window_mut(window) {
             window.color = color;
+        }
+    }
+
+    pub fn set_window_cursor(&mut self, window: WindowId, cursor: CursorIcon) {
+        if let Some(window) = self.window_mut(window) {
+            window.cursor = cursor;
         }
     }
 }

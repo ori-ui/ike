@@ -24,22 +24,22 @@ impl Entry {
         let placeholder = Paragraph::new(16.0, TextAlign::Start, TextWrap::None);
         let placeholder = Label::new(cx, placeholder).id();
 
-        cx.insert_widget(
-            Entry {
-                text_area,
-                placeholder,
+        cx.build_widget(Entry {
+            text_area,
+            placeholder,
 
-                min_width: 100.0,
-                max_width: f32::INFINITY,
-                padding: Padding::all(8.0),
-                border_width: BorderWidth::all(1.0),
-                corner_radius: CornerRadius::all(8.0),
-                background_color: Color::WHITE,
-                border_color: Color::BLACK,
-                focus_color: Color::BLUE,
-            },
-            (text_area, placeholder),
-        )
+            min_width: 100.0,
+            max_width: f32::INFINITY,
+            padding: Padding::all(8.0),
+            border_width: BorderWidth::all(1.0),
+            corner_radius: CornerRadius::all(8.0),
+            background_color: Color::WHITE,
+            border_color: Color::BLACK,
+            focus_color: Color::BLUE,
+        })
+        .with_child(text_area)
+        .with_child(placeholder)
+        .finish()
     }
 
     pub fn set_placeholder(this: &mut WidgetMut<Self>, paragraph: Paragraph) {

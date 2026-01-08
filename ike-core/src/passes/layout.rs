@@ -107,7 +107,7 @@ pub(crate) fn layout_widget(
         widget.cx.hierarchy.request_draw();
     }
 
-    passes::propagate::update_hirarchy(widget);
+    passes::propagate::update(widget);
     widget.cx.state.size = size;
     widget.cx.state.previous_space = Some(space);
 

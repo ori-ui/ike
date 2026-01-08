@@ -4,7 +4,7 @@ use crate::{
     AnyWidgetId, Axis, BorderWidth, BuildCx, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
     EventCx, Gesture, LayoutCx, Padding, Paint, Painter, Point, PointerEvent, PointerPropagate,
     Rect, ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Update,
-    UpdateCx, Widget, WidgetMut, build::SingleChild,
+    UpdateCx, Widget, WidgetMut,
 };
 
 pub struct Scroll {
@@ -28,27 +28,26 @@ pub struct Scroll {
 
 impl Scroll {
     pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
-        cx.insert_widget(
-            Self {
-                axis:               Axis::Vertical,
-                bar_width:          16.0,
-                bar_padding:        Padding::all(4.0),
-                bar_border_width:   BorderWidth::all(1.0),
-                bar_corner_radius:  CornerRadius::all(0.0),
-                knob_corner_radius: CornerRadius::all(4.0),
-                bar_paint:          Paint::from(Color::WHITE),
-                bar_border_paint:   Paint::from(Color::BLACK),
-                knob_paint:         Paint::from(Color::BLACK),
+        cx.build_widget(Self {
+            axis:               Axis::Vertical,
+            bar_width:          16.0,
+            bar_padding:        Padding::all(4.0),
+            bar_border_width:   BorderWidth::all(1.0),
+            bar_corner_radius:  CornerRadius::all(0.0),
+            knob_corner_radius: CornerRadius::all(4.0),
+            bar_paint:          Paint::from(Color::WHITE),
+            bar_border_paint:   Paint::from(Color::BLACK),
+            knob_paint:         Paint::from(Color::BLACK),
 
-                knob_length:  0.0,
-                scroll_major: 0.0,
-                child_major:  0.0,
-                scroll:       Transitioned::new(0.0, Transition::ease(0.25)),
+            knob_length:  0.0,
+            scroll_major: 0.0,
+            child_major:  0.0,
+            scroll:       Transitioned::new(0.0, Transition::ease(0.25)),
 
-                drag_offset: 0.0,
-            },
-            child,
-        )
+            drag_offset: 0.0,
+        })
+        .with_child(child)
+        .finish()
     }
 
     pub fn set_axis(this: &mut WidgetMut<Self>, axis: Axis) {
@@ -151,8 +150,6 @@ impl Scroll {
         self.track_start() + self.knob_space() * self.scroll_fraction()
     }
 }
-
-impl SingleChild for Scroll {}
 
 impl Widget for Scroll {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, painter: &mut dyn Painter, space: Space) -> Size {

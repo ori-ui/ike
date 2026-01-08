@@ -43,7 +43,22 @@ impl WidgetFlags {
     }
 
     pub fn reset(&mut self) {
-        self.remove(Self::HAS_HOVERED | Self::HAS_FOCUSED | Self::HAS_ACTIVE)
+        self.remove(Self::HAS_HOVERED | Self::HAS_FOCUSED | Self::HAS_ACTIVE);
+
+        self.set(
+            Self::HAS_HOVERED,
+            self.contains(Self::IS_HOVERED),
+        );
+
+        self.set(
+            Self::HAS_FOCUSED,
+            self.contains(Self::IS_FOCUSED),
+        );
+
+        self.set(
+            Self::HAS_ACTIVE,
+            self.contains(Self::IS_ACTIVE),
+        );
     }
 
     pub fn propagate_down(&mut self, child: Self) {
@@ -154,6 +169,27 @@ impl WidgetHierarchy {
         self.flags.update(|flags| {
             // remove the NEEDS_DRAW flags
             flags.difference(WidgetFlags::NEEDS_DRAW)
+        })
+    }
+
+    pub fn set_hovered(&self, is_hovered: bool) {
+        self.flags.update(|mut flags| {
+            flags.set(WidgetFlags::IS_HOVERED, is_hovered);
+            flags
+        })
+    }
+
+    pub fn set_focused(&self, is_focused: bool) {
+        self.flags.update(|mut flags| {
+            flags.set(WidgetFlags::IS_FOCUSED, is_focused);
+            flags
+        })
+    }
+
+    pub fn set_active(&self, is_active: bool) {
+        self.flags.update(|mut flags| {
+            flags.set(WidgetFlags::IS_ACTIVE, is_active);
+            flags
         })
     }
 

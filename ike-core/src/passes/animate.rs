@@ -23,7 +23,7 @@ pub(crate) fn animate_widget_recursive(widget: &mut WidgetMut<'_>, delta_time: D
         animate_widget_recursive(child, delta_time);
     });
 
-    passes::propagate::update_hirarchy(widget);
+    passes::propagate::update(widget);
 
     let mut cx = widget.cx.as_update_cx();
     widget.widget.animate(&mut cx, delta_time);

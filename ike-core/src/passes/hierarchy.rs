@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::{WidgetId, WindowId, World};
+use crate::{Update, WidgetId, WindowId, World, debug::debug_panic, passes, widget::ChildUpdate};
 
 pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
     if let Some(child) = world.widgets.get_hierarchy_mut(child) {
@@ -12,10 +12,45 @@ pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
     }
 
     propagate_up(world, parent);
+
+    if let Some(mut widget) = world.widget_mut(parent) {
+        let index = widget.cx.hierarchy.children.len() - 1;
+        let update = Update::Children(ChildUpdate::Added(index));
+        passes::update::widget(&mut widget, update);
+    }
 }
 
 pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child: WidgetId) {
-    todo!()
+    let parent_id = parent;
+
+    let Some(parent) = world.widgets.get_hierarchy_mut(parent) else {
+        return;
+    };
+
+    // get the current child
+    let Some(current) = parent.children.get_mut(index) else {
+        debug_panic!("set_child called with invalid index");
+        return;
+    };
+
+    // replace the current child with the new child
+    let prev = mem::replace(current, child);
+
+    // unset the parent of the previous child
+    if let Some(prev) = world.widgets.get_hierarchy_mut(prev) {
+        prev.parent = None;
+    }
+
+    // set the parent of the new child
+    if let Some(child) = world.widgets.get_hierarchy_mut(child) {
+        child.parent = Some(parent_id);
+    }
+
+    // run update pass on the parent widget
+    if let Some(mut parent) = world.widget_mut(parent_id) {
+        let update = Update::Children(ChildUpdate::Replaced(index));
+        passes::update::widget(&mut parent, update);
+    }
 }
 
 /// Set the `window` of a `widget` and its descendants.
@@ -51,14 +86,6 @@ pub(crate) fn propagate_up(world: &mut World, widget: WidgetId) {
     }
 }
 
-pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize, index_b: usize) {
-    let Some(parent) = world.widgets.get_hierarchy_mut(parent) else {
-        return;
-    };
-
-    parent.children.swap(index_a, index_b);
-}
-
 pub(crate) fn remove(world: &mut World, widget: WidgetId) {
     let Some(widget) = world.widget(widget) else {
         return;
@@ -70,10 +97,15 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
     drop(widget);
 
     if let Some(parent) = parent
-        && let Some(parent) = world.widgets.get_hierarchy_mut(parent)
-        && let Some(index) = parent.children.iter().position(|child| *child == id)
+        && let Some(hierarchy) = world.widgets.get_hierarchy_mut(parent)
+        && let Some(index) = hierarchy.children.iter().position(|child| *child == id)
     {
-        parent.children.remove(index);
+        hierarchy.children.remove(index);
+
+        if let Some(mut parent) = world.widget_mut(parent) {
+            let update = Update::Children(ChildUpdate::Removed(index));
+            passes::update::widget(&mut parent, update);
+        }
     }
 
     world.widgets.remove(id);
