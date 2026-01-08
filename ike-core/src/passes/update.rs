@@ -18,6 +18,13 @@ pub(crate) fn widget_recursive(widget: &mut WidgetMut<'_>, update: &Update) {
     });
 
     passes::propagate::update(widget);
+
+    if let Update::WindowScaled(..) = update
+        && widget.cx.is_pixel_perfect()
+    {
+        widget.cx.hierarchy.request_layout();
+    }
+
     self::widget(widget, update.clone());
 }
 
