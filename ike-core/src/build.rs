@@ -93,7 +93,7 @@ pub trait BuildCx {
             .map_or(&[], |hierarchy| &hierarchy.children)
     }
 
-    fn is_parent(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
+    fn is_child(&self, parent: impl AnyWidgetId, child: impl AnyWidgetId) -> bool
     where
         Self: Sized,
     {

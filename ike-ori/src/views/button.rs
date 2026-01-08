@@ -248,7 +248,7 @@ where
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ButtonTheme>();
 
-        if !cx.is_parent(*element, *contents) {
+        if !cx.is_child(*element, *contents) {
             cx.set_child(*element, 0, *contents);
         }
 
@@ -323,7 +323,7 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if !cx.is_parent(*element, *contents) {
+        if !cx.is_child(*element, *contents) {
             cx.set_child(*element, 0, *contents);
         }
 

@@ -24,7 +24,7 @@ pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
 }
 
 pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child: WidgetId) {
-    debug_assert!(!world.is_parent(parent, child));
+    debug_assert!(!world.is_child(parent, child));
 
     let parent_id = parent;
 

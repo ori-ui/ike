@@ -157,7 +157,7 @@ fn update_children(
     children: &mut impl ElementSeq<Flex<WidgetId>>,
 ) {
     for child in children.iter() {
-        if !cx.is_parent(widget, child.contents) {
+        if !cx.is_child(widget, child.contents) {
             cx.add_child(widget, child.contents);
         }
     }

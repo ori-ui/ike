@@ -174,7 +174,7 @@ where
             &mut old.contents,
         );
 
-        if !cx.is_parent(*element, *contents) {
+        if !cx.is_child(*element, *contents) {
             cx.set_child(*element, 0, *contents);
         }
 
@@ -220,7 +220,7 @@ where
     ) -> ori::Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if !cx.is_parent(*element, *contents) {
+        if !cx.is_child(*element, *contents) {
             cx.set_child(*element, 0, *contents);
         }
 
