@@ -1,6 +1,6 @@
 use std::ops::Add;
 
-use crate::{Offset, Size};
+use crate::{LayoutCx, Offset, Size, Space};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CornerRadius {
@@ -76,6 +76,18 @@ impl BorderWidth {
         )
     }
 
+    pub fn layout_down(self, cx: &LayoutCx<'_>, space: Space) -> Space {
+        let size = Size::new(self.left, self.top).pixel_align(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_align(cx.scale());
+
+        space.shrink(size)
+    }
+
+    pub fn layout_up(self, cx: &LayoutCx<'_>, size: Size) -> Size {
+        size + Size::new(self.left, self.top).pixel_align(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_align(cx.scale())
+    }
+
     pub const fn offset(self) -> Offset {
         Offset::new(self.left, self.top)
     }
@@ -132,6 +144,18 @@ impl Padding {
             self.left + self.right,
             self.top + self.bottom,
         )
+    }
+
+    pub fn layout_down(self, cx: &LayoutCx<'_>, space: Space) -> Space {
+        let size = Size::new(self.left, self.top).pixel_align(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_align(cx.scale());
+
+        space.shrink(size)
+    }
+
+    pub fn layout_up(self, cx: &LayoutCx<'_>, size: Size) -> Size {
+        size + Size::new(self.left, self.top).pixel_align(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_align(cx.scale())
     }
 
     pub const fn offset(self) -> Offset {

@@ -49,7 +49,7 @@ pub(crate) fn compose_widget(widget: &mut WidgetMut<'_>, transform: Affine, scal
 
 pub(crate) fn place_widget(widget: &mut WidgetMut<'_>, mut transform: Affine, scale: f32) {
     if widget.cx.state.is_pixel_perfect {
-        transform.offset = transform.offset.round_to_scale(scale);
+        transform.offset = transform.offset.pixel_align(scale);
     }
 
     if widget.cx.state.transform != transform {

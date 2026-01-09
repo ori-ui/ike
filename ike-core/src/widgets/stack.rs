@@ -177,7 +177,7 @@ impl Widget for Stack {
         };
 
         for i in 0..child_count {
-            let size = cx.child_size(i);
+            let size = cx.get_child(i).map_or(Size::ZERO, |child| child.cx.size());
             let (child_major, child_minor) = self.axis.unpack_size(size);
 
             let excess_minor = minor - child_minor;

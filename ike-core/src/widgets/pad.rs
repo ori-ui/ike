@@ -21,9 +21,9 @@ impl Pad {
 
 impl Widget for Pad {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
-        let space = space.shrink(self.padding.size());
+        let space = self.padding.layout_down(cx, space);
         let size = cx.layout_child(0, space);
         cx.place_child(0, self.padding.offset());
-        size + self.padding.size()
+        self.padding.layout_up(cx, size)
     }
 }

@@ -151,7 +151,9 @@ impl Entry {
 
 impl Widget for Entry {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
-        let mut space = space.shrink(self.padding.size() + self.border_width.size());
+        let mut space = self.padding.layout_down(cx, space);
+        space = self.border_width.layout_down(cx, space);
+
         space.min.width = space.min.width.max(self.min_width);
         space.max.width = space.max.width.min(self.max_width);
         space.min.width = space.min.width.min(space.max.width);
@@ -175,7 +177,9 @@ impl Widget for Entry {
             self.padding.offset() + self.border_width.offset(),
         );
 
-        text_size.max(placeholder_size) + self.padding.size() + self.border_width.size()
+        let size = text_size.max(placeholder_size);
+        let size = self.padding.layout_up(cx, size);
+        self.border_width.layout_up(cx, size)
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {

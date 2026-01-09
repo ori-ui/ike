@@ -226,6 +226,10 @@ impl LayoutCx<'_> {
         self.painter.measure_svg(svg)
     }
 
+    pub fn scale(&self) -> f32 {
+        self.scale
+    }
+
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
         if let Some(child) = self.hierarchy.children.get(index)
             && let Some(mut child) = self.widgets.get_mut(self.world, *child)
@@ -263,22 +267,16 @@ impl LayoutCx<'_> {
         }
     }
 
-    pub fn child_size(&self, index: usize) -> Size {
-        if let Some(child) = self.hierarchy.children.get(index)
-            && let Some(child) = self.get_widget(*child)
-        {
-            child.cx.state.size
-        } else {
-            Size::ZERO
-        }
-    }
-
     pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
         self.state.clip = rect.into();
     }
 }
 
 impl ComposeCx<'_> {
+    pub fn scale(&self) -> f32 {
+        self.scale
+    }
+
     pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
         if let Some(child) = self.hierarchy.children.get(index)
             && let Some(mut child) = self.widgets.get_mut(self.world, *child)
