@@ -1,5 +1,5 @@
 use crate::{
-    BuildCx, Canvas, DrawCx, LayoutCx, Offset, Paragraph, Point, Rect, Size, Space, Widget,
+    Builder, Canvas, DrawCx, LayoutCx, Offset, Paragraph, Point, Rect, Size, Space, Widget,
     WidgetMut,
 };
 
@@ -8,7 +8,7 @@ pub struct Label {
 }
 
 impl Label {
-    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, paragraph: Paragraph) -> WidgetMut<'_, Self> {
         cx.build_widget(Self { paragraph }).finish()
     }
 

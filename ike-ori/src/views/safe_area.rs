@@ -1,39 +1,33 @@
-use ike_core::{AnyWidgetId, Builder, Padding, WidgetId, widgets};
+use ike_core::{AnyWidgetId, Builder, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
 
-pub fn pad<V>(padding: impl Into<Padding>, contents: V) -> Pad<V> {
-    Pad::new(padding, contents)
+pub fn safe_area<V>(contents: V) -> SafeArea<V> {
+    SafeArea::new(contents)
 }
 
-pub struct Pad<V> {
+pub struct SafeArea<V> {
     contents: V,
-    padding:  Padding,
 }
 
-impl<V> Pad<V> {
-    pub fn new(padding: impl Into<Padding>, contents: V) -> Self {
-        Self {
-            contents,
-            padding: padding.into(),
-        }
+impl<V> SafeArea<V> {
+    pub fn new(contents: V) -> Self {
+        Self { contents }
     }
 }
 
-impl<V> ViewMarker for Pad<V> {}
-impl<C, T, V> View<C, T> for Pad<V>
+impl<V> ViewMarker for SafeArea<V> {}
+impl<C, T, V> View<C, T> for SafeArea<V>
 where
     C: Builder,
     V: View<C, T, Element: AnyWidgetId>,
 {
-    type Element = WidgetId<widgets::Pad>;
+    type Element = WidgetId<widgets::SafeArea>;
     type State = (V::Element, V::State);
 
     fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
-        let mut widget = widgets::Pad::new(cx, contents);
-
-        widgets::Pad::set_padding(&mut widget, self.padding);
+        let widget = widgets::SafeArea::new(cx, contents);
 
         (widget.id(), (contents, state))
     }
@@ -57,14 +51,6 @@ where
         if !cx.is_child(*element, *contents) {
             cx.set_child(*element, 0, *contents);
         }
-
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
-            return;
-        };
-
-        if self.padding != old.padding {
-            widgets::Pad::set_padding(&mut widget, self.padding);
-        }
     }
 
     fn teardown(
@@ -80,18 +66,12 @@ where
 
     fn event(
         &mut self,
-        element: &mut Self::Element,
+        _element: &mut Self::Element,
         (contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        let action = self.contents.event(contents, state, cx, data, event);
-
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
-
-        action
+        self.contents.event(contents, state, cx, data, event)
     }
 }

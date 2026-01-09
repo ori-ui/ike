@@ -1,7 +1,7 @@
 use std::mem;
 
 use crate::{
-    BuildCx, Update, Widget, WidgetId, WidgetMut, WindowId, World, debug::debug_panic, passes,
+    Builder, Update, Widget, WidgetId, WidgetMut, WindowId, World, debug::debug_panic, passes,
     widget::ChildUpdate, world::Widgets,
 };
 

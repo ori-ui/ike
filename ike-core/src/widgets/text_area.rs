@@ -3,7 +3,7 @@ use std::time::Duration;
 use keyboard_types::NamedKey;
 
 use crate::{
-    BuildCx, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Gesture, ImeEvent, Key,
+    Builder, Canvas, Color, CornerRadius, CursorIcon, DrawCx, EventCx, Gesture, ImeEvent, Key,
     KeyEvent, LayoutCx, MutCx, Offset, Paint, Paragraph, Point, PointerEvent, PointerPropagate,
     Propagate, Rect, Size, Space, TextLayoutLine, TouchEvent, TouchPropagate, Update, UpdateCx,
     Widget, WidgetMut, event::TextEvent,
@@ -63,7 +63,7 @@ pub struct TextArea<const EDITABLE: bool> {
 }
 
 impl<const EDITABLE: bool> TextArea<EDITABLE> {
-    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, paragraph: Paragraph) -> WidgetMut<'_, Self> {
         let cursor = paragraph.text.len();
 
         cx.build_widget(Self {

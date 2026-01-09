@@ -1,5 +1,5 @@
 use crate::{
-    Affine, Blend, BuildCx, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Recording, Shader,
+    Affine, Blend, Builder, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Recording, Shader,
     Size, Space, Svg, SvgData, Widget, WidgetMut,
 };
 
@@ -37,7 +37,7 @@ pub struct Picture {
 }
 
 impl Picture {
-    pub fn new(cx: &mut impl BuildCx, contents: Picturable) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, contents: Picturable) -> WidgetMut<'_, Self> {
         cx.build_widget(Self {
             contents,
             fit: Fit::None,

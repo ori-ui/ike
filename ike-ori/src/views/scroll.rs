@@ -1,5 +1,5 @@
 use ike_core::{
-    AnyWidgetId, Axis, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId,
+    AnyWidgetId, Axis, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId,
     widgets,
 };
 use ori::{Action, Event, Providable, View, ViewMarker};
@@ -164,7 +164,7 @@ impl<V> Scroll<V> {
 impl<V> ViewMarker for Scroll<V> {}
 impl<C, T, V> View<C, T> for Scroll<V>
 where
-    C: BuildCx + Providable,
+    C: Builder + Providable,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Scroll>;

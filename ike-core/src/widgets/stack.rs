@@ -1,5 +1,5 @@
 use crate::{
-    Axis, BuildCx, LayoutCx, Size, Space, Update, UpdateCx, Widget, WidgetMut, widget::ChildUpdate,
+    Axis, Builder, LayoutCx, Size, Space, Update, UpdateCx, Widget, WidgetMut, widget::ChildUpdate,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,7 +30,7 @@ pub struct Stack {
 }
 
 impl Stack {
-    pub fn new(cx: &mut impl BuildCx) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder) -> WidgetMut<'_, Self> {
         cx.build_widget(Self {
             axis:    Axis::Vertical,
             justify: Justify::Start,

@@ -1,5 +1,5 @@
 use crate::{
-    Axis, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Paint, Rect, Size, Space, Widget,
+    Axis, Builder, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Paint, Rect, Size, Space, Widget,
     WidgetMut,
 };
 
@@ -12,7 +12,7 @@ pub struct Divider {
 }
 
 impl Divider {
-    pub fn new(cx: &mut impl BuildCx) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder) -> WidgetMut<'_, Self> {
         cx.build_widget(Self {
             axis:          Axis::Horizontal,
             thickness:     2.0,

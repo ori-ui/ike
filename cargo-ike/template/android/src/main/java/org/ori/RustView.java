@@ -10,7 +10,6 @@ import android.view.KeyEvent;
 
 public final class RustView extends View {
     final InputMethodManager inputMethodManager;
-    long context;
 
     public RustView(Context context) {
         super(context);
@@ -27,6 +26,10 @@ public final class RustView extends View {
 
         return new RustInputConnection(this);
     }
+
+    public native void onApplyWindowInsetsNative(int systemBarsLeft, int systemBarsTop, int systemBarsRight,
+            int systemBarsBottom, int imeLeft, int imeTop, int imeRight, int imeBottom, int cutoutLeft, int cutoutTop,
+            int cutoutRight, int cutoutBottom);
 
     public native String getTextBeforeCursorNative(int n, int flags);
 

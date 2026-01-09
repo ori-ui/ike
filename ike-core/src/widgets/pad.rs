@@ -1,11 +1,11 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Padding, Size, Space, Widget, WidgetMut};
+use crate::{AnyWidgetId, Builder, LayoutCx, Padding, Size, Space, Widget, WidgetMut};
 
 pub struct Pad {
     padding: Padding,
 }
 
 impl Pad {
-    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
         cx.build_widget(Pad {
             padding: Padding::all(8.0),
         })

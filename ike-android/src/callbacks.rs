@@ -1,4 +1,4 @@
-use crate::{Event, GLOBAL_STATE, InputQueueEvent, WindowEvent};
+use crate::{Event, InputQueueEvent, WindowEvent, send_event};
 
 pub fn register_callbacks(activity: &mut ndk_sys::ANativeActivity) {
     let callbacks = unsafe { &mut *activity.callbacks };
@@ -13,24 +13,15 @@ pub fn register_callbacks(activity: &mut ndk_sys::ANativeActivity) {
     callbacks.onInputQueueDestroyed = Some(on_input_queue_destroyed);
 }
 
-fn send(event: Event) {
-    let global_state = GLOBAL_STATE.get().expect("GLOBAL_STATE has not been set");
-    let _ = global_state.sender.send(event);
-
-    if let Some(ref wake) = *global_state.waker.lock() {
-        wake();
-    }
-}
-
 unsafe extern "C" fn on_resume(_activity: *mut ndk_sys::ANativeActivity) {
-    send(Event::Resumed);
+    send_event(Event::Resumed);
 }
 
 unsafe extern "C" fn on_window_created(
     _activity: *mut ndk_sys::ANativeActivity,
     window: *mut ndk_sys::ANativeWindow,
 ) {
-    send(Event::Window(WindowEvent::Created(
+    send_event(Event::Window(WindowEvent::Created(
         window,
     )));
 }
@@ -39,28 +30,28 @@ unsafe extern "C" fn on_window_destroyed(
     _activity: *mut ndk_sys::ANativeActivity,
     _window: *mut ndk_sys::ANativeWindow,
 ) {
-    send(Event::Window(WindowEvent::Destroyed));
+    send_event(Event::Window(WindowEvent::Destroyed));
 }
 
 unsafe extern "C" fn on_window_redraw_needed(
     _activity: *mut ndk_sys::ANativeActivity,
     _window: *mut ndk_sys::ANativeWindow,
 ) {
-    send(Event::Window(WindowEvent::Redraw));
+    send_event(Event::Window(WindowEvent::Redraw));
 }
 
 unsafe extern "C" fn on_window_resized(
     _activity: *mut ndk_sys::ANativeActivity,
     _window: *mut ndk_sys::ANativeWindow,
 ) {
-    send(Event::Window(WindowEvent::Resized));
+    send_event(Event::Window(WindowEvent::Resized));
 }
 
 unsafe extern "C" fn on_window_focus_changed(
     _activity: *mut ndk_sys::ANativeActivity,
     focused: i32,
 ) {
-    send(Event::Window(
+    send_event(Event::Window(
         WindowEvent::FocusChanged(focused > 0),
     ));
 }
@@ -69,7 +60,7 @@ unsafe extern "C" fn on_input_queue_created(
     _activity: *mut ndk_sys::ANativeActivity,
     queue: *mut ndk_sys::AInputQueue,
 ) {
-    send(Event::InputQueue(
+    send_event(Event::InputQueue(
         InputQueueEvent::Created(queue),
     ));
 }
@@ -78,7 +69,7 @@ unsafe extern "C" fn on_input_queue_destroyed(
     _activity: *mut ndk_sys::ANativeActivity,
     queue: *mut ndk_sys::AInputQueue,
 ) {
-    send(Event::InputQueue(
+    send_event(Event::InputQueue(
         InputQueueEvent::Destroyed(queue),
     ));
 }

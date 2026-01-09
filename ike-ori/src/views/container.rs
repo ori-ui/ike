@@ -1,5 +1,5 @@
 use ike_core::{
-    AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, WidgetId, widgets,
+    AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, WidgetId, widgets,
 };
 use ori::{Action, Event, Providable, View, ViewMarker};
 
@@ -103,7 +103,7 @@ impl<V> Container<V> {
 impl<V> ViewMarker for Container<V> {}
 impl<C, T, V> View<C, T> for Container<V>
 where
-    C: BuildCx + Providable,
+    C: Builder + Providable,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Container>;

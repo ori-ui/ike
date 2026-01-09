@@ -1,9 +1,10 @@
 use std::{ffi, ptr};
 
-use ike_core::Size;
+use ike_core::{Point, Rect, Size};
+use jni::{JNIEnv, objects::JObject};
 use raw_window_handle::{AndroidNdkWindowHandle, DisplayHandle, RawWindowHandle, WindowHandle};
 
-use crate::{Event, EventLoop, Window, WindowState, context::Proxy};
+use crate::{Event, EventLoop, Window, WindowState, context::Proxy, send_event};
 
 #[derive(Debug)]
 pub(super) enum WindowEvent {
@@ -12,6 +13,11 @@ pub(super) enum WindowEvent {
     Redraw,
     Resized,
     FocusChanged(bool),
+    InsetsChanged {
+        system_bars: Rect,
+        ime:         Rect,
+        cutout:      Rect,
+    },
     RenderFinished,
 }
 
@@ -177,6 +183,43 @@ impl<'a, T> EventLoop<'a, T> {
                 }
             }
 
+            WindowEvent::InsetsChanged {
+                system_bars,
+                ime,
+                cutout,
+            } => {
+                tracing::trace!(
+                    ?system_bars,
+                    ?ime,
+                    ?cutout,
+                    "insets changed",
+                );
+
+                if let WindowState::Open(ref mut window) = self.window {
+                    let mut safe_area = Rect::min_size(
+                        Point::ORIGIN,
+                        Size::new(
+                            window.width as f32,
+                            window.height as f32,
+                        ),
+                    );
+
+                    safe_area.min.x += system_bars.left() + ime.left() + cutout.left();
+                    safe_area.min.y += system_bars.top() + ime.top() + cutout.top();
+                    safe_area.max.x -= system_bars.right() + ime.right() + cutout.right();
+                    safe_area.max.y -= system_bars.bottom().max(ime.bottom()) + cutout.bottom();
+
+                    safe_area.min.x /= self.scale_factor;
+                    safe_area.min.y /= self.scale_factor;
+                    safe_area.max.x /= self.scale_factor;
+                    safe_area.max.y /= self.scale_factor;
+
+                    if let Some(id) = window.id {
+                        (self.context.world).window_safe_area_changed(id, Some(safe_area));
+                    }
+                }
+            }
+
             WindowEvent::FocusChanged(focused) => {
                 tracing::trace!(focused, "window focus changed");
 
@@ -209,5 +252,63 @@ unsafe extern "C" fn frame_callback(_frame_time_nanos: i64, data: *mut ffi::c_vo
     let proxy = unsafe { &*data.cast::<Proxy>() };
     proxy.send(Event::Window(
         WindowEvent::RenderFinished,
+    ));
+}
+
+pub unsafe extern "C" fn on_apply_window_insets<'local>(
+    _env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
+    system_bars_left: i32,
+    system_bars_top: i32,
+    system_bars_right: i32,
+    system_bars_bottom: i32,
+    ime_left: i32,
+    ime_top: i32,
+    ime_right: i32,
+    ime_bottom: i32,
+    cutout_left: i32,
+    cutout_top: i32,
+    cutout_right: i32,
+    cutout_bottom: i32,
+) {
+    let system_bars = Rect {
+        min: Point {
+            x: system_bars_left as f32,
+            y: system_bars_top as f32,
+        },
+        max: Point {
+            x: system_bars_right as f32,
+            y: system_bars_bottom as f32,
+        },
+    };
+
+    let ime = Rect {
+        min: Point {
+            x: ime_left as f32,
+            y: ime_top as f32,
+        },
+        max: Point {
+            x: ime_right as f32,
+            y: ime_bottom as f32,
+        },
+    };
+
+    let cutout = Rect {
+        min: Point {
+            x: cutout_left as f32,
+            y: cutout_top as f32,
+        },
+        max: Point {
+            x: cutout_right as f32,
+            y: cutout_bottom as f32,
+        },
+    };
+
+    send_event(Event::Window(
+        WindowEvent::InsetsChanged {
+            system_bars,
+            ime,
+            cutout,
+        },
     ));
 }

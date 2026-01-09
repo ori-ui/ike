@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use ike_core::{AnyWidgetId, BuildCx, WidgetId, World};
+use ike_core::{AnyWidgetId, Builder, WidgetId, World};
 use ori::{Providable, Proxy, Proxyable, Super};
 
 use crate::Resources;
@@ -11,7 +11,7 @@ pub struct Context {
     pub resources: Resources,
 }
 
-impl BuildCx for Context {
+impl Builder for Context {
     fn world(&self) -> &World {
         &self.world
     }

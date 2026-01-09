@@ -1,5 +1,5 @@
 use crate::{
-    AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding,
+    AnyWidgetId, BorderWidth, Builder, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding,
     Paint, Size, Space, Widget, WidgetMut,
 };
 
@@ -12,7 +12,7 @@ pub struct Container {
 }
 
 impl Container {
-    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
         cx.build_widget(Container {
             padding:          Padding::all(8.0),
             border_width:     BorderWidth::all(1.0),

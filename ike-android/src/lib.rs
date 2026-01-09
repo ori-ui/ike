@@ -18,6 +18,7 @@ mod context;
 mod ime;
 mod input;
 mod log;
+mod native;
 mod window;
 
 use jni::JavaVM;
@@ -42,6 +43,17 @@ struct ActivityState {
     receiver: Receiver<Event>,
     sender:   Sender<Event>,
     waker:    Mutex<Option<Box<dyn Fn() + Send>>>,
+
+    ime: Ime,
+}
+
+fn send_event(event: Event) {
+    let global_state = GLOBAL_STATE.get().expect("GLOBAL_STATE has not been set");
+    let _ = global_state.sender.send(event);
+
+    if let Some(ref wake) = *global_state.waker.lock() {
+        wake();
+    }
 }
 
 unsafe impl Send for ActivityState {}
@@ -90,13 +102,20 @@ where
         receiver,
         sender,
         waker: Default::default(),
+
+        ime: Ime::new(),
     };
 
     GLOBAL_STATE
         .set(state)
         .unwrap_or_else(|_| panic!("android main should never called twice"));
 
-    unsafe { callbacks::register_callbacks(native_activity.as_mut()) };
+    unsafe {
+        callbacks::register_callbacks(native_activity.as_mut());
+
+        let jvm = JavaVM::from_raw(native_activity.as_ref().vm).expect("failed getting jvm");
+        native::init(&jvm, native_activity).expect("failed to register callbacks");
+    }
 
     std::thread::spawn(move || {
         let exit_code = main().report();
@@ -167,16 +186,7 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     let mut view = build(data);
     let (_, state) = view.any_build(&mut context, data);
 
-    let (jvm, ime) = unsafe {
-        let jvm = JavaVM::from_raw(global_state.activity.as_ref().vm)?;
-        let ime = ime::init(
-            &jvm,
-            global_state.activity,
-            proxy.clone(),
-        )?;
-
-        (jvm, ime)
-    };
+    let jvm = unsafe { JavaVM::from_raw(global_state.activity.as_ref().vm)? };
 
     let mut event_loop = EventLoop {
         data,
@@ -188,10 +198,10 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
         context,
         proxy,
 
+        global_state,
         native_activity: global_state.activity,
         looper,
         jvm,
-        ime,
 
         choreographer: None,
         is_rendering: false,
@@ -225,10 +235,10 @@ struct EventLoop<'a, T> {
     context: ike_ori::Context,
     proxy:   Proxy,
 
+    global_state:    &'static ActivityState,
     native_activity: NonNull<ndk_sys::ANativeActivity>,
     looper:          *mut ndk_sys::ALooper,
     jvm:             JavaVM,
-    ime:             &'static Ime,
 
     choreographer: Option<NonNull<ndk_sys::AChoreographer>>,
     is_rendering:  bool,
@@ -290,6 +300,10 @@ impl fmt::Debug for Event {
 }
 
 impl<'a, T> EventLoop<'a, T> {
+    fn ime(&self) -> &Ime {
+        &self.global_state.ime
+    }
+
     fn run(&mut self) {
         unsafe {
             let proxy = Box::new(self.proxy.clone());

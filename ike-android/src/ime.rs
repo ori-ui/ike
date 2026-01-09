@@ -1,13 +1,13 @@
-use std::{ffi, ops::Range, ptr::NonNull};
+use std::ops::Range;
 
 use ike_core::{ImeSignal, Key, NamedKey};
 use jni::{
-    JNIEnv, JavaVM,
-    objects::{JClass, JObject, JString},
+    JNIEnv,
+    objects::{JObject, JString},
 };
 use parking_lot::Mutex;
 
-use crate::{Event, EventLoop, WindowState, context::Proxy};
+use crate::{Event, EventLoop, GLOBAL_STATE, WindowState, native, send_event};
 
 #[derive(Debug)]
 pub(super) enum ImeEvent {
@@ -18,11 +18,20 @@ pub(super) enum ImeEvent {
 }
 
 pub(super) struct Ime {
-    proxy: Proxy,
     state: Mutex<ImeState>,
 }
 
 impl Ime {
+    pub fn new() -> Self {
+        Self {
+            state: Mutex::new(ImeState {
+                text:      String::new(),
+                selection: 0..0,
+                composing: None,
+            }),
+        }
+    }
+
     pub fn selection(&self) -> Range<usize> {
         self.state.lock().selection.clone()
     }
@@ -111,7 +120,7 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     };
 
-                    let selection = self.ime.selection();
+                    let selection = self.ime().selection();
 
                     if selection.start != selection.end {
                         self.context.world.ime_commit_text(id, String::new());
@@ -119,13 +128,13 @@ impl<'a, T> EventLoop<'a, T> {
                     }
 
                     if before != 0 {
-                        let start = self.ime.index_n_chars_before(before);
+                        let start = self.ime().index_n_chars_before(before);
                         self.context.world.ime_select(id, start..selection.start);
                         self.context.world.ime_commit_text(id, String::new());
                     }
 
                     if after != 0 {
-                        let end = self.ime.index_n_chars_after(after);
+                        let end = self.ime().index_n_chars_after(after);
                         self.context.world.ime_select(id, selection.end..end);
                         self.context.world.ime_commit_text(id, String::new());
                     }
@@ -152,7 +161,7 @@ impl<'a, T> EventLoop<'a, T> {
                         return;
                     };
 
-                    self.ime.set_selection(start..end);
+                    self.ime().set_selection(start..end);
                     self.context.world.ime_select(id, start..end);
                 }
             }
@@ -199,11 +208,11 @@ impl<'a, T> EventLoop<'a, T> {
             ImeSignal::Area(..) => {}
 
             ImeSignal::Text(text) => {
-                self.ime.set_text(text);
+                self.ime().set_text(text);
 
                 if let Ok(mut env) = self.jvm.attach_current_thread() {
-                    let selection = self.ime.selection();
-                    let compose = self.ime.composing();
+                    let selection = self.ime().selection();
+                    let compose = self.ime().composing();
 
                     let _ = self.update_selection(
                         &mut env,
@@ -219,13 +228,13 @@ impl<'a, T> EventLoop<'a, T> {
                 selection,
                 composing: compose,
             } => {
-                if self.ime.selection() == selection && self.ime.composing() == compose {
+                if self.ime().selection() == selection && self.ime().composing() == compose {
                     return;
                 }
 
                 if let Ok(mut env) = self.jvm.attach_current_thread() {
-                    self.ime.set_selection(selection.clone());
-                    self.ime.set_composing(compose.clone());
+                    self.ime().set_selection(selection.clone());
+                    self.ime().set_composing(compose.clone());
 
                     let _ = self.update_selection(
                         &mut env,
@@ -242,8 +251,8 @@ impl<'a, T> EventLoop<'a, T> {
     }
 
     fn is_soft_input_active(&self, env: &mut JNIEnv<'_>) -> jni::errors::Result<bool> {
-        let activity = unsafe { native_activity(self.native_activity) };
-        let view = rust_view(env, &activity)?;
+        let activity = unsafe { native::native_activity(self.native_activity) };
+        let view = native::rust_view(env, &activity)?;
         let imm = self.input_method_manager(env, &view)?;
 
         env.call_method(
@@ -256,8 +265,8 @@ impl<'a, T> EventLoop<'a, T> {
     }
 
     fn show_soft_input(&self, env: &mut JNIEnv<'_>, flags: i32) -> jni::errors::Result<bool> {
-        let activity = unsafe { native_activity(self.native_activity) };
-        let view = rust_view(env, &activity)?;
+        let activity = unsafe { native::native_activity(self.native_activity) };
+        let view = native::rust_view(env, &activity)?;
         let imm = self.input_method_manager(env, &view)?;
 
         env.call_method(
@@ -270,8 +279,8 @@ impl<'a, T> EventLoop<'a, T> {
     }
 
     fn hide_soft_input(&self, env: &mut JNIEnv<'_>, flags: i32) -> jni::errors::Result<bool> {
-        let activity = unsafe { native_activity(self.native_activity) };
-        let view = rust_view(env, &activity)?;
+        let activity = unsafe { native::native_activity(self.native_activity) };
+        let view = native::rust_view(env, &activity)?;
         let window = self.window_token(env, &view)?;
         let imm = self.input_method_manager(env, &view)?;
 
@@ -285,8 +294,8 @@ impl<'a, T> EventLoop<'a, T> {
     }
 
     fn restart_input(&self, env: &mut JNIEnv<'_>) -> jni::errors::Result<()> {
-        let activity = unsafe { native_activity(self.native_activity) };
-        let view = rust_view(env, &activity)?;
+        let activity = unsafe { native::native_activity(self.native_activity) };
+        let view = native::rust_view(env, &activity)?;
         let imm = self.input_method_manager(env, &view)?;
 
         env.call_method(
@@ -306,8 +315,8 @@ impl<'a, T> EventLoop<'a, T> {
         compose_start: i32,
         compose_end: i32,
     ) -> jni::errors::Result<()> {
-        let activity = unsafe { native_activity(self.native_activity) };
-        let view = rust_view(env, &activity)?;
+        let activity = unsafe { native::native_activity(self.native_activity) };
+        let view = native::rust_view(env, &activity)?;
         let imm = self.input_method_manager(env, &view)?;
 
         env.call_method(
@@ -353,152 +362,17 @@ impl<'a, T> EventLoop<'a, T> {
     }
 }
 
-pub unsafe fn init(
-    jvm: &JavaVM,
-    activity: NonNull<ndk_sys::ANativeActivity>,
-    proxy: Proxy,
-) -> jni::errors::Result<&'static Ime> {
-    let activity = unsafe { native_activity(activity) };
-
-    let mut env = jvm.attach_current_thread()?;
-    let rust_view = rust_view(&mut env, &activity)?;
-
-    let context = Ime {
-        proxy,
-        state: Mutex::new(ImeState {
-            text:      String::new(),
-            selection: 0..0,
-            composing: None,
-        }),
-    };
-
-    let context: &Ime = Box::leak(Box::new(context));
-
-    env.set_field(
-        &rust_view,
-        "context",
-        "J",
-        (context as *const Ime as i64).into(),
-    )?;
-
-    let class_name = env.new_string("org.ori.RustView")?;
-    let class_loader = env
-        .call_method(
-            activity,
-            "getClassLoader",
-            "()Ljava/lang/ClassLoader;",
-            &[],
-        )?
-        .l()?;
-
-    let class = env
-        .call_method(
-            class_loader,
-            "loadClass",
-            "(Ljava/lang/String;)Ljava/lang/Class;",
-            &[(&class_name).into()],
-        )?
-        .l()?;
-
-    env.register_native_methods(
-        JClass::from(class),
-        &[
-            jni::NativeMethod {
-                name:   "getTextBeforeCursorNative".into(),
-                sig:    "(II)Ljava/lang/String;".into(),
-                fn_ptr: get_text_before_cursor as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "getTextAfterCursorNative".into(),
-                sig:    "(II)Ljava/lang/String;".into(),
-                fn_ptr: get_text_after_cursor as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "getSelectedTextNative".into(),
-                sig:    "(I)Ljava/lang/String;".into(),
-                fn_ptr: get_selected_text as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "commitTextNative".into(),
-                sig:    "(Ljava/lang/String;I)Z".into(),
-                fn_ptr: commit_text as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "deleteSurroundingTextNative".into(),
-                sig:    "(II)Z".into(),
-                fn_ptr: delete_surrounding_text as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "deleteSurroundingTextInCodePointsNative".into(),
-                sig:    "(II)Z".into(),
-                fn_ptr: delete_surrounding_in_code_points_text as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "setComposingTextNative".into(),
-                sig:    "(Ljava/lang/String;I)Z".into(),
-                fn_ptr: set_composing_text as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "sendKeyEventNative".into(),
-                sig:    "(Landroid/view/KeyEvent;)Z".into(),
-                fn_ptr: send_key_event as *mut ffi::c_void,
-            },
-            jni::NativeMethod {
-                name:   "setSelectionNative".into(),
-                sig:    "(II)Z".into(),
-                fn_ptr: set_selection as *mut ffi::c_void,
-            },
-        ],
-    )?;
-
-    Ok(context)
-}
-
-fn rust_view<'local>(
-    env: &mut JNIEnv<'local>,
-    activity: &JObject<'local>,
-) -> jni::errors::Result<JObject<'local>> {
-    env.get_field(
-        activity,
-        "rustView",
-        "Lorg/ori/RustView;",
-    )?
-    .l()
-}
-
-unsafe fn native_activity<'local>(
-    native_activity: NonNull<ndk_sys::ANativeActivity>,
-) -> JObject<'local> {
-    unsafe { JObject::from_raw(native_activity.as_ref().clazz) }
-}
-
-unsafe fn get_ime<'local>(
-    env: &mut JNIEnv<'local>,
-    rust_view: &JObject<'local>,
-) -> jni::errors::Result<&'local Ime> {
-    let ptr = env.get_field(rust_view, "context", "J")?.j()?;
-
-    unsafe { Ok(&*(ptr as usize as *const Ime)) }
-}
-
-unsafe fn get_proxy<'local>(
-    env: &mut JNIEnv<'local>,
-    rust_view: &JObject<'local>,
-) -> jni::errors::Result<&'local Proxy> {
-    unsafe { get_ime(env, rust_view).map(|cx| &cx.proxy) }
-}
-
-unsafe extern "C" fn get_text_before_cursor<'local>(
-    mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+pub unsafe extern "C" fn get_text_before_cursor<'local>(
+    env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
     n: i32,
     flags: i32,
 ) -> JString<'local> {
     tracing::trace!(n, flags, "get text before cursor");
 
-    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
-        let start = context.index_n_chars_before(n as usize);
-        let state = context.state.lock();
+    if let Some(global_state) = GLOBAL_STATE.get() {
+        let start = global_state.ime.index_n_chars_before(n as usize);
+        let state = global_state.ime.state.lock();
         let text = &state.text[start..state.selection.start];
 
         env.new_string(text)
@@ -508,17 +382,17 @@ unsafe extern "C" fn get_text_before_cursor<'local>(
     }
 }
 
-unsafe extern "C" fn get_text_after_cursor<'local>(
-    mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+pub unsafe extern "C" fn get_text_after_cursor<'local>(
+    env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
     n: i32,
     flags: i32,
 ) -> JString<'local> {
     tracing::trace!(n, flags, "get text after cursor");
 
-    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
-        let end = context.index_n_chars_after(n as usize);
-        let state = context.state.lock();
+    if let Some(global_state) = GLOBAL_STATE.get() {
+        let end = global_state.ime.index_n_chars_after(n as usize);
+        let state = global_state.ime.state.lock();
         let text = &state.text[state.selection.end..end];
 
         env.new_string(text)
@@ -528,15 +402,15 @@ unsafe extern "C" fn get_text_after_cursor<'local>(
     }
 }
 
-unsafe extern "C" fn get_selected_text<'local>(
-    mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+pub unsafe extern "C" fn get_selected_text<'local>(
+    env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
     flags: i32,
 ) -> JString<'local> {
     tracing::trace!(flags, "get selected text");
 
-    if let Ok(context) = unsafe { get_ime(&mut env, &rust_view) } {
-        let state = context.state.lock();
+    if let Some(global_state) = GLOBAL_STATE.get() {
+        let state = global_state.ime.state.lock();
         let start = state.selection.start.min(state.selection.len());
         let end = state.selection.end.min(state.selection.len());
         let text = &state.text[start..end];
@@ -548,16 +422,14 @@ unsafe extern "C" fn get_selected_text<'local>(
     }
 }
 
-unsafe extern "C" fn commit_text<'local>(
+pub unsafe extern "C" fn commit_text<'local>(
     mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+    _rust_view: JObject<'local>,
     text: JString<'local>,
     new_cursor_position: i32,
 ) -> bool {
-    if let Ok(proxy) = unsafe { get_proxy(&mut env, &rust_view) }
-        && let Ok(text) = env.get_string(&text)
-    {
-        proxy.send(Event::Ime(ImeEvent::CommitText(
+    if let Ok(text) = env.get_string(&text) {
+        send_event(Event::Ime(ImeEvent::CommitText(
             text.to_string_lossy().to_string(),
             new_cursor_position as usize,
         )));
@@ -568,25 +440,21 @@ unsafe extern "C" fn commit_text<'local>(
     }
 }
 
-unsafe extern "C" fn delete_surrounding_text<'local>(
-    mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+pub unsafe extern "C" fn delete_surrounding_text<'local>(
+    _env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
     before: i32,
     after: i32,
 ) -> bool {
-    if let Ok(proxy) = unsafe { get_proxy(&mut env, &rust_view) } {
-        proxy.send(Event::Ime(ImeEvent::DeleteSurrounding(
-            before as usize,
-            after as usize,
-        )));
+    send_event(Event::Ime(ImeEvent::DeleteSurrounding(
+        before as usize,
+        after as usize,
+    )));
 
-        true
-    } else {
-        false
-    }
+    true
 }
 
-unsafe extern "C" fn delete_surrounding_in_code_points_text<'local>(
+pub unsafe extern "C" fn delete_surrounding_in_code_points_text<'local>(
     _env: JNIEnv<'local>,
     _rust_view: JObject<'local>,
     _before: i32,
@@ -595,7 +463,7 @@ unsafe extern "C" fn delete_surrounding_in_code_points_text<'local>(
     false
 }
 
-unsafe extern "C" fn set_composing_text<'local>(
+pub unsafe extern "C" fn set_composing_text<'local>(
     _env: JNIEnv<'local>,
     _rust_view: JObject<'local>,
     _text: JString<'local>,
@@ -606,55 +474,47 @@ unsafe extern "C" fn set_composing_text<'local>(
     false
 }
 
-unsafe extern "C" fn send_key_event<'local>(
+pub unsafe extern "C" fn send_key_event<'local>(
     mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+    _rust_view: JObject<'local>,
     event: JObject<'local>,
 ) -> bool {
-    if let Ok(proxy) = unsafe { get_proxy(&mut env, &rust_view) } {
-        let keycode = env
-            .call_method(&event, "getKeyCode", "()I", &[])
-            .and_then(|v| v.i())
-            .unwrap_or(ndk_sys::AKEYCODE_UNKNOWN as i32);
+    let keycode = env
+        .call_method(&event, "getKeyCode", "()I", &[])
+        .and_then(|v| v.i())
+        .unwrap_or(ndk_sys::AKEYCODE_UNKNOWN as i32);
 
-        let action = env
-            .call_method(&event, "getAction", "()I", &[])
-            .and_then(|v| v.i())
-            .unwrap_or(ndk_sys::AKEY_EVENT_ACTION_DOWN as i32);
+    let action = env
+        .call_method(&event, "getAction", "()I", &[])
+        .and_then(|v| v.i())
+        .unwrap_or(ndk_sys::AKEY_EVENT_ACTION_DOWN as i32);
 
-        let key = match keycode as u32 {
-            ndk_sys::AKEYCODE_DEL => Key::Named(NamedKey::Backspace),
-            ndk_sys::AKEYCODE_ENTER => Key::Named(NamedKey::Enter),
-            _ => Key::Named(NamedKey::Unidentified),
-        };
+    let key = match keycode as u32 {
+        ndk_sys::AKEYCODE_DEL => Key::Named(NamedKey::Backspace),
+        ndk_sys::AKEYCODE_ENTER => Key::Named(NamedKey::Enter),
+        _ => Key::Named(NamedKey::Unidentified),
+    };
 
-        let pressed = action as u32 == ndk_sys::AKEY_EVENT_ACTION_DOWN;
+    let pressed = action as u32 == ndk_sys::AKEY_EVENT_ACTION_DOWN;
 
-        proxy.send(Event::Ime(ImeEvent::SendKeyEvent {
-            key,
-            pressed,
-        }));
+    send_event(Event::Ime(ImeEvent::SendKeyEvent {
+        key,
+        pressed,
+    }));
 
-        true
-    } else {
-        false
-    }
+    true
 }
 
-unsafe extern "C" fn set_selection<'local>(
-    mut env: JNIEnv<'local>,
-    rust_view: JObject<'local>,
+pub unsafe extern "C" fn set_selection<'local>(
+    _env: JNIEnv<'local>,
+    _rust_view: JObject<'local>,
     start: i32,
     end: i32,
 ) -> bool {
-    if let Ok(proxy) = unsafe { get_proxy(&mut env, &rust_view) } {
-        proxy.send(Event::Ime(ImeEvent::SetSelection(
-            start as usize,
-            end as usize,
-        )));
+    send_event(Event::Ime(ImeEvent::SetSelection(
+        start as usize,
+        end as usize,
+    )));
 
-        true
-    } else {
-        false
-    }
+    true
 }

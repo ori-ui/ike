@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::{
-    AnyWidgetId, BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, EventCx, Gesture, Key,
+    AnyWidgetId, BorderWidth, Builder, Canvas, Color, CornerRadius, DrawCx, EventCx, Gesture, Key,
     KeyEvent, LayoutCx, NamedKey, Padding, Paint, PointerEvent, PointerPropagate, Propagate, Size,
     Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget, WidgetMut,
     context::UpdateCx, widget::Update,
@@ -21,7 +21,7 @@ pub struct Button {
 }
 
 impl Button {
-    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
         cx.build_widget(Button {
             padding:       Padding::all(8.0),
             border_width:  BorderWidth::all(1.0),

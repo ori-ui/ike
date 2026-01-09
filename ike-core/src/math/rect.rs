@@ -41,10 +41,38 @@ impl Rect {
     }
 
     pub const fn center(self) -> Point {
-        Point::new(
-            (self.min.x + self.max.x) / 2.0,
-            (self.min.y + self.max.y) / 2.0,
-        )
+        Point {
+            x: (self.min.x + self.max.x) / 2.0,
+            y: (self.min.y + self.max.y) / 2.0,
+        }
+    }
+
+    pub const fn top_left(self) -> Point {
+        Point {
+            x: self.left(),
+            y: self.top(),
+        }
+    }
+
+    pub const fn top_right(self) -> Point {
+        Point {
+            x: self.right(),
+            y: self.top(),
+        }
+    }
+
+    pub const fn bottom_left(self) -> Point {
+        Point {
+            x: self.left(),
+            y: self.bottom(),
+        }
+    }
+
+    pub const fn bottom_right(self) -> Point {
+        Point {
+            x: self.right(),
+            y: self.bottom(),
+        }
     }
 
     pub const fn width(self) -> f32 {
@@ -53,6 +81,13 @@ impl Rect {
 
     pub const fn height(self) -> f32 {
         self.max.y - self.min.y
+    }
+
+    pub const fn size(self) -> Size {
+        Size {
+            width:  self.width(),
+            height: self.height(),
+        }
     }
 
     pub const fn contains(self, point: Point) -> bool {

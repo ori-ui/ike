@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::{
-    AnyWidgetId, Axis, BorderWidth, BuildCx, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
+    AnyWidgetId, Axis, BorderWidth, Builder, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
     EventCx, Gesture, LayoutCx, Padding, Paint, Point, PointerEvent, PointerPropagate, Rect,
     ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Update,
     UpdateCx, Widget, WidgetMut,
@@ -27,7 +27,7 @@ pub struct Scroll {
 }
 
 impl Scroll {
-    pub fn new(cx: &mut impl BuildCx, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, child: impl AnyWidgetId) -> WidgetMut<'_, Self> {
         cx.build_widget(Self {
             axis:               Axis::Vertical,
             bar_width:          16.0,

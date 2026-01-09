@@ -1,4 +1,4 @@
-use crate::{AnyWidgetId, BuildCx, LayoutCx, Offset, Size, Space, Widget, WidgetMut};
+use crate::{AnyWidgetId, Builder, LayoutCx, Offset, Size, Space, Widget, WidgetMut};
 
 pub struct Aligned {
     x: f32,
@@ -7,7 +7,7 @@ pub struct Aligned {
 
 impl Aligned {
     pub fn new(
-        cx: &mut impl BuildCx,
+        cx: &mut impl Builder,
         x: f32,
         y: f32,
         contents: impl AnyWidgetId,

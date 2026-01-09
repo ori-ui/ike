@@ -136,9 +136,14 @@ pub enum Update {
     Disabled(bool),
     ScrollTo(Rect),
 
+    /// [`Window::is_focused`](crate::Window::is_focused) has changed.
     WindowFocused(bool),
+    /// [`Window::size`](crate::Window::size) has changed.
     WindowResized(Size),
+    /// [`Window::scale`](crate::Window::scale) has changed.
     WindowScaled(f32),
+    /// [`Window::safe_area`](crate::Window::safe_area) has changed.
+    WindowSafeAreaChanged(Option<Rect>),
 
     Children(ChildUpdate),
 }

@@ -1,5 +1,5 @@
 use crate::{
-    BorderWidth, BuildCx, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Paragraph,
+    BorderWidth, Builder, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Padding, Paint, Paragraph,
     Size, Space, TextAlign, TextWrap, Widget, WidgetId, WidgetMut, WidgetRef,
     widgets::{Label, NewlineBehaviour, SubmitBehaviour, TextArea},
 };
@@ -19,7 +19,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn new(cx: &mut impl BuildCx, paragraph: Paragraph) -> WidgetMut<'_, Self> {
+    pub fn new(cx: &mut impl Builder, paragraph: Paragraph) -> WidgetMut<'_, Self> {
         let text_area = TextArea::new(cx, paragraph).id();
         let placeholder = Paragraph::new(16.0, TextAlign::Start, TextWrap::None);
         let placeholder = Label::new(cx, placeholder).id();

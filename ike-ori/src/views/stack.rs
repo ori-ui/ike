@@ -1,5 +1,5 @@
 use ike_core::{
-    AnyWidgetId, Axis, BuildCx, WidgetId,
+    AnyWidgetId, Axis, Builder, WidgetId,
     widgets::{self, Align, Justify},
 };
 use ori::{Action, ElementSeq, Event, Super, View, ViewMarker, ViewSeq};
@@ -56,7 +56,7 @@ impl<V> Stack<V> {
 impl<V> ViewMarker for Stack<V> {}
 impl<C, T, V> View<C, T> for Stack<V>
 where
-    C: BuildCx,
+    C: Builder,
     V: ViewSeq<C, T, Flex<WidgetId>>,
 {
     type Element = WidgetId<widgets::Stack>;
@@ -152,7 +152,7 @@ where
 }
 
 fn update_children(
-    cx: &mut impl BuildCx,
+    cx: &mut impl Builder,
     widget: WidgetId<widgets::Stack>,
     children: &mut impl ElementSeq<Flex<WidgetId>>,
 ) {
@@ -191,7 +191,7 @@ fn update_children(
 }
 
 fn update_flex(
-    cx: &mut impl BuildCx,
+    cx: &mut impl Builder,
     widget: WidgetId<widgets::Stack>,
     children: &impl ElementSeq<Flex<WidgetId>>,
 ) {

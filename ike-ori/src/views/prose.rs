@@ -1,5 +1,5 @@
 use ike_core::{
-    BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
+    Builder, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
 use ori::{Action, Providable, View, ViewId, ViewMarker};
@@ -214,7 +214,7 @@ impl Prose {
 impl ViewMarker for Prose {}
 impl<C, T> View<C, T> for Prose
 where
-    C: BuildCx + Providable,
+    C: Builder + Providable,
 {
     type Element = WidgetId<widgets::TextArea<false>>;
     type State = ViewId;

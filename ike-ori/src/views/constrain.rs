@@ -1,4 +1,4 @@
-use ike_core::{AnyWidgetId, BuildCx, Size, Transition, WidgetId, widgets};
+use ike_core::{AnyWidgetId, Builder, Size, Transition, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
 
 pub fn constrain<V>(contents: V) -> Constrain<V> {
@@ -140,7 +140,7 @@ impl<V> Constrain<V> {
 impl<V> ViewMarker for Constrain<V> {}
 impl<C, T, V> View<C, T> for Constrain<V>
 where
-    C: BuildCx,
+    C: Builder,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Constrain>;

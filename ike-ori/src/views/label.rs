@@ -1,5 +1,5 @@
 use ike_core::{
-    BuildCx, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
+    Builder, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
 use ori::{Action, Providable, View, ViewMarker};
@@ -116,7 +116,7 @@ impl Label {
 impl ViewMarker for Label {}
 impl<C, T> View<C, T> for Label
 where
-    C: BuildCx + Providable,
+    C: Builder + Providable,
 {
     type Element = WidgetId<widgets::Label>;
     type State = ();

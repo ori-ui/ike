@@ -1,5 +1,5 @@
 use ike_core::{
-    BorderWidth, BuildCx, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Padding, Paint,
+    BorderWidth, Builder, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Padding, Paint,
     Paragraph, TextAlign, TextStyle, TextWrap, WidgetId,
     widgets::{self, NewlineBehaviour, SubmitBehaviour},
 };
@@ -386,7 +386,7 @@ enum EntryEvent {
 impl<T> ViewMarker for Entry<T> {}
 impl<C, T> View<C, T> for Entry<T>
 where
-    C: BuildCx + Proxyable + Providable,
+    C: Builder + Proxyable + Providable,
 {
     type Element = WidgetId<widgets::Entry>;
     type State = ViewId;

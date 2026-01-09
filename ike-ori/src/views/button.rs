@@ -1,5 +1,5 @@
 use ike_core::{
-    AnyWidgetId, BorderWidth, BuildCx, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
+    AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
 use ori::{Action, Event, IntoAction, Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
 
@@ -183,7 +183,7 @@ enum ButtonEvent {
 impl<T, V> ViewMarker for Button<T, V> {}
 impl<C, T, V> View<C, T> for Button<T, V>
 where
-    C: BuildCx + Proxyable + Providable,
+    C: Builder + Proxyable + Providable,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Button>;

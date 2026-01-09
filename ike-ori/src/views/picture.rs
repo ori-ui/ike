@@ -1,5 +1,5 @@
 use ike_core::{
-    BuildCx, Color, WidgetId,
+    Builder, Color, WidgetId,
     widgets::{self, Fit, Picturable},
 };
 use ori::{Action, Event, View, ViewMarker};
@@ -32,7 +32,7 @@ impl Picture {
 impl ViewMarker for Picture {}
 impl<C, T> View<C, T> for Picture
 where
-    C: BuildCx,
+    C: Builder,
 {
     type Element = WidgetId<widgets::Picture>;
     type State = ();

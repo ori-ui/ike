@@ -3,7 +3,7 @@ use crate::{
     WindowSizing, World, passes,
 };
 
-pub trait BuildCx {
+pub trait Builder {
     fn world(&self) -> &World;
     fn world_mut(&mut self) -> &mut World;
 
@@ -142,9 +142,9 @@ pub trait BuildCx {
     }
 }
 
-impl<T> BuildCx for &mut T
+impl<T> Builder for &mut T
 where
-    T: BuildCx,
+    T: Builder,
 {
     fn world(&self) -> &World {
         T::world(self)

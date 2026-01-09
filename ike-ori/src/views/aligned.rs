@@ -1,4 +1,4 @@
-use ike_core::{AnyWidgetId, BuildCx, WidgetId, widgets};
+use ike_core::{AnyWidgetId, Builder, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
 
 pub fn align<V>(x: f32, y: f32, contents: V) -> Aligned<V> {
@@ -50,7 +50,7 @@ pub struct Aligned<V> {
 impl<V> ViewMarker for Aligned<V> {}
 impl<C, T, V> View<C, T> for Aligned<V>
 where
-    C: BuildCx,
+    C: Builder,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Aligned>;

@@ -1,4 +1,4 @@
-use ike_core::{AnyWidgetId, BuildCx, Color, Size, WindowId, WindowSizing};
+use ike_core::{AnyWidgetId, Builder, Color, Size, WindowId, WindowSizing};
 use ori::{Action, Event, NoElement, Providable, View, ViewMarker};
 
 use crate::Palette;
@@ -66,7 +66,7 @@ impl<V> Window<V> {
 impl<V> ViewMarker for Window<V> {}
 impl<C, T, V> View<C, T> for Window<V>
 where
-    C: BuildCx + Providable,
+    C: Builder + Providable,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = NoElement;

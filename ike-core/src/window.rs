@@ -1,7 +1,7 @@
 use std::{any::Any, fmt, rc::Rc};
 
 use crate::{
-    Color, CursorIcon, Modifiers, Point, Pointer, PointerId, Size, Touch, TouchId, WidgetId,
+    Color, CursorIcon, Modifiers, Point, Pointer, PointerId, Rect, Size, Touch, TouchId, WidgetId,
     debug::debug_panic,
 };
 
@@ -48,6 +48,7 @@ pub struct Window {
 
     pub(crate) scale:        f32,
     pub(crate) size:         Size,
+    pub(crate) safe_area:    Option<Rect>,
     pub(crate) is_visible:   bool,
     pub(crate) is_focused:   bool,
     pub(crate) is_decorated: bool,
@@ -69,6 +70,17 @@ impl Window {
 
     pub fn size(&self) -> Size {
         self.size
+    }
+
+    /// Get the rect of the window that is safe to use.
+    ///
+    /// On mobile platforms it is common to have areas of the screen occupied by system bars, IMEs,
+    /// or screen cutouts. The returned [`Rect`] is a rect that completely avoids all of those.
+    ///
+    /// If [`None`] is returned the platform hasn't specified a safe area, all of the screen is
+    /// safe to use.
+    pub fn safe_area(&self) -> Option<Rect> {
+        self.safe_area
     }
 
     pub fn modifiers(&self) -> Modifiers {
