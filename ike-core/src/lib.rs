@@ -45,7 +45,7 @@ pub use text::{
     FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,
     TextLayoutLine, TextStyle, TextWrap, WeakParagraph,
 };
-pub use transition::{Transition, TransitionCurve, Transitionable, Transitioned};
+pub use transition::{Interpolate, Transition, TransitionCurve, Transitioned};
 pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
 pub use window::{Layer, Window, WindowId, WindowSizing};
 pub use world::{AnyWidget, ImeSignal, Signal, WidgetMut, WidgetRef, WindowUpdate, World};

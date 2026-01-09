@@ -42,27 +42,27 @@ impl Transition {
     }
 }
 
-pub trait Transitionable {
-    fn interpolate(from: &Self, to: &Self, x: f32) -> Self;
+pub trait Interpolate {
+    fn interpolate(start: &Self, end: &Self, x: f32) -> Self;
 }
 
 pub struct Transitioned<T> {
     transition: Transition,
     current:    T,
-    from:       T,
-    to:         T,
+    start:      T,
+    end:        T,
     time:       f32,
 }
 
 impl<T> Transitioned<T>
 where
-    T: Transitionable + Clone + PartialEq,
+    T: Interpolate + Clone + PartialEq,
 {
     pub fn new(value: T, transition: Transition) -> Self {
         Self {
             current: value.clone(),
-            from: value.clone(),
-            to: value,
+            start: value.clone(),
+            end: value,
             time: transition.duration,
             transition,
         }
@@ -78,21 +78,25 @@ where
         self.update_current();
     }
 
+    /// Set a concrete value, and cancel the current transition.
     pub fn set(&mut self, value: T) {
-        self.to = value.clone();
-        self.from = value.clone();
+        self.end = value.clone();
+        self.start = value.clone();
         self.current = value.clone();
         self.time = self.transition.duration;
     }
 
-    pub fn from(&self) -> T {
-        self.from.clone()
+    /// Get the starting value.
+    pub fn start(&self) -> T {
+        self.start.clone()
     }
 
-    pub fn to(&self) -> T {
-        self.to.clone()
+    /// Get the end value.
+    pub fn end(&self) -> T {
+        self.end.clone()
     }
 
+    /// Get the current value.
     pub fn get(&self) -> T {
         self.current.clone()
     }
@@ -100,13 +104,13 @@ where
     /// Start transitioning to a value.
     ///
     /// Returns whether `request_animate` should be called.
-    pub fn begin(&mut self, to: T) -> bool {
-        if to == self.to {
+    pub fn begin(&mut self, target: T) -> bool {
+        if target == self.end {
             return false;
         }
 
-        self.from = self.current.clone();
-        self.to = to;
+        self.start = self.current.clone();
+        self.end = target;
         self.time = 0.0;
 
         self.update_current();
@@ -114,6 +118,9 @@ where
         !self.is_complete()
     }
 
+    /// Animate the value.
+    ///
+    /// Returns whether `request_animate` should be called.
     pub fn animate(&mut self, delta_time: Duration) -> bool {
         self.time += delta_time.as_secs_f32();
         self.time = self.time.clamp(0.0, self.transition.duration);
@@ -123,20 +130,21 @@ where
         !self.is_complete()
     }
 
+    /// Check if the transition has reached the end.
     pub fn is_complete(&self) -> bool {
         self.time >= self.transition.duration
     }
 
     fn update_current(&mut self) {
         if self.transition.duration == 0.0 {
-            self.current = self.to.clone();
+            self.current = self.end.clone();
             return;
         }
 
         let fraction = self.time / self.transition.duration;
         let position = self.transition.curve.apply(fraction);
 
-        self.current = T::interpolate(&self.from, &self.to, position);
+        self.current = T::interpolate(&self.start, &self.end, position);
     }
 }
 
@@ -148,24 +156,24 @@ impl<T> Deref for Transitioned<T> {
     }
 }
 
-impl Transitionable for f32 {
-    fn interpolate(from: &Self, to: &Self, x: f32) -> Self {
-        *from * (1.0 - x) + *to * x
+impl Interpolate for f32 {
+    fn interpolate(start: &Self, end: &Self, x: f32) -> Self {
+        *start * (1.0 - x) + *end * x
     }
 }
 
-impl Transitionable for Color {
-    fn interpolate(from: &Self, to: &Self, x: f32) -> Self {
+impl Interpolate for Color {
+    fn interpolate(start: &Self, end: &Self, x: f32) -> Self {
         Self {
-            r: f32::interpolate(&from.r, &to.r, x),
-            g: f32::interpolate(&from.g, &to.g, x),
-            b: f32::interpolate(&from.b, &to.b, x),
-            a: f32::interpolate(&from.a, &to.a, x),
+            r: f32::interpolate(&start.r, &end.r, x),
+            g: f32::interpolate(&start.g, &end.g, x),
+            b: f32::interpolate(&start.b, &end.b, x),
+            a: f32::interpolate(&start.a, &end.a, x),
         }
     }
 }
 
-impl Transitionable for Size {
+impl Interpolate for Size {
     fn interpolate(from: &Self, to: &Self, x: f32) -> Self {
         Self {
             width:  f32::interpolate(&from.width, &to.width, x),

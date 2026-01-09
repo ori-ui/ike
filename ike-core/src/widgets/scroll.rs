@@ -321,7 +321,7 @@ impl Widget for Scroll {
                     ScrollDelta::Pixel(offset) => offset,
                 };
 
-                let mut scroll = self.scroll.to() - self.axis.unpack_offset(delta).0;
+                let mut scroll = self.scroll.end() - self.axis.unpack_offset(delta).0;
                 scroll = scroll.clamp(0.0, self.overflow());
 
                 match event.delta {
@@ -350,7 +350,7 @@ impl Widget for Scroll {
         match event {
             TouchEvent::Gesture(Gesture::Pan(event)) => {
                 let (delta, _) = self.axis.unpack_offset(event.delta);
-                let mut scroll = self.scroll.to() - delta;
+                let mut scroll = self.scroll.end() - delta;
                 scroll = scroll.clamp(0.0, self.overflow());
 
                 if *self.scroll != scroll {
