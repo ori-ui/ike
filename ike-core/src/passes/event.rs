@@ -18,8 +18,6 @@ where
         && let Some(widget) = world.widget_mut(id)
         && propagate == bubble
     {
-        passes::hierarchy::update_flags(&widget);
-
         let mut cx = EventCx {
             widgets:   widget.cx.widgets,
             world:     widget.cx.world,
@@ -32,6 +30,7 @@ where
         current = widget.cx.parent();
     }
 
+    passes::hierarchy::propagate_down(&world.widgets, target);
     passes::focus::update(world, window, focus);
 
     propagate

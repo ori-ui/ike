@@ -122,5 +122,6 @@ pub(crate) fn place_widget(widget: &mut WidgetMut<'_>, mut transform: Affine, sc
     if widget.cx.state.transform != transform {
         widget.cx.state.transform = transform;
         widget.cx.hierarchy.request_compose();
+        widget.cx.hierarchy.request_draw();
     }
 }
