@@ -10,7 +10,7 @@ use crate::{
     world::{WidgetMut, WorldState},
 };
 
-pub struct Widgets {
+pub(crate) struct Widgets {
     entities:  Entities,
     widgets:   Vec<UnsafeCell<Box<dyn Widget>>>,
     states:    Vec<UnsafeCell<WidgetState>>,
@@ -64,7 +64,7 @@ impl Widgets {
         }
     }
 
-    pub(crate) fn remove(&mut self, id: WidgetId) -> bool {
+    pub fn remove(&mut self, id: WidgetId) -> bool {
         if !self.entities.free(id) {
             // the entity could not be freed, because it never existed
             return false;
@@ -194,7 +194,7 @@ impl Widgets {
         unsafe { &mut *self.states.get_unchecked(index).get() }
     }
 
-    pub(crate) fn get_hierarchy(&self, id: WidgetId) -> Option<&WidgetHierarchy> {
+    pub fn get_hierarchy(&self, id: WidgetId) -> Option<&WidgetHierarchy> {
         debug_assert!(
             self.entities.contains(id),
             "widget {id:?} not contained",
@@ -202,7 +202,7 @@ impl Widgets {
         self.hierarchy.get(id.index as usize)
     }
 
-    pub(crate) fn get_hierarchy_mut(&mut self, id: WidgetId) -> Option<&mut WidgetHierarchy> {
+    pub fn get_hierarchy_mut(&mut self, id: WidgetId) -> Option<&mut WidgetHierarchy> {
         debug_assert!(
             self.entities.contains(id),
             "widget {id:?} not contained",

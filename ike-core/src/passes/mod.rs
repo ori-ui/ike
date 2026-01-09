@@ -7,7 +7,6 @@ pub(crate) mod hierarchy;
 pub(crate) mod key;
 pub(crate) mod layout;
 pub(crate) mod pointer;
-pub(crate) mod propagate;
 pub(crate) mod query;
 pub(crate) mod record;
 pub(crate) mod scroll;

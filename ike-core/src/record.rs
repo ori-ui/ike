@@ -9,7 +9,7 @@ use std::{
 
 use seahash::SeaHasher;
 
-use crate::{Size, WidgetId, Widgets};
+use crate::{Size, WidgetId, world::Widgets};
 
 #[derive(Debug)]
 pub struct Recorder {
@@ -31,7 +31,7 @@ pub struct Recorder {
 struct RecorderEntry {
     recording:       Recording,
     last_frame_used: u64,
-    cost:            f32,
+    cost_estimate:   f32,
 }
 
 type BuildSeaHasher = BuildHasherDefault<SeaHasher>;
@@ -47,7 +47,7 @@ impl Recorder {
         Self {
             cost_threshold:    65.0,
             max_frames_unused: 30,
-            max_memory_usage:  512 * 1024u64.pow(2),
+            max_memory_usage:  512 * 1024u64.pow(2), // 512 MiB (quite large)
             memory_usage:      0,
             frame_count:       0,
             entries:           HashMap::default(),
@@ -58,17 +58,13 @@ impl Recorder {
         self.memory_usage
     }
 
-    pub fn cleanup(&mut self, widgets: &Widgets) {
-        self.entries.retain(|id, _| widgets.contains(*id));
-    }
-
-    pub fn insert(&mut self, widget: WidgetId, cost: f32, recording: Recording) {
+    pub fn insert(&mut self, widget: WidgetId, cost_estimate: f32, recording: Recording) {
         self.memory_usage += recording.memory;
 
         let entry = RecorderEntry {
             recording,
             last_frame_used: self.frame_count,
-            cost,
+            cost_estimate,
         };
 
         self.entries.insert(widget, entry);
@@ -96,7 +92,11 @@ impl Recorder {
         self.entries.contains_key(&widget)
     }
 
-    pub fn frame(&mut self, widgets: &Widgets) {
+    pub(crate) fn cleanup(&mut self, widgets: &Widgets) {
+        self.entries.retain(|id, _| widgets.contains(*id));
+    }
+
+    pub(crate) fn frame(&mut self, widgets: &Widgets) {
         self.cleanup(widgets);
         self.frame_count += 1;
 
@@ -125,6 +125,7 @@ impl Recorder {
         );
     }
 
+    /// Cull recordings if memory usage exceeds `3/4` of `max_memory_usage`.
     fn cull_memory(&mut self) {
         let cull_threshold = self.max_memory_usage * 3 / 4;
 
@@ -141,7 +142,7 @@ impl Recorder {
         let mut widgets = Vec::new();
 
         for (widget, entry) in self.entries.iter() {
-            let weighted_cost = entry.recording.memory as f32 / entry.cost;
+            let weighted_cost = entry.recording.memory as f32 / entry.cost_estimate;
 
             widgets.push((*widget, weighted_cost));
         }

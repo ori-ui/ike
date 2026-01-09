@@ -19,11 +19,13 @@ pub(crate) fn animate_widget_recursive(widget: &mut WidgetMut<'_>, delta_time: D
         return;
     }
 
+    widget.cx.hierarchy.mark_animated();
+
     widget.cx.for_each_child_mut(|child| {
         animate_widget_recursive(child, delta_time);
     });
 
-    passes::propagate::update(widget);
+    passes::hierarchy::update_flags(widget);
 
     let mut cx = widget.cx.as_update_cx();
     widget.widget.animate(&mut cx, delta_time);

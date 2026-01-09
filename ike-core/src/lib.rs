@@ -48,6 +48,4 @@ pub use text::{
 pub use transition::{Transition, TransitionCurve, Transitionable, Transitioned};
 pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
 pub use window::{Layer, Window, WindowId, WindowSizing};
-pub use world::{
-    AnyWidget, ImeSignal, Signal, WidgetMut, WidgetRef, Widgets, WindowUpdate, World, WorldState,
-};
+pub use world::{AnyWidget, ImeSignal, Signal, WidgetMut, WidgetRef, WindowUpdate, World};

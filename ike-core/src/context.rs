@@ -2,10 +2,10 @@ use std::ops::Range;
 
 use crate::{
     Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, ImeSignal, Painter, Paragraph, Point, Rect,
-    Signal, Size, Space, Svg, TextLayoutLine, Widget, WidgetId, WidgetMut, WidgetRef, Widgets,
-    Window, passes,
+    Signal, Size, Space, Svg, TextLayoutLine, Widget, WidgetId, WidgetMut, WidgetRef, Window,
+    passes,
     widget::{WidgetHierarchy, WidgetState},
-    world::WorldState,
+    world::{Widgets, WorldState},
 };
 
 pub(crate) enum FocusUpdate {
@@ -98,7 +98,7 @@ impl MutCx<'_> {
 
     pub fn request_compose(&mut self) {
         self.hierarchy.request_compose();
-        passes::propagate::propagate_down(self.widgets, self.id());
+        passes::hierarchy::propagate_down(self.widgets, self.id());
 
         if let Some(window) = self.hierarchy.window {
             self.world.request_redraw(window);
@@ -107,7 +107,7 @@ impl MutCx<'_> {
 
     pub fn request_animate(&mut self) {
         self.hierarchy.request_animate();
-        passes::propagate::propagate_down(self.widgets, self.id());
+        passes::hierarchy::propagate_down(self.widgets, self.id());
 
         if let Some(window) = self.hierarchy.window {
             self.world.request_animate(window);
@@ -116,7 +116,7 @@ impl MutCx<'_> {
 
     pub fn request_layout(&mut self) {
         self.hierarchy.request_layout();
-        passes::propagate::propagate_down(self.widgets, self.id());
+        passes::hierarchy::propagate_down(self.widgets, self.id());
 
         if let Some(window) = self.hierarchy.window {
             self.world.request_redraw(window);
@@ -125,7 +125,7 @@ impl MutCx<'_> {
 
     pub fn request_draw(&mut self) {
         self.hierarchy.request_draw();
-        passes::propagate::propagate_down(self.widgets, self.id());
+        passes::hierarchy::propagate_down(self.widgets, self.id());
 
         if let Some(window) = self.hierarchy.window {
             self.world.request_redraw(window);
@@ -234,7 +234,7 @@ impl LayoutCx<'_> {
         if let Some(child) = self.hierarchy.children.get(index)
             && let Some(mut child) = self.widgets.get_mut(self.world, *child)
         {
-            passes::propagate::set_stashed(&mut child, is_stashed);
+            passes::hierarchy::set_stashed(&mut child, is_stashed);
         } else {
             tracing::error!("`LayoutCx::set_child_stashed` called on invalid child");
         }

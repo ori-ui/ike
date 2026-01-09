@@ -126,6 +126,9 @@ pub trait Widget: Any {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Update {
+    Added,
+    Removed,
+
     Hovered(bool),
     Active(bool),
     Focused(bool),

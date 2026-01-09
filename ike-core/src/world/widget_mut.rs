@@ -53,7 +53,7 @@ where
     }
 
     pub fn set_disabled(&mut self, is_disabled: bool) {
-        passes::propagate::set_disabled(self, is_disabled);
+        passes::hierarchy::set_disabled(self, is_disabled);
     }
 
     pub(crate) fn set_hovered(&mut self, is_hovered: bool) {
@@ -67,7 +67,7 @@ where
             Update::Hovered(is_hovered),
         );
 
-        passes::propagate::propagate_down(self.cx.widgets, self.cx.id());
+        passes::hierarchy::propagate_down(self.cx.widgets, self.cx.id());
     }
 
     pub(crate) fn set_focused(&mut self, is_focused: bool) {
@@ -81,7 +81,7 @@ where
             Update::Focused(is_focused),
         );
 
-        passes::propagate::propagate_down(self.cx.widgets, self.cx.id());
+        passes::hierarchy::propagate_down(self.cx.widgets, self.cx.id());
     }
 
     pub(crate) fn set_active(&mut self, is_active: bool) {
@@ -95,6 +95,6 @@ where
             Update::Active(is_active),
         );
 
-        passes::propagate::propagate_down(self.cx.widgets, self.cx.id());
+        passes::hierarchy::propagate_down(self.cx.widgets, self.cx.id());
     }
 }

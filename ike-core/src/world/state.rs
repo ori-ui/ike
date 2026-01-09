@@ -7,10 +7,10 @@ use crate::{
     event::TouchSettings,
 };
 
-pub struct WorldState {
-    signaller: Box<dyn Fn(Signal)>,
+pub(crate) struct WorldState {
+    pub signaller: Box<dyn Fn(Signal)>,
 
-    pub(super) windows: Vec<Window>,
+    pub windows: Vec<Window>,
 
     pub should_trace:   bool,
     pub touch_settings: TouchSettings,
@@ -18,7 +18,7 @@ pub struct WorldState {
 }
 
 impl WorldState {
-    pub(crate) fn new(signaller: Box<dyn Fn(Signal)>) -> Self {
+    pub fn new(signaller: Box<dyn Fn(Signal)>) -> Self {
         Self {
             signaller,
 
@@ -32,7 +32,7 @@ impl WorldState {
 }
 
 impl WorldState {
-    pub(crate) fn window(&self, id: WindowId) -> Option<&Window> {
+    pub fn window(&self, id: WindowId) -> Option<&Window> {
         match self.get_window(id) {
             Some(window) => Some(window),
             None => {
@@ -42,7 +42,7 @@ impl WorldState {
         }
     }
 
-    pub(crate) fn window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
+    pub fn window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
         match self.get_window_mut(id) {
             Some(window) => Some(window),
             None => {
@@ -102,18 +102,18 @@ impl WorldState {
 }
 
 impl WorldState {
-    pub(crate) fn emit_signal(&self, signal: Signal) {
+    pub fn emit_signal(&self, signal: Signal) {
         (self.signaller)(signal);
     }
 
-    pub(crate) fn request_animate(&self, window: WindowId) {
+    pub fn request_animate(&self, window: WindowId) {
         self.emit_signal(Signal::RequestAnimate {
             window,
             start: Instant::now(),
         });
     }
 
-    pub(crate) fn request_redraw(&self, window: WindowId) {
+    pub fn request_redraw(&self, window: WindowId) {
         self.emit_signal(Signal::RequestRedraw { window });
     }
 }

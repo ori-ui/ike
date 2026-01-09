@@ -26,6 +26,7 @@ pub(crate) fn draw_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
     if widget.cx.hierarchy.needs_draw() {
         widget.cx.state.stable_draws = 0;
         widget.cx.world.recorder.remove(widget.id());
+        widget.cx.hierarchy.mark_drawn();
     }
 
     if let Some(recording) = widget.cx.world.recorder.get_marked(widget.id()) {

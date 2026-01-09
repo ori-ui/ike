@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use crate::{Affine, Clip, CursorIcon, Size, Space, Widget, WidgetId, Widgets, WindowId};
+use crate::{Affine, Clip, CursorIcon, Size, Space, Widget, WidgetId, WindowId, world::Widgets};
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

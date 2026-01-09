@@ -1,6 +1,6 @@
 use crate::{
-    AnyWidget, AnyWidgetId, Color, Widget, WidgetId, WidgetMut, WidgetRef, WindowId, WindowSizing,
-    World, passes,
+    AnyWidget, AnyWidgetId, Color, Update, Widget, WidgetId, WidgetMut, WidgetRef, WindowId,
+    WindowSizing, World, passes,
 };
 
 pub trait BuildCx {
@@ -32,6 +32,11 @@ pub trait BuildCx {
     {
         let world = self.world_mut();
         let id = world.widgets.insert(widget);
+
+        if let Some(mut widget) = world.widget_mut(id.upcast()) {
+            passes::update::widget(&mut widget, Update::Added);
+            passes::hierarchy::propagate_down(widget.cx.widgets, id.upcast());
+        }
 
         WidgetBuilder { world, id }
     }

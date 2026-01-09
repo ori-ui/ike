@@ -19,7 +19,7 @@ pub(crate) fn widget_recursive(widget: &mut WidgetMut<'_>, update: &Update) {
         widget_recursive(child, update);
     });
 
-    passes::propagate::update(widget);
+    passes::hierarchy::update_flags(widget);
 
     if let Update::WindowScaled(..) = update
         && widget.cx.is_pixel_perfect()

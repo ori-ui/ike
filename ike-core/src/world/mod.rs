@@ -11,11 +11,13 @@ use std::{
     time::Duration,
 };
 
+pub(crate) use state::WorldState;
+pub(crate) use widgets::Widgets;
+
 pub use signal::{ImeSignal, Signal, WindowUpdate};
-pub use state::WorldState;
 pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
-pub use widgets::{AnyWidget, Widgets};
+pub use widgets::AnyWidget;
 
 use crate::{
     BuildCx, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Point, PointerButton, PointerId,

@@ -18,7 +18,7 @@ where
         && let Some(widget) = world.widget_mut(id)
         && propagate == bubble
     {
-        passes::propagate::update(&widget);
+        passes::hierarchy::update_flags(&widget);
 
         let mut cx = EventCx {
             widgets:   widget.cx.widgets,
