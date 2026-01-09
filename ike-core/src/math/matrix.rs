@@ -18,6 +18,10 @@ impl Matrix {
         Self::new([x, 0.0, 0.0, y])
     }
 
+    pub fn rotate(r: f32) -> Self {
+        Self::new([r.cos(), r.sin(), -r.sin(), r.cos()])
+    }
+
     pub const fn determinant(self) -> f32 {
         let [a, b, c, d] = self.matrix;
 
@@ -102,6 +106,13 @@ impl Affine {
     pub const fn scale(x: f32, y: f32) -> Self {
         Self {
             matrix: Matrix::scale(x, y),
+            offset: Offset::all(0.0),
+        }
+    }
+
+    pub fn rotate(r: f32) -> Self {
+        Self {
+            matrix: Matrix::rotate(r),
             offset: Offset::all(0.0),
         }
     }

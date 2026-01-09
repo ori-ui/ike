@@ -1,4 +1,4 @@
-use crate::{Affine, Point, WidgetMut, WindowId, World, passes};
+use crate::{Affine, WidgetMut, WindowId, World, passes};
 
 pub(crate) fn compose_window(world: &mut World, window: WindowId) {
     let window_id = window;
@@ -13,13 +13,9 @@ pub(crate) fn compose_window(world: &mut World, window: WindowId) {
         // compose the layers widget
         if let Some(window) = world.window(window_id)
             && let Some(layer) = window.layers().get(i)
+            && let Some(mut widget) = world.widget_mut(layer.widget)
         {
-            // translate the layer to it's position
-            let transform = Affine::translate(layer.position - Point::ORIGIN);
-
-            if let Some(mut widget) = world.widget_mut(layer.widget) {
-                compose_widget(&mut widget, transform, scale)
-            }
+            compose_widget(&mut widget, Affine::IDENTITY, scale)
         }
     }
 }

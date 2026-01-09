@@ -78,7 +78,7 @@ pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize,
 }
 
 pub(crate) fn remove(world: &mut World, widget: WidgetId) {
-    let Some(widget) = world.widget(widget) else {
+    let Some(widget) = world.get_widget(widget) else {
         return;
     };
 
@@ -86,6 +86,11 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
     let parent = widget.cx.parent();
 
     drop(widget);
+
+    if let Some(mut widget) = world.widget_mut(id) {
+        passes::update::widget(&mut widget, Update::Removed);
+    }
+
     set_window(world, id, None);
 
     if let Some(parent) = parent

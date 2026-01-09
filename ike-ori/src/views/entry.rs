@@ -424,6 +424,7 @@ where
         let selection_color = self.get_selection_color(&palette, &theme);
         let blink_rate = self.blink_rate.unwrap_or(theme.blink_rate);
 
+        widgets::Entry::set_handle_color(&mut widget, palette.primary);
         widgets::Entry::set_placeholder(&mut widget, placeholder);
         widgets::Entry::set_min_width(&mut widget, min_width);
         widgets::Entry::set_max_width(&mut widget, max_width);

@@ -164,6 +164,10 @@ pub struct WidgetId<T: ?Sized = dyn Widget> {
     pub(crate) marker:     PhantomData<T>,
 }
 
+// SAFETY: doesn't actually contain T
+unsafe impl<T: ?Sized> Send for WidgetId<T> {}
+unsafe impl<T: ?Sized> Sync for WidgetId<T> {}
+
 impl<T: ?Sized> Clone for WidgetId<T> {
     fn clone(&self) -> Self {
         *self

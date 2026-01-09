@@ -24,6 +24,10 @@ impl Rect {
         }
     }
 
+    pub fn shrink(self, margin: f32) -> Self {
+        self.expand(-margin)
+    }
+
     pub const fn top(self) -> f32 {
         self.min.y
     }

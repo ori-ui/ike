@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-use crate::{Paint, Rect};
+use crate::{Paint, Point, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TextAlign {
@@ -234,6 +234,13 @@ impl TextLayoutLine {
 
     pub fn bottom(&self) -> f32 {
         self.baseline + self.descent
+    }
+
+    pub fn rect(&self) -> Rect {
+        Rect {
+            min: Point::new(self.left(), self.top()),
+            max: Point::new(self.right(), self.bottom()),
+        }
     }
 }
 

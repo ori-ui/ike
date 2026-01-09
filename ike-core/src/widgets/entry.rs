@@ -106,9 +106,27 @@ impl Entry {
         }
     }
 
+    pub fn set_handle_color(this: &mut WidgetMut<Self>, color: Color) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
+            TextArea::set_handle_color(&mut text_area, color);
+        }
+    }
+
     pub fn set_blink_rate(this: &mut WidgetMut<Self>, rate: f32) {
         if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
             TextArea::set_blink_rate(&mut text_area, rate);
+        }
+    }
+
+    pub fn set_handle_size(this: &mut WidgetMut<Self>, size: f32) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
+            TextArea::set_handle_size(&mut text_area, size);
+        }
+    }
+
+    pub fn set_handles_enabled(this: &mut WidgetMut<Self>, enabled: bool) {
+        if let Some(mut text_area) = this.cx.get_widget_mut(this.widget.text_area) {
+            TextArea::set_handles_enabled(&mut text_area, enabled);
         }
     }
 

@@ -36,8 +36,10 @@ pub(crate) fn down(world: &mut World, window: WindowId, touch: TouchId, position
         && let Some(touch) = window.touch(touch)
         && let Some(target) = find_touch_target(world, window, touch, position)
     {
+        let touch_id = touch.id;
+
         let event = TouchEvent::Down(TouchPressEvent {
-            touch: touch.id,
+            touch: touch_id,
             position,
         });
 
@@ -48,6 +50,12 @@ pub(crate) fn down(world: &mut World, window: WindowId, touch: TouchId, position
             TouchPropagate::Capture => {
                 if let Some(mut widget) = world.widget_mut(target) {
                     widget.set_active(true);
+                }
+
+                if let Some(window) = world.window_mut(window_id)
+                    && let Some(touch) = window.touch_mut(touch_id)
+                {
+                    touch.capturer = Some(target);
                 }
 
                 true
@@ -149,6 +157,12 @@ pub(crate) fn up(world: &mut World, window: WindowId, touch: TouchId, position: 
         widget.set_active(false);
     }
 
+    if let Some(window) = world.window_mut(window_id)
+        && let Some(touch) = window.touch_mut(touch_id)
+    {
+        touch.capturer = None;
+    }
+
     handled
 }
 
@@ -194,6 +208,12 @@ pub(crate) fn moved(world: &mut World, window: WindowId, touch: TouchId, positio
                 TouchPropagate::Capture => {
                     if let Some(mut widget) = world.widget_mut(target) {
                         widget.set_active(true);
+                    }
+
+                    if let Some(window) = world.window_mut(window_id)
+                        && let Some(touch) = window.touch_mut(touch_id)
+                    {
+                        touch.capturer = Some(target);
                     }
 
                     true

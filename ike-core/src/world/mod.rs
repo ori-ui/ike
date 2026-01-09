@@ -20,9 +20,9 @@ pub use widget_ref::WidgetRef;
 pub use widgets::AnyWidget;
 
 use crate::{
-    Builder, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Padding, Point, PointerButton,
-    PointerId, Recorder, ScrollDelta, Size, TouchId, Update, WidgetId, Window, WindowId,
-    WindowSizing, debug::debug_panic, event::TouchSettings, passes, window::LayerId,
+    AnyWidgetId, Builder, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Offset, Padding, Point,
+    PointerButton, PointerId, Recorder, ScrollDelta, Size, TouchId, Update, WidgetId, Window,
+    WindowId, WindowSizing, debug::debug_panic, event::TouchSettings, passes, window::LayerId,
 };
 
 pub struct World {
@@ -133,11 +133,19 @@ impl World {
         }
     }
 
-    pub fn add_layer(&mut self, window: WindowId, position: Point, widget: WidgetId) {
+    pub fn add_layer(
+        &mut self,
+        window: WindowId,
+        position: Point,
+        widget: impl AnyWidgetId,
+    ) -> LayerId {
+        let widget = widget.upcast();
+
         passes::hierarchy::set_window(self, widget, Some(window));
 
+        let id = Layer::next_id();
         let layer = Layer {
-            id: Layer::next_id(),
+            id,
             widget,
             position,
             size: self
@@ -156,8 +164,15 @@ impl World {
                 "layer widgets mut be orphans",
             );
 
+            widget.cx.state.transform.offset = Offset {
+                x: position.x,
+                y: position.y,
+            };
+
             widget.cx.request_compose();
         }
+
+        id
     }
 
     pub fn set_layer_position(&mut self, window: WindowId, layer: LayerId, position: Point) {
@@ -168,12 +183,19 @@ impl World {
             let widget = layer.widget;
 
             if let Some(mut widget) = self.widget_mut(widget) {
+                widget.cx.state.transform.offset = Offset {
+                    x: position.x,
+                    y: position.y,
+                };
+
                 widget.cx.request_compose();
             }
         }
     }
 
-    pub fn set_layer_widget(&mut self, window: WindowId, layer: LayerId, widget: WidgetId) {
+    pub fn set_layer_widget(&mut self, window: WindowId, layer: LayerId, widget: impl AnyWidgetId) {
+        let widget = widget.upcast();
+
         passes::hierarchy::set_window(self, widget, Some(window));
 
         if let Some(window) = self.state.window_mut(window)
@@ -191,7 +213,7 @@ impl World {
         if let Some(window) = self.state.window_mut(window) {
             let layers = Rc::make_mut(&mut window.layers);
 
-            if let Some(index) = layers.iter().position(|l| l.id != layer) {
+            if let Some(index) = layers.iter().position(|l| l.id == layer) {
                 debug_assert!(index > 0, "cannot remove base layer");
 
                 let layer = layers.remove(index);

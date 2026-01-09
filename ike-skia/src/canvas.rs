@@ -19,9 +19,9 @@ impl Canvas for SkiaCanvas<'_> {
     fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas)) {
         let matrix = skia_safe::Matrix::new_all(
             affine.matrix.matrix[0],
-            affine.matrix.matrix[1],
-            affine.offset.x,
             affine.matrix.matrix[2],
+            affine.offset.x,
+            affine.matrix.matrix[1],
             affine.matrix.matrix[3],
             affine.offset.y,
             0.0,
@@ -136,14 +136,16 @@ impl Canvas for SkiaCanvas<'_> {
     }
 
     fn draw_rect(&mut self, rect: Rect, radius: CornerRadius, paint: &Paint) {
-        let rect = skia_safe::RRect::new_nine_patch(
+        let rect = skia_safe::RRect::new_rect_radii(
             skia_safe::Rect::new(
                 rect.min.x, rect.min.y, rect.max.x, rect.max.y,
             ),
-            radius.top_left,
-            radius.top_right,
-            radius.bottom_right,
-            radius.bottom_left,
+            &[
+                skia_safe::Point::new(radius.top_left, radius.top_left),
+                skia_safe::Point::new(radius.top_right, radius.top_right),
+                skia_safe::Point::new(radius.bottom_right, radius.bottom_right),
+                skia_safe::Point::new(radius.bottom_left, radius.bottom_left),
+            ],
         );
 
         let paint = self.painter.create_paint(paint);

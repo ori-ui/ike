@@ -95,8 +95,16 @@ impl WorldState {
     }
 
     pub fn set_window_cursor(&mut self, window: WindowId, cursor: CursorIcon) {
-        if let Some(window) = self.window_mut(window) {
+        if let Some(window) = self.window_mut(window)
+            && window.cursor != cursor
+        {
             window.cursor = cursor;
+
+            let window = window.id;
+            self.emit_signal(Signal::UpdateWindow(
+                window,
+                WindowUpdate::Cursor(cursor),
+            ));
         }
     }
 }

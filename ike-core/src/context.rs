@@ -3,7 +3,7 @@ use std::ops::Range;
 use crate::{
     Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, ImeSignal, Painter, Paragraph, Point, Rect,
     Signal, Size, Space, Svg, TextLayoutLine, Widget, WidgetId, WidgetMut, WidgetRef, Window,
-    World, passes,
+    WindowId, World, passes,
     widget::{WidgetHierarchy, WidgetState},
     world::{Widgets, WorldState},
 };
@@ -326,6 +326,14 @@ impl_contexts! {
     LayoutCx<'_>,
     ComposeCx<'_>,
     DrawCx<'_> {
+        /// Mutate the [`World`] at an unspecified time in the future.
+        ///
+        /// This is useful for when a widget needs to insert or remove other widgets, but use with
+        /// care, as this can cause unwanted side effects.
+        pub fn defer(&self, f: impl FnOnce(&mut World) + Send + 'static) {
+            self.world.emit_signal(Signal::Mutate(Box::new(f)));
+        }
+
         pub fn get_widget<U>(&self, id: WidgetId<U>) -> Option<WidgetRef<'_, U>>
         where
             U: ?Sized + AnyWidget,
@@ -359,8 +367,12 @@ impl_contexts! {
             self.widgets.get(self.world, self.hierarchy.parent?)
         }
 
+        pub fn window(&self) -> Option<WindowId> {
+            self.hierarchy.window
+        }
+
         pub fn get_window(&self) -> Option<&Window> {
-            self.world.get_window(self.hierarchy.window?)
+            self.world.get_window(self.window()?)
         }
 
         pub fn is_window_focused(&self) -> bool {
@@ -466,14 +478,6 @@ impl_contexts! {
     MutCx<'_>,
     EventCx<'_>,
     UpdateCx<'_> {
-        /// Mutate the [`World`] at an unspecified time in the future.
-        ///
-        /// This is useful for when a widget needs to insert or remove other widgets, but use with
-        /// care, as this can cause unwanted side effects.
-        pub fn mutate_world(&self, f: impl FnOnce(&mut World) + Send + 'static) {
-            self.world.emit_signal(Signal::Mutate(Box::new(f)));
-        }
-
         pub fn restart_ime(&mut self) {
             if !self.is_focused() || !self.hierarchy.accepts_text() {
                 tracing::warn!("`restart_ime` can only be called on a focused view that accepts text");
