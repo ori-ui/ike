@@ -1,4 +1,4 @@
-use ike_core::{AnyWidgetId, Builder, WidgetId, widgets};
+use ike_core::{AnyWidgetId, Builder, Transition, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
 
 pub fn safe_area<V>(contents: V) -> SafeArea<V> {
@@ -7,11 +7,21 @@ pub fn safe_area<V>(contents: V) -> SafeArea<V> {
 
 pub struct SafeArea<V> {
     contents: V,
+
+    transition: Transition,
 }
 
 impl<V> SafeArea<V> {
     pub fn new(contents: V) -> Self {
-        Self { contents }
+        Self {
+            contents,
+            transition: Transition::ease(0.1),
+        }
+    }
+
+    pub fn transition(mut self, transition: Transition) -> Self {
+        self.transition = transition;
+        self
     }
 }
 
@@ -27,7 +37,9 @@ where
     fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
-        let widget = widgets::SafeArea::new(cx, contents);
+        let mut widget = widgets::SafeArea::new(cx, contents);
+
+        widgets::SafeArea::set_transition(&mut widget, self.transition);
 
         (widget.id(), (contents, state))
     }
@@ -51,6 +63,14 @@ where
         if !cx.is_child(*element, *contents) {
             cx.set_child(*element, 0, *contents);
         }
+
+        let Some(mut widget) = cx.get_widget_mut(*element) else {
+            return;
+        };
+
+        if self.transition != old.transition {
+            widgets::SafeArea::set_transition(&mut widget, self.transition);
+        }
     }
 
     fn teardown(
@@ -66,12 +86,18 @@ where
 
     fn event(
         &mut self,
-        _element: &mut Self::Element,
+        element: &mut Self::Element,
         (contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.event(contents, state, cx, data, event)
+        let action = self.contents.event(contents, state, cx, data, event);
+
+        if !cx.is_child(*element, *contents) {
+            cx.set_child(*element, 0, *contents);
+        }
+
+        action
     }
 }

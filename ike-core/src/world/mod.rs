@@ -20,8 +20,8 @@ pub use widget_ref::WidgetRef;
 pub use widgets::AnyWidget;
 
 use crate::{
-    Builder, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Point, PointerButton, PointerId,
-    Rect, ScrollDelta, Size, TouchId, Update, WidgetId, Window, WindowId, WindowSizing,
+    Builder, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Padding, Point, PointerButton,
+    PointerId, ScrollDelta, Size, TouchId, Update, WidgetId, Window, WindowId, WindowSizing,
     debug::debug_panic, passes,
 };
 
@@ -83,7 +83,7 @@ impl World {
 
             scale: 1.0,
             size: Size::new(800.0, 600.0),
-            safe_area: None,
+            insets: Padding::all(0.0),
             is_visible: true,
             is_focused: false,
             is_decorated: true,
@@ -162,16 +162,16 @@ impl World {
         passes::update::window(self, window_id, &update);
     }
 
-    pub fn window_safe_area_changed(&mut self, window: WindowId, safe_area: Option<Rect>) {
+    pub fn window_inset(&mut self, window: WindowId, insets: Padding) {
         let window_id = window;
 
         let Some(window) = self.window_mut(window) else {
             return;
         };
 
-        window.safe_area = safe_area;
+        window.insets = insets;
 
-        let update = Update::WindowSafeAreaChanged(safe_area);
+        let update = Update::WindowInset(insets);
         passes::update::window(self, window_id, &update);
     }
 

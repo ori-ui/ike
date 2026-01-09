@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    Canvas, Clip, ComposeCx, DrawCx, EventCx, KeyEvent, LayoutCx, Point, PointerEvent,
+    Canvas, Clip, ComposeCx, DrawCx, EventCx, KeyEvent, LayoutCx, Padding, Point, PointerEvent,
     PointerPropagate, Propagate, Rect, RefCx, Size, Space, TextEvent, TouchEvent, TouchPropagate,
     UpdateCx,
 };
@@ -142,8 +142,8 @@ pub enum Update {
     WindowResized(Size),
     /// [`Window::scale`](crate::Window::scale) has changed.
     WindowScaled(f32),
-    /// [`Window::safe_area`](crate::Window::safe_area) has changed.
-    WindowSafeAreaChanged(Option<Rect>),
+    /// [`Window::insets`](crate::Window::insets) have changed.
+    WindowInset(Padding),
 
     Children(ChildUpdate),
 }

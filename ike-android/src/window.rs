@@ -1,6 +1,6 @@
 use std::{ffi, ptr};
 
-use ike_core::{Point, Rect, Size};
+use ike_core::{Padding, Size};
 use jni::{JNIEnv, objects::JObject};
 use raw_window_handle::{AndroidNdkWindowHandle, DisplayHandle, RawWindowHandle, WindowHandle};
 
@@ -14,9 +14,9 @@ pub(super) enum WindowEvent {
     Resized,
     FocusChanged(bool),
     InsetsChanged {
-        system_bars: Rect,
-        ime:         Rect,
-        cutout:      Rect,
+        system_bars: Padding,
+        ime:         Padding,
+        cutout:      Padding,
     },
     RenderFinished,
 }
@@ -196,26 +196,20 @@ impl<'a, T> EventLoop<'a, T> {
                 );
 
                 if let WindowState::Open(ref mut window) = self.window {
-                    let mut safe_area = Rect::min_size(
-                        Point::ORIGIN,
-                        Size::new(
-                            window.width as f32,
-                            window.height as f32,
-                        ),
-                    );
+                    let mut insets = Padding::all(0.0);
 
-                    safe_area.min.x += system_bars.left() + ime.left() + cutout.left();
-                    safe_area.min.y += system_bars.top() + ime.top() + cutout.top();
-                    safe_area.max.x -= system_bars.right() + ime.right() + cutout.right();
-                    safe_area.max.y -= system_bars.bottom().max(ime.bottom()) + cutout.bottom();
+                    insets.left += system_bars.left + ime.left + cutout.left;
+                    insets.top += system_bars.top + ime.top + cutout.top;
+                    insets.right += system_bars.right + ime.right + cutout.right;
+                    insets.bottom += system_bars.bottom.max(ime.bottom) + cutout.bottom;
 
-                    safe_area.min.x /= self.scale_factor;
-                    safe_area.min.y /= self.scale_factor;
-                    safe_area.max.x /= self.scale_factor;
-                    safe_area.max.y /= self.scale_factor;
+                    insets.left /= self.scale_factor;
+                    insets.top /= self.scale_factor;
+                    insets.right /= self.scale_factor;
+                    insets.bottom /= self.scale_factor;
 
                     if let Some(id) = window.id {
-                        (self.context.world).window_safe_area_changed(id, Some(safe_area));
+                        (self.context.world).window_inset(id, insets);
                     }
                 }
             }
@@ -271,37 +265,25 @@ pub unsafe extern "C" fn on_apply_window_insets<'local>(
     cutout_right: i32,
     cutout_bottom: i32,
 ) {
-    let system_bars = Rect {
-        min: Point {
-            x: system_bars_left as f32,
-            y: system_bars_top as f32,
-        },
-        max: Point {
-            x: system_bars_right as f32,
-            y: system_bars_bottom as f32,
-        },
+    let system_bars = Padding {
+        left:   system_bars_left as f32,
+        top:    system_bars_top as f32,
+        right:  system_bars_right as f32,
+        bottom: system_bars_bottom as f32,
     };
 
-    let ime = Rect {
-        min: Point {
-            x: ime_left as f32,
-            y: ime_top as f32,
-        },
-        max: Point {
-            x: ime_right as f32,
-            y: ime_bottom as f32,
-        },
+    let ime = Padding {
+        left:   ime_left as f32,
+        top:    ime_top as f32,
+        right:  ime_right as f32,
+        bottom: ime_bottom as f32,
     };
 
-    let cutout = Rect {
-        min: Point {
-            x: cutout_left as f32,
-            y: cutout_top as f32,
-        },
-        max: Point {
-            x: cutout_right as f32,
-            y: cutout_bottom as f32,
-        },
+    let cutout = Padding {
+        left:   cutout_left as f32,
+        top:    cutout_top as f32,
+        right:  cutout_right as f32,
+        bottom: cutout_bottom as f32,
     };
 
     send_event(Event::Window(

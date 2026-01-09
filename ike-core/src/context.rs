@@ -132,9 +132,9 @@ impl MutCx<'_> {
         }
     }
 
-    pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
-        if self.is_pixel_perfect() != pixel_perfect {
-            self.state.is_pixel_perfect = pixel_perfect;
+    pub fn set_subpixel(&mut self, subpixel: bool) {
+        if self.is_subpixel() != subpixel {
+            self.state.is_subpixel = subpixel;
             self.request_layout();
         }
     }
@@ -367,8 +367,8 @@ impl_contexts! {
             self.get_window().is_some_and(|window| window.is_focused())
         }
 
-        pub fn is_pixel_perfect(&self) -> bool {
-            self.state.is_pixel_perfect
+        pub fn is_subpixel(&self) -> bool {
+            self.state.is_subpixel
         }
 
         pub fn is_hovered(&self) -> bool {
@@ -449,9 +449,9 @@ impl_contexts! {
             }
         }
 
-        pub fn set_pixel_perfect(&mut self, pixel_perfect: bool) {
-            if self.is_pixel_perfect() != pixel_perfect {
-                self.state.is_pixel_perfect = pixel_perfect;
+        pub fn set_subpixel(&mut self, subpixel: bool) {
+            if self.is_subpixel() != subpixel {
+                self.state.is_subpixel = subpixel;
                 self.request_layout();
             }
         }

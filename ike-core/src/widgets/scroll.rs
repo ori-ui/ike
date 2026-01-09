@@ -265,9 +265,9 @@ impl Widget for Scroll {
 
         if self.scroll.animate(dt) {
             cx.request_animate();
-            cx.set_pixel_perfect(false);
+            cx.set_subpixel(true);
         } else {
-            cx.set_pixel_perfect(true);
+            cx.set_subpixel(false);
         }
     }
 

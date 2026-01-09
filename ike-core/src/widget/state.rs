@@ -290,9 +290,9 @@ pub struct WidgetState {
     pub(crate) previous_space:   Option<Space>,
     pub(crate) cursor:           CursorIcon,
 
-    pub(crate) is_pixel_perfect: bool,
-    pub(crate) stable_draws:     u32,
-    pub(crate) clip:             Option<Clip>,
+    pub(crate) is_subpixel:  bool,
+    pub(crate) stable_draws: u32,
+    pub(crate) clip:         Option<Clip>,
 
     pub(crate) tracing_span: tracing::Span,
     #[allow(dead_code, reason = "used for debug purposes")]
@@ -313,9 +313,9 @@ impl WidgetState {
             previous_space:   None,
             cursor:           CursorIcon::Default,
 
-            is_pixel_perfect: true,
-            stable_draws:     0,
-            clip:             None,
+            is_subpixel:  false,
+            stable_draws: 0,
+            clip:         None,
 
             tracing_span: tracing::error_span!(
                 "Widget",

@@ -1,6 +1,6 @@
 use std::{ops::Deref, time::Duration};
 
-use crate::{Color, Size};
+use crate::{Color, Padding, Size};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TransitionCurve {
@@ -121,8 +121,8 @@ where
     /// Animate the value.
     ///
     /// Returns whether `request_animate` should be called.
-    pub fn animate(&mut self, delta_time: Duration) -> bool {
-        self.time += delta_time.as_secs_f32();
+    pub fn animate(&mut self, dt: Duration) -> bool {
+        self.time += dt.as_secs_f32();
         self.time = self.time.clamp(0.0, self.transition.duration);
 
         self.update_current();
@@ -178,6 +178,17 @@ impl Interpolate for Size {
         Self {
             width:  f32::interpolate(&from.width, &to.width, x),
             height: f32::interpolate(&from.height, &to.height, x),
+        }
+    }
+}
+
+impl Interpolate for Padding {
+    fn interpolate(start: &Self, end: &Self, x: f32) -> Self {
+        Self {
+            left:   f32::interpolate(&start.left, &end.left, x),
+            top:    f32::interpolate(&start.top, &end.top, x),
+            right:  f32::interpolate(&start.right, &end.right, x),
+            bottom: f32::interpolate(&start.bottom, &end.bottom, x),
         }
     }
 }

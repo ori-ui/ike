@@ -87,7 +87,7 @@ pub(crate) fn layout_widget(
     let mut cx = widget.cx.as_layout_cx(painter, scale);
     let mut size = widget.widget.layout(&mut cx, space);
 
-    if widget.cx.state.is_pixel_perfect {
+    if !widget.cx.is_subpixel() {
         size = size.pixel_align(scale);
 
         if size.width > space.max.width {
@@ -115,7 +115,7 @@ pub(crate) fn layout_widget(
 }
 
 pub(crate) fn place_widget(widget: &mut WidgetMut<'_>, mut transform: Affine, scale: f32) {
-    if widget.cx.state.is_pixel_perfect {
+    if !widget.cx.is_subpixel() {
         transform.offset = transform.offset.pixel_align(scale);
     }
 

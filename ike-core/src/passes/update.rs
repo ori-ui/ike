@@ -22,7 +22,7 @@ pub(crate) fn widget_recursive(widget: &mut WidgetMut<'_>, update: &Update) {
     passes::hierarchy::update_flags(widget);
 
     if let Update::WindowScaled(..) = update
-        && widget.cx.is_pixel_perfect()
+        && !widget.cx.is_subpixel()
     {
         widget.cx.hierarchy.request_layout();
     }

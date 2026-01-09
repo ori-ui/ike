@@ -69,9 +69,9 @@ impl Widget for Constrain {
 
         if self.min_size.animate(dt) || self.max_size.animate(dt) {
             cx.request_animate();
-            cx.set_pixel_perfect(false);
+            cx.set_subpixel(true);
         } else {
-            cx.set_pixel_perfect(true);
+            cx.set_subpixel(false);
         }
     }
 }
