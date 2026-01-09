@@ -52,6 +52,8 @@ if (keystorePropertiesFile.exists()) {
         ? file(keystoreProperties['storeFile']) : null
 }
 
+buildDir = "${cargoMetadata['build_directory']}/android"
+
 android {
     namespace  = androidMetadata['package']
     compileSdk = androidMetadata['compile-sdk'] ?: 35
