@@ -103,6 +103,11 @@ impl<'a, T> EventLoop<'a, T> {
                             id:      window.id,
                             updates: Vec::new(),
                         };
+
+                        // apparently, when the surface is recreated, all the recorded images become
+                        // invalidated. for this reason, we clear the recorder to ensure all widgets are
+                        // redraw. what a funny quirk!
+                        self.context.world.recorder_mut().clear();
                     }
 
                     WindowState::Pending { .. } => {}
@@ -153,6 +158,8 @@ impl<'a, T> EventLoop<'a, T> {
                     if let Err(err) = result {
                         tracing::error!("draw failed: {err}");
                     }
+
+                    self.painter.cleanup();
                 }
             }
 

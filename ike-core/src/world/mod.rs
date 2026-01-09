@@ -21,8 +21,8 @@ pub use widgets::AnyWidget;
 
 use crate::{
     Builder, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Padding, Point, PointerButton,
-    PointerId, ScrollDelta, Size, TouchId, Update, WidgetId, Window, WindowId, WindowSizing,
-    debug::debug_panic, passes,
+    PointerId, Recorder, ScrollDelta, Size, TouchId, Update, WidgetId, Window, WindowId,
+    WindowSizing, debug::debug_panic, event::TouchSettings, passes,
 };
 
 pub struct World {
@@ -130,6 +130,22 @@ impl World {
 
     pub fn get_window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
         self.state.get_window_mut(id)
+    }
+
+    pub fn touch_settings(&self) -> &TouchSettings {
+        &self.state.touch_settings
+    }
+
+    pub fn touch_settings_mut(&mut self) -> &mut TouchSettings {
+        &mut self.state.touch_settings
+    }
+
+    pub fn recorder(&mut self) -> &Recorder {
+        &self.state.recorder
+    }
+
+    pub fn recorder_mut(&mut self) -> &mut Recorder {
+        &mut self.state.recorder
     }
 
     pub fn window_resized(&mut self, window: WindowId, new_size: Size) {

@@ -92,6 +92,12 @@ impl Recorder {
         self.entries.contains_key(&widget)
     }
 
+    pub fn clear(&mut self) {
+        self.memory_usage = 0;
+        self.frame_count = 0;
+        self.entries.clear();
+    }
+
     pub(crate) fn cleanup(&mut self, widgets: &Widgets) {
         self.entries.retain(|id, _| widgets.contains(*id));
     }
