@@ -439,6 +439,10 @@ impl<T> AppState<'_, T> {
                 }
             }
 
+            Signal::Mutate(f) => {
+                f(&mut self.context.world);
+            }
+
             Signal::ClipboardSet(text) => {
                 let _ = self.clipboard.set_text(text);
             }

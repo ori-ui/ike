@@ -84,33 +84,9 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
 
     let id = widget.cx.id();
     let parent = widget.cx.parent();
-    let window = widget.cx.hierarchy.window;
 
     drop(widget);
-
-    if let Some(window_id) = window
-        && let Some(window) = world.window_mut(window_id)
-    {
-        for pointer in window.pointers.iter_mut() {
-            if pointer.hovering == Some(id) {
-                pointer.hovering = None;
-            }
-
-            if pointer.capturer == Some(id) {
-                pointer.capturer = None;
-            }
-        }
-
-        for touch in window.touches.iter_mut() {
-            if touch.capturer == Some(id) {
-                touch.capturer = None;
-            }
-        }
-
-        if window.focused == Some(id) {
-            passes::focus::next(world, window_id, true);
-        }
-    }
+    set_window(world, id, None);
 
     if let Some(parent) = parent
         && let Some(hierarchy) = world.widgets.get_hierarchy_mut(parent)
@@ -130,11 +106,83 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
 
 /// Set the `window` of a `widget` and its descendants.
 pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<WindowId>) {
-    if let Some(hierarchy) = world.widgets.get_hierarchy_mut(widget) {
-        hierarchy.window = window;
+    let Some(hierarchy) = world.widgets.get_hierarchy_mut(widget) else {
+        return;
+    };
+
+    let previous = mem::replace(&mut hierarchy.window, window);
+
+    let has_hovered = hierarchy.has_hovered();
+    let has_focused = hierarchy.has_focused();
+    let has_active = hierarchy.has_active();
+
+    if has_hovered
+        && let Some(window) = previous
+        && let Some(window) = world.state.window_mut(window)
+    {
+        for pointer in &mut window.pointers {
+            if let Some(hovered) = pointer.hovering
+                && is_descendant(&world.widgets, widget, hovered)
+            {
+                pointer.hovering = None;
+
+                if let Some(mut widget) = world.widget_mut(hovered) {
+                    widget.set_hovered(false);
+                }
+
+                break;
+            }
+        }
+    }
+
+    if has_active
+        && let Some(window) = previous
+        && let Some(window) = world.state.window_mut(window)
+    {
+        for pointer in &mut window.pointers {
+            if let Some(capturer) = pointer.capturer
+                && is_descendant(&world.widgets, widget, capturer)
+            {
+                pointer.capturer = None;
+
+                if let Some(mut widget) = world.widget_mut(capturer) {
+                    widget.set_active(false);
+                }
+
+                break;
+            }
+        }
+    }
+
+    if has_focused
+        && let Some(window) = previous
+        && let Some(window) = world.state.window_mut(window)
+        && let Some(focused) = window.focused
+    {
+        window.focused = None;
+
+        if let Some(mut widget) = world.widget_mut(focused) {
+            widget.set_focused(false);
+        }
     }
 
     propagate_up(world, widget);
+}
+
+fn is_descendant(widgets: &Widgets, ancestor: WidgetId, descendant: WidgetId) -> bool {
+    let mut current = Some(descendant);
+
+    while let Some(widget) = current
+        && let Some(hierarchy) = widgets.get_hierarchy(widget)
+    {
+        if ancestor == widget {
+            return true;
+        }
+
+        current = hierarchy.parent;
+    }
+
+    false
 }
 
 pub(crate) fn propagate_up(world: &mut World, widget: WidgetId) {

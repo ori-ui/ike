@@ -115,6 +115,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         this.widget.paragraph = paragraph;
 
         this.cx.request_layout();
+        this.cx.request_draw();
     }
 
     pub fn set_selection_color(this: &mut WidgetMut<Self>, color: Color) {

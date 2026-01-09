@@ -113,7 +113,7 @@ pub trait Builder {
     where
         Self: Sized,
     {
-        (self.world_mut()).set_window_base_layer(window, contents.upcast());
+        (self.world_mut()).set_window_widget(window, contents.upcast());
     }
 
     fn set_window_title(&mut self, window: WindowId, title: String) {

@@ -15,6 +15,7 @@ impl Label {
     pub fn set_text(this: &mut WidgetMut<Self>, paragraph: Paragraph) {
         this.widget.paragraph = paragraph;
         this.cx.request_layout();
+        this.cx.request_draw();
     }
 }
 

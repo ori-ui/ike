@@ -110,7 +110,7 @@ where
 
         if let Some(window) = cx.world().get_window(*id)
             && let Some(layer) = window.layers().first()
-            && layer.widget != contents.upcast()
+            && layer.widget() != contents.upcast()
         {
             cx.set_window_base_layer(*id, *contents);
         }
@@ -161,7 +161,7 @@ where
 
         if let Some(window) = cx.world().get_window(*id)
             && let Some(layer) = window.layers().first()
-            && layer.widget != contents.upcast()
+            && layer.widget() != contents.upcast()
         {
             cx.set_window_base_layer(*id, *contents);
         }

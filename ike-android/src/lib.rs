@@ -393,6 +393,10 @@ impl<'a, T> EventLoop<'a, T> {
                 }
             }
 
+            Signal::Mutate(f) => {
+                f(&mut self.context.world);
+            }
+
             Signal::ClipboardSet(..) => {}
 
             Signal::CreateWindow(window_id) => match self.window {

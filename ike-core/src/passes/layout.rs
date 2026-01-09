@@ -21,7 +21,7 @@ pub(crate) fn layout_window(
     let _span = tracing::info_span!("layout");
 
     // compute layout of the base layer
-    let size = if let Some(layer) = window.base_layer()
+    let size = if let Some(layer) = window.get_base_layer()
         && let Some(mut widget) = world.widget_mut(layer.widget)
     {
         let space = Space::new(Size::ZERO, max_size);
@@ -33,7 +33,7 @@ pub(crate) fn layout_window(
     let window = world.window_mut(window_id)?;
 
     // update layer size
-    if let Some(layer) = window.base_layer_mut() {
+    if let Some(layer) = window.get_base_layer_mut() {
         layer.size = size;
     }
 

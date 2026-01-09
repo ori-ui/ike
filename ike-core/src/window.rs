@@ -1,18 +1,34 @@
-use std::{any::Any, fmt, rc::Rc};
+use std::{
+    any::Any,
+    fmt,
+    rc::Rc,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use crate::{
     Color, CursorIcon, Modifiers, Padding, Point, Pointer, PointerId, Size, Touch, TouchId,
     WidgetId, debug::debug_panic,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowId {
     pub(crate) data: u64,
 }
 
 impl fmt::Debug for WindowId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "w{:x}", self.data)
+        write!(f, "{:x}", self.data)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LayerId {
+    pub(crate) data: u64,
+}
+
+impl fmt::Debug for LayerId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:x}", self.data)
     }
 }
 
@@ -28,9 +44,36 @@ pub enum WindowSizing {
 
 #[derive(Clone, Debug)]
 pub struct Layer {
-    pub widget:   WidgetId,
-    pub size:     Size,
-    pub position: Point,
+    pub(crate) id:       LayerId,
+    pub(crate) widget:   WidgetId,
+    pub(crate) position: Point,
+    pub(crate) size:     Size,
+}
+
+impl Layer {
+    pub(crate) fn next_id() -> LayerId {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
+        LayerId {
+            data: NEXT_ID.fetch_add(1, Ordering::SeqCst),
+        }
+    }
+
+    pub fn id(&self) -> LayerId {
+        self.id
+    }
+
+    pub fn widget(&self) -> WidgetId {
+        self.widget
+    }
+
+    pub fn size(&self) -> Size {
+        self.size
+    }
+
+    pub fn position(&self) -> Point {
+        self.position
+    }
 }
 
 #[derive(Debug)]
@@ -117,11 +160,19 @@ impl Window {
         Rc::make_mut(&mut self.layers).as_mut_slice()
     }
 
-    pub fn base_layer(&self) -> Option<&Layer> {
+    pub fn get_layer(&self, layer: LayerId) -> Option<&Layer> {
+        self.layers().iter().find(|l| l.id == layer)
+    }
+
+    pub fn get_layer_mut(&mut self, layer: LayerId) -> Option<&mut Layer> {
+        self.layers_mut().iter_mut().find(|l| l.id == layer)
+    }
+
+    pub fn get_base_layer(&self) -> Option<&Layer> {
         self.layers().first()
     }
 
-    pub fn base_layer_mut(&mut self) -> Option<&mut Layer> {
+    pub(crate) fn get_base_layer_mut(&mut self) -> Option<&mut Layer> {
         self.layers_mut().first_mut()
     }
 
