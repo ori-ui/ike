@@ -77,6 +77,7 @@ impl<'a, T> EventLoop<'a, T> {
                     focused: false,
                     width: width as u32,
                     height: height as u32,
+                    insets: Padding::all(0.0),
                 };
 
                 for update in updates.drain(..) {
@@ -207,6 +208,8 @@ impl<'a, T> EventLoop<'a, T> {
                     insets.top /= self.scale_factor;
                     insets.right /= self.scale_factor;
                     insets.bottom /= self.scale_factor;
+
+                    window.insets = insets;
 
                     if let Some(id) = window.id {
                         (self.context.world).window_inset(id, insets);

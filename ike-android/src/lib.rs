@@ -24,7 +24,7 @@ mod window;
 use jni::JavaVM;
 pub use log::MakeAndroidWriter;
 
-use ike_core::{Signal, Size, WindowId, WindowUpdate, World};
+use ike_core::{Padding, Signal, Size, WindowId, WindowUpdate, World};
 use ori::Proxyable;
 use parking_lot::Mutex;
 use raw_window_handle::DisplayHandle;
@@ -270,6 +270,7 @@ struct Window {
     focused: bool,
     width:   u32,
     height:  u32,
+    insets:  Padding,
 }
 
 enum Event {
@@ -408,6 +409,7 @@ impl<'a, T> EventLoop<'a, T> {
                     window.id = Some(window_id);
                     (self.context.world).window_scaled(window_id, size, self.scale_factor);
                     (self.context.world).window_focused(window_id, window.focused);
+                    (self.context.world).window_inset(window_id, window.insets);
                 }
 
                 _ => {
