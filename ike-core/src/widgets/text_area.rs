@@ -78,7 +78,10 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             handle_color: Color::GREEN,
             blink_rate: 5.0,
             handle_size: 20.0,
-            handles_enabled: cfg!(target_os = "android"),
+            handles_enabled: cfg!(any(
+                target_os = "android",
+                target_os = "ios",
+            )),
             newline_behaviour: NewlineBehaviour::Enter,
             submit_behaviour: SubmitBehaviour::default(),
 
