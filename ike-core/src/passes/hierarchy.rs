@@ -159,6 +159,25 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
         }
     }
 
+    if has_active
+        && let Some(window) = previous
+        && let Some(window) = world.state.window_mut(window)
+    {
+        for touch in &mut window.touches {
+            if let Some(capturer) = touch.capturer
+                && is_descendant(&world.widgets, widget, capturer)
+            {
+                touch.capturer = None;
+
+                if let Some(mut widget) = world.widget_mut(capturer) {
+                    widget.set_active(false);
+                }
+
+                break;
+            }
+        }
+    }
+
     if has_focused
         && let Some(window) = previous
         && let Some(window) = world.state.window_mut(window)

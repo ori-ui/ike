@@ -188,11 +188,17 @@ pub(crate) fn moved(world: &mut World, window: WindowId, touch: TouchId, positio
     if touch.distance() > pan_distance || matches!(touch.state, TouchState::Panning) {
         tracing::trace!(?touch_id, ?position, "touch pan");
 
+        // if we're starting a pan gesture, target it at the start position
+        let target_position = match touch.state {
+            TouchState::Panning => position,
+            _ => touch.start_position,
+        };
+
         touch.state = TouchState::Panning;
 
         if let Some(window) = world.window(window_id)
             && let Some(touch) = window.touch(touch_id)
-            && let Some(target) = find_touch_target(world, window, touch, position)
+            && let Some(target) = find_touch_target(world, window, touch, target_position)
         {
             let pan_event = TouchEvent::Gesture(Gesture::Pan(PanGesture {
                 touch: touch_id,

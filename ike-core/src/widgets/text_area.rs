@@ -6,7 +6,7 @@ use crate::{
     Affine, AnyWidgetId, Builder, Canvas, Color, ComposeCx, CornerRadius, CursorIcon, DrawCx,
     EventCx, Gesture, ImeEvent, Key, KeyEvent, LayoutCx, MutCx, Offset, Paint, Paragraph, Point,
     PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine, TouchEvent,
-    TouchPropagate, Update, UpdateCx, Widget, WidgetId, WidgetMut, event::TextEvent,
+    TouchPropagate, Update, UpdateCx, Widget, WidgetId, WidgetMut, World, event::TextEvent,
     window::LayerId,
 };
 
@@ -59,12 +59,13 @@ pub struct TextArea<const EDITABLE: bool> {
     #[allow(clippy::type_complexity)]
     on_submit: Option<Box<dyn FnMut(&str)>>,
 
-    lines:         Vec<TextLayoutLine>,
-    cursor:        usize,
-    selection:     Option<usize>,
-    blink:         f32,
-    cursor_anchor: Option<f32>,
-    handle:        Option<(LayerId, WidgetId<Handle<EDITABLE>>)>,
+    lines:            Vec<TextLayoutLine>,
+    cursor:           usize,
+    selection:        Option<usize>,
+    blink:            f32,
+    cursor_anchor:    Option<f32>,
+    cursor_handle:    Option<(LayerId, WidgetId<Handle<EDITABLE>>)>,
+    selection_handle: Option<(LayerId, WidgetId<Handle<EDITABLE>>)>,
 }
 
 impl<const EDITABLE: bool> TextArea<EDITABLE> {
@@ -78,10 +79,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             handle_color: Color::GREEN,
             blink_rate: 5.0,
             handle_size: 20.0,
-            handles_enabled: cfg!(any(
-                target_os = "android",
-                target_os = "ios",
-            )),
+            handles_enabled: true,
             newline_behaviour: NewlineBehaviour::Enter,
             submit_behaviour: SubmitBehaviour::default(),
 
@@ -93,7 +91,8 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             selection: None,
             blink: 0.0,
             cursor_anchor: None,
-            handle: None,
+            cursor_handle: None,
+            selection_handle: None,
         })
         .finish()
     }
@@ -143,7 +142,14 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
     pub fn set_handle_color(this: &mut WidgetMut<Self>, color: Color) {
         this.widget.handle_color = color;
 
-        if let Some((_layer, handle)) = this.widget.handle
+        if let Some((_layer, handle)) = this.widget.cursor_handle
+            && let Some(mut handle) = this.cx.get_widget_mut(handle)
+        {
+            handle.widget.color = color;
+            handle.cx.request_draw();
+        }
+
+        if let Some((_layer, handle)) = this.widget.selection_handle
             && let Some(mut handle) = this.cx.get_widget_mut(handle)
         {
             handle.widget.color = color;
@@ -155,7 +161,14 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         this.widget.handle_size = size;
         this.cx.request_compose();
 
-        if let Some((_layer, handle)) = this.widget.handle
+        if let Some((_layer, handle)) = this.widget.cursor_handle
+            && let Some(mut handle) = this.cx.get_widget_mut(handle)
+        {
+            handle.widget.size = size;
+            handle.cx.request_layout();
+        }
+
+        if let Some((_layer, handle)) = this.widget.selection_handle
             && let Some(mut handle) = this.cx.get_widget_mut(handle)
         {
             handle.widget.size = size;
@@ -168,7 +181,16 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
 
         if !enabled
             && let Some(window) = this.cx.window()
-            && let Some((layer, _handle)) = this.widget.handle.take()
+            && let Some((layer, _handle)) = this.widget.cursor_handle.take()
+        {
+            this.cx.defer(move |world| {
+                world.remove_layer(window, layer);
+            });
+        }
+
+        if !enabled
+            && let Some(window) = this.cx.window()
+            && let Some((layer, _handle)) = this.widget.selection_handle.take()
         {
             this.cx.defer(move |world| {
                 world.remove_layer(window, layer);
@@ -511,9 +533,13 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         );
     }
 
-    fn set_selection_event(&self, cx: &mut EventCx<'_>) {
+    fn set_selection_event(&mut self, cx: &mut EventCx<'_>) {
         if !cx.is_focused() || !EDITABLE {
             return;
+        }
+
+        if self.selection.is_none() && self.selection_handle.is_some() {
+            cx.defer(self.remove_selection_handle());
         }
 
         let (start, end) = match self.selection {
@@ -527,9 +553,13 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         cx.set_ime_selection(start..end, None);
     }
 
-    fn set_selection_mut(&self, cx: &mut MutCx<'_>) {
+    fn set_selection_mut(&mut self, cx: &mut MutCx<'_>) {
         if !cx.is_focused() || !EDITABLE {
             return;
+        }
+
+        if self.selection.is_none() && self.selection_handle.is_some() {
+            cx.defer(self.remove_selection_handle());
         }
 
         let (start, end) = match self.selection {
@@ -546,19 +576,23 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
     fn text_changed(&mut self, cx: &mut EventCx<'_>) {
         cx.set_ime_text(self.text().to_owned());
 
+        cx.request_layout();
+        cx.request_compose();
+        cx.request_draw();
+        cx.request_animate();
+
         if let Some(ref mut on_change) = self.on_change {
             on_change(&self.paragraph.text);
         }
 
-        self.remove_handle_event(cx);
+        cx.defer(self.remove_handles());
     }
 
-    fn create_handle(&mut self, cx: &mut EventCx<'_>) {
+    fn create_handle(&mut self, cx: &mut EventCx<'_>, offset: usize, is_cursor: bool) {
         if let Some(window) = cx.window()
             && self.handles_enabled
-            && self.handle.is_none()
         {
-            let (position, offset) = self.handle_position(cx.rect(), self.cursor);
+            let (position, offset) = self.handle_position(cx.rect(), offset);
             let position = cx.global_transform() * position;
 
             let size = self.handle_size;
@@ -566,11 +600,22 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             let this = WidgetId::<Self>::downcast_unchecked(cx.id());
 
             cx.defer(move |world| {
+                if let Some(text_area) = world.get_widget(this) {
+                    if is_cursor && text_area.widget.cursor_handle.is_some() {
+                        return;
+                    }
+
+                    if !is_cursor && text_area.widget.selection_handle.is_some() {
+                        return;
+                    }
+                }
+
                 let handle = world
                     .build_widget(Handle {
                         size,
                         offset,
                         color,
+                        is_cursor,
                         text_area: this,
                     })
                     .finish()
@@ -579,33 +624,51 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
                 let layer = world.add_layer(window, position, handle);
 
                 if let Some(text_area) = world.get_widget_mut(this) {
-                    text_area.widget.handle = Some((layer, handle));
+                    if is_cursor {
+                        text_area.widget.cursor_handle = Some((layer, handle));
+                    } else {
+                        text_area.widget.selection_handle = Some((layer, handle));
+                    }
                 }
             });
         }
     }
 
-    fn remove_handle_event(&mut self, cx: &mut EventCx<'_>) {
-        if let Some(window) = cx.get_window()
-            && let Some((layer, _handle)) = self.handle.take()
-        {
-            let window = window.id();
+    fn remove_handles(&mut self) -> impl FnOnce(&mut World) + 'static {
+        let cursor = self.remove_cursor_handle();
+        let selection = self.remove_selection_handle();
 
-            cx.defer(move |world| {
-                world.remove_layer(window, layer);
-            });
+        move |world| {
+            cursor(world);
+            selection(world);
         }
     }
 
-    fn remove_handle_update(&mut self, cx: &mut UpdateCx<'_>) {
-        if let Some(window) = cx.get_window()
-            && let Some((layer, _handle)) = self.handle.take()
-        {
-            let window = window.id();
+    fn remove_cursor_handle(&mut self) -> impl FnOnce(&mut World) + 'static + use<EDITABLE> {
+        let cursor_handle = self.cursor_handle.take();
 
-            cx.defer(move |world| {
+        move |world| {
+            if let Some((layer, widget)) = cursor_handle
+                && let Some(window) = world
+                    .get_widget(widget)
+                    .and_then(|widget| widget.cx.window())
+            {
                 world.remove_layer(window, layer);
-            });
+            }
+        }
+    }
+
+    fn remove_selection_handle(&mut self) -> impl FnOnce(&mut World) + 'static + use<EDITABLE> {
+        let selection_handle = self.selection_handle.take();
+
+        move |world| {
+            if let Some((layer, widget)) = selection_handle
+                && let Some(window) = world
+                    .get_widget(widget)
+                    .and_then(|widget| widget.cx.window())
+            {
+                world.remove_layer(window, layer);
+            }
         }
     }
 
@@ -615,7 +678,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             .iter()
             .find(|l| offset >= l.start_index && offset <= l.end_index)
         {
-            let offset = Self::cursor_offset_in_line(self.cursor, line);
+            let offset = Self::cursor_offset_in_line(offset, line);
             let position = Point::new(
                 offset - self.handle_size / 2.0,
                 line.bottom(),
@@ -648,9 +711,21 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
     fn compose(&mut self, cx: &mut ComposeCx<'_>) {
         if let Some(window) = cx.window()
-            && let Some((layer, _handle)) = self.handle
+            && let Some((layer, _handle)) = self.cursor_handle
         {
             let (position, _offset) = self.handle_position(cx.rect(), self.cursor);
+            let position = cx.global_transform() * position;
+
+            cx.defer(move |world| {
+                world.set_layer_position(window, layer, position);
+            });
+        }
+
+        if let Some(window) = cx.window()
+            && let Some(selection) = self.selection
+            && let Some((layer, _handle)) = self.selection_handle
+        {
+            let (position, _offset) = self.handle_position(cx.rect(), selection);
             let position = cx.global_transform() * position;
 
             cx.defer(move |world| {
@@ -682,7 +757,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
             Update::Focused(..) | Update::WindowFocused(..) => {
                 // remove the handle
                 if let Update::Focused(false) = update {
-                    self.remove_handle_update(cx);
+                    cx.defer(self.remove_handles());
                 }
 
                 cx.request_draw();
@@ -697,7 +772,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
             }
 
             Update::Removed => {
-                self.remove_handle_update(cx);
+                cx.defer(self.remove_handles());
             }
 
             _ => {}
@@ -764,7 +839,38 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                 cx.request_animate();
 
                 if cx.is_focused() {
-                    self.create_handle(cx);
+                    self.create_handle(cx, self.cursor, true);
+                }
+
+                TouchPropagate::Handled
+            }
+
+            TouchEvent::Gesture(Gesture::DoubleTap(..)) if cx.is_focused() => {
+                // select the tapped word
+
+                let mut selection = self.cursor;
+
+                while let Some(c) = self.paragraph.text[self.cursor..].chars().next()
+                    && !c.is_whitespace()
+                {
+                    self.cursor += c.len_utf8();
+                }
+
+                while let Some(c) = self.paragraph.text[..selection].chars().next_back()
+                    && !c.is_whitespace()
+                {
+                    selection -= c.len_utf8();
+                }
+
+                if self.cursor != selection {
+                    self.selection = Some(selection);
+
+                    cx.request_compose();
+                    cx.request_draw();
+
+                    cx.defer(self.remove_handles());
+                    self.create_handle(cx, self.cursor, true);
+                    self.create_handle(cx, selection, false);
                 }
 
                 TouchPropagate::Handled
@@ -801,9 +907,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         self.text_changed(cx);
                         self.set_selection_event(cx);
 
-                        cx.request_compose();
-                        cx.request_layout();
-
                         Propagate::Handled
                     }
 
@@ -816,9 +919,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         self.text_changed(cx);
                         self.set_selection_event(cx);
 
-                        cx.request_compose();
-                        cx.request_layout();
-
                         Propagate::Handled
                     }
 
@@ -828,7 +928,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         cx.request_compose();
                         cx.request_draw();
-                        cx.request_animate();
 
                         Propagate::Handled
                     }
@@ -839,7 +938,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         cx.request_compose();
                         cx.request_draw();
-                        cx.request_animate();
 
                         Propagate::Handled
                     }
@@ -850,7 +948,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         cx.request_compose();
                         cx.request_draw();
-                        cx.request_animate();
 
                         Propagate::Handled
                     }
@@ -861,7 +958,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         cx.request_compose();
                         cx.request_draw();
-                        cx.request_animate();
 
                         Propagate::Handled
                     }
@@ -872,19 +968,11 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                             self.text_changed(cx);
                             self.set_selection_event(cx);
-
-                            cx.request_compose();
-                            cx.request_layout();
-                            cx.request_animate();
                         } else if self.cursor < self.paragraph.text.len() {
                             self.paragraph.text.remove(self.cursor);
 
                             self.text_changed(cx);
                             self.set_selection_event(cx);
-
-                            cx.request_compose();
-                            cx.request_layout();
-                            cx.request_animate();
                         }
 
                         Propagate::Handled
@@ -896,20 +984,12 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                             self.text_changed(cx);
                             self.set_selection_event(cx);
-
-                            cx.request_compose();
-                            cx.request_layout();
-                            cx.request_animate();
                         } else if self.cursor > 0 {
                             self.move_backward(false);
                             self.paragraph.text.remove(self.cursor);
 
                             self.text_changed(cx);
                             self.set_selection_event(cx);
-
-                            cx.request_compose();
-                            cx.request_layout();
-                            cx.request_animate();
                         }
 
                         Propagate::Handled
@@ -925,10 +1005,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                         self.text_changed(cx);
                         self.set_selection_event(cx);
-
-                        cx.request_compose();
-                        cx.request_layout();
-                        cx.request_animate();
 
                         Propagate::Handled
                     }
@@ -950,10 +1026,11 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                         if self.submit_behaviour.clear_text {
                             self.paragraph.text.clear();
                             self.set_cursor(0, false);
-
-                            cx.request_compose();
-                            cx.request_layout();
                         }
+
+                        cx.request_layout();
+                        cx.request_compose();
+                        cx.request_draw();
 
                         Propagate::Handled
                     }
@@ -973,9 +1050,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
                 self.text_changed(cx);
                 self.set_selection_event(cx);
-
-                cx.request_compose();
-                cx.request_layout();
 
                 Propagate::Handled
             }
@@ -1008,9 +1082,6 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
                     self.text_changed(cx);
                     self.set_selection_event(cx);
 
-                    cx.request_compose();
-                    cx.request_layout();
-
                     Propagate::Handled
                 }
 
@@ -1038,6 +1109,7 @@ struct Handle<const EDITABLE: bool> {
     size:      f32,
     offset:    f32,
     color:     Color,
+    is_cursor: bool,
     text_area: WidgetId<TextArea<EDITABLE>>,
 }
 
@@ -1066,59 +1138,35 @@ impl<const EDITABLE: bool> Widget for Handle<EDITABLE> {
         );
     }
 
-    fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
-        match event {
-            PointerEvent::Down(..) => PointerPropagate::Capture,
-
-            PointerEvent::Move(event) if cx.is_active() => {
-                let mut position = event.position;
-                position.y -= self.offset;
-
-                let text_area = self.text_area;
-
-                cx.defer(move |world| {
-                    if let Some(mut widget) = world.get_widget_mut(text_area) {
-                        let position = widget.cx.global_transform().inverse() * position;
-
-                        let cursor = widget.widget.find_point(position, true);
-                        widget.widget.set_cursor(cursor, false);
-
-                        widget.cx.request_compose();
-                        widget.cx.request_draw();
-                    }
-                });
-
-                PointerPropagate::Bubble
-            }
-
-            _ => PointerPropagate::Bubble,
-        }
-    }
-
     fn on_touch_event(&mut self, cx: &mut EventCx<'_>, event: &TouchEvent) -> TouchPropagate {
         match event {
-            TouchEvent::Down(..) => TouchPropagate::Capture,
-
-            TouchEvent::Move(event) if cx.is_active() => {
+            TouchEvent::Gesture(Gesture::Pan(event)) => {
                 let mut position = event.position;
                 position.y -= self.offset;
 
                 let text_area = self.text_area;
+                let is_cursor = self.is_cursor;
 
                 cx.defer(move |world| {
-                    if let Some(mut widget) = world.get_widget_mut(text_area) {
-                        let position = widget.cx.global_transform().inverse() * position;
+                    if let Some(mut text_area) = world.get_widget_mut(text_area) {
+                        let position = text_area.cx.global_transform().inverse() * position;
 
-                        let cursor = widget.widget.find_point(position, true);
-                        widget.widget.set_cursor(cursor, false);
-                        widget.widget.set_selection_mut(&mut widget.cx);
+                        let cursor = text_area.widget.find_point(position, true);
 
-                        widget.cx.request_compose();
-                        widget.cx.request_draw();
+                        if is_cursor {
+                            text_area.widget.cursor = cursor;
+                        } else {
+                            text_area.widget.selection = Some(cursor);
+                        }
+
+                        text_area.widget.set_selection_mut(&mut text_area.cx);
+
+                        text_area.cx.request_compose();
+                        text_area.cx.request_draw();
                     }
                 });
 
-                TouchPropagate::Bubble
+                TouchPropagate::Capture
             }
 
             TouchEvent::Up(..) if cx.is_active() => TouchPropagate::Handled,

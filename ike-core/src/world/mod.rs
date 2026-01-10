@@ -405,6 +405,7 @@ impl World {
 }
 
 impl World {
+    #[track_caller]
     pub(crate) fn widget(&self, id: WidgetId) -> Option<WidgetRef<'_>> {
         match self.get_widget(id) {
             Some(widget) => Some(widget),
@@ -416,6 +417,7 @@ impl World {
         }
     }
 
+    #[track_caller]
     pub(crate) fn widget_mut(&mut self, id: WidgetId) -> Option<WidgetMut<'_>> {
         match self.get_widget_mut(id) {
             Some(widget) => Some(widget),
