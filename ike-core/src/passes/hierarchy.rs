@@ -91,6 +91,7 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
         passes::update::widget(&mut widget, Update::Removed);
     }
 
+    // set the window to `None` to handle the removal of hover, focus, and active
     set_window(world, id, None);
 
     if let Some(parent) = parent
@@ -121,6 +122,7 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
     let has_focused = hierarchy.has_focused();
     let has_active = hierarchy.has_active();
 
+    // remove widget from pointer hovered
     if has_hovered
         && let Some(window) = previous
         && let Some(window) = world.state.window_mut(window)
@@ -140,44 +142,47 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
         }
     }
 
-    if has_active
-        && let Some(window) = previous
-        && let Some(window) = world.state.window_mut(window)
-    {
-        for pointer in &mut window.pointers {
-            if let Some(capturer) = pointer.capturer
-                && is_descendant(&world.widgets, widget, capturer)
-            {
-                pointer.capturer = None;
+    if has_active {
+        // remove widget from pointer capturer
+        if let Some(window) = previous
+            && let Some(window) = world.state.window_mut(window)
+        {
+            for pointer in &mut window.pointers {
+                if let Some(capturer) = pointer.capturer
+                    && is_descendant(&world.widgets, widget, capturer)
+                {
+                    pointer.capturer = None;
 
-                if let Some(mut widget) = world.widget_mut(capturer) {
-                    widget.set_active(false);
+                    if let Some(mut widget) = world.widget_mut(capturer) {
+                        widget.set_active(false);
+                    }
+
+                    break;
                 }
+            }
+        }
 
-                break;
+        // remove widget from touch capturer
+        if let Some(window) = previous
+            && let Some(window) = world.state.window_mut(window)
+        {
+            for touch in &mut window.touches {
+                if let Some(capturer) = touch.capturer
+                    && is_descendant(&world.widgets, widget, capturer)
+                {
+                    touch.capturer = None;
+
+                    if let Some(mut widget) = world.widget_mut(capturer) {
+                        widget.set_active(false);
+                    }
+
+                    break;
+                }
             }
         }
     }
 
-    if has_active
-        && let Some(window) = previous
-        && let Some(window) = world.state.window_mut(window)
-    {
-        for touch in &mut window.touches {
-            if let Some(capturer) = touch.capturer
-                && is_descendant(&world.widgets, widget, capturer)
-            {
-                touch.capturer = None;
-
-                if let Some(mut widget) = world.widget_mut(capturer) {
-                    widget.set_active(false);
-                }
-
-                break;
-            }
-        }
-    }
-
+    // remove widget from window focused
     if has_focused
         && let Some(window) = previous
         && let Some(window) = world.state.window_mut(window)
@@ -189,6 +194,10 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
             widget.set_focused(false);
         }
     }
+
+    // TODO: handle stashed and disabled, it only matters for when a widget is moved from one
+    //       window to another while a parent is stashed or disabled, which is something that will
+    //       not happen often
 
     propagate_up(world, widget);
 }
