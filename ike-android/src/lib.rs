@@ -128,7 +128,11 @@ where
     });
 }
 
-pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Error> {
+pub fn run<T>(
+    data: &mut T,
+    mut build: ike_ori::UiBuilder<T>,
+    settings: ike_core::Settings,
+) -> Result<(), Error> {
     let global_state = GLOBAL_STATE
         .get()
         .expect("android_main should have been called");
@@ -173,7 +177,7 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     });
 
     let mut context = ike_ori::Context {
-        world:     World::new(signaller),
+        world:     World::new(signaller, settings),
         proxy:     Arc::new(proxy.clone()),
         resources: ike_ori::Resources::new(),
     };

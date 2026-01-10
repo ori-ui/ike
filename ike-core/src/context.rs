@@ -258,13 +258,7 @@ impl LayoutCx<'_> {
     }
 
     pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
-        if let Some(child) = self.hierarchy.children.get(index)
-            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
-        {
-            passes::layout::place_widget(&mut child, transform.into(), self.scale);
-        } else {
-            tracing::error!("`LayoutCx::place_child` called on invalid child");
-        }
+        passes::layout::place_child(self, index, transform.into());
     }
 
     pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
@@ -278,13 +272,7 @@ impl ComposeCx<'_> {
     }
 
     pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
-        if let Some(child) = self.hierarchy.children.get(index)
-            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
-        {
-            passes::compose::place_widget(&mut child, transform.into(), self.scale);
-        } else {
-            tracing::error!("`ComposeCx::place_child` called on invalid child");
-        }
+        passes::compose::place_child(self, index, transform.into());
     }
 }
 
@@ -452,15 +440,6 @@ impl_contexts! {
             }
         }
 
-
-        pub fn request_draw(&mut self) {
-            self.hierarchy.request_draw();
-
-            if let Some(window) = self.hierarchy.window {
-                self.world.request_redraw(window);
-            }
-        }
-
         pub fn set_subpixel(&mut self, subpixel: bool) {
             if self.is_subpixel() != subpixel {
                 self.state.is_subpixel = subpixel;
@@ -470,6 +449,21 @@ impl_contexts! {
 
         pub fn set_cursor(&mut self, cursor: CursorIcon) {
             self.state.cursor = cursor;
+        }
+    }
+}
+
+impl_contexts! {
+    EventCx<'_>,
+    UpdateCx<'_>,
+    LayoutCx<'_>,
+    ComposeCx<'_> {
+        pub fn request_draw(&mut self) {
+            self.hierarchy.request_draw();
+
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_redraw(window);
+            }
         }
     }
 }

@@ -31,11 +31,13 @@ pub use canvas::{Blend, Canvas, Cap, Clip, Join, Paint, Shader, Stroke};
 pub use color::Color;
 pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
 pub use curve::{Curve, CurveData, CurveSegment, CurveVerb, Fill, WeakCurve};
+pub use debug::DebugSettings;
 pub use event::{
     CursorIcon, Gesture, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, PanGesture,
     Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,
     PointerPropagate, PointerScrollEvent, Propagate, ScrollDelta, TapGesture, TextEvent,
     TextPasteEvent, Touch, TouchEvent, TouchId, TouchMoveEvent, TouchPressEvent, TouchPropagate,
+    TouchSettings,
 };
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
@@ -47,5 +49,7 @@ pub use text::{
 };
 pub use transition::{Interpolate, Transition, TransitionCurve, Transitioned};
 pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
-pub use window::{Layer, Window, WindowId, WindowSizing};
-pub use world::{AnyWidget, ImeSignal, Signal, WidgetMut, WidgetRef, WindowUpdate, World};
+pub use window::{Layer, LayerId, Window, WindowId, WindowSizing};
+pub use world::{
+    AnyWidget, ImeSignal, Settings, Signal, WidgetMut, WidgetRef, WindowUpdate, World,
+};

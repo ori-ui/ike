@@ -30,7 +30,7 @@ pub struct Recorder {
 #[derive(Debug)]
 struct RecorderEntry {
     recording:       Recording,
-    last_frame_used: u64,
+    frame_last_used: u64,
     cost_estimate:   f32,
 }
 
@@ -63,16 +63,36 @@ impl Recorder {
 
         let entry = RecorderEntry {
             recording,
-            last_frame_used: self.frame_count,
+            frame_last_used: self.frame_count,
             cost_estimate,
         };
 
         self.entries.insert(widget, entry);
     }
 
-    pub fn get_marked(&mut self, widget: WidgetId) -> Option<Recording> {
+    pub fn get_recording_unmarked(&self, widget: WidgetId) -> Option<&Recording> {
+        let entry = self.entries.get(&widget)?;
+        Some(&entry.recording)
+    }
+
+    pub fn get_last_frame_used(&self, widget: WidgetId) -> Option<u64> {
+        let entry = self.entries.get(&widget)?;
+        Some(entry.frame_last_used)
+    }
+
+    pub fn get_frames_unused(&self, widget: WidgetId) -> Option<u64> {
+        let entry = self.entries.get(&widget)?;
+        Some(self.frame_count - entry.frame_last_used)
+    }
+
+    pub fn get_cost_estimate(&self, widget: WidgetId) -> Option<f32> {
+        let entry = self.entries.get(&widget)?;
+        Some(entry.cost_estimate)
+    }
+
+    pub fn get_recording_marked(&mut self, widget: WidgetId) -> Option<Recording> {
         let entry = self.entries.get_mut(&widget)?;
-        entry.last_frame_used = self.frame_count;
+        entry.frame_last_used = self.frame_count;
         Some(entry.recording.clone())
     }
 
@@ -107,7 +127,7 @@ impl Recorder {
         self.frame_count += 1;
 
         self.entries.retain(|widget, entry| {
-            let frames_unused = self.frame_count - entry.last_frame_used;
+            let frames_unused = self.frame_count - entry.frame_last_used;
             let should_remove = frames_unused >= self.max_frames_unused;
 
             if should_remove {

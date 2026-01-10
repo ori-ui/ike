@@ -51,7 +51,11 @@ pub enum Error {
     Io(#[from] io::Error),
 }
 
-pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Error> {
+pub fn run<T>(
+    data: &mut T,
+    mut build: ike_ori::UiBuilder<T>,
+    settings: ike_core::Settings,
+) -> Result<(), Error> {
     let rt;
     let _rt_guard = if tokio::runtime::Handle::try_current().is_err() {
         rt = Some(tokio::runtime::Runtime::new()?);
@@ -82,7 +86,7 @@ pub fn run<T>(data: &mut T, mut build: ike_ori::UiBuilder<T>) -> Result<(), Erro
     });
 
     let context = ike_ori::Context {
-        world:     World::new(signaller),
+        world:     World::new(signaller, settings),
         proxy:     Arc::new(proxy),
         resources: ike_ori::Resources::new(),
     };

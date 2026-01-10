@@ -3,29 +3,29 @@ use std::time::Instant;
 use cursor_icon::CursorIcon;
 
 use crate::{
-    Color, Recorder, Signal, Window, WindowId, WindowSizing, WindowUpdate, debug::debug_panic,
-    event::TouchSettings,
+    Color, Recorder, Settings, Signal, Window, WindowId, WindowSizing, WindowUpdate,
+    debug::debug_panic,
 };
 
 pub(crate) struct WorldState {
     pub signaller: Box<dyn Fn(Signal)>,
+    pub settings:  Settings,
 
     pub windows: Vec<Window>,
 
-    pub should_trace:   bool,
-    pub touch_settings: TouchSettings,
-    pub recorder:       Recorder,
+    pub should_trace: bool,
+    pub recorder:     Recorder,
 }
 
 impl WorldState {
-    pub fn new(signaller: Box<dyn Fn(Signal)>) -> Self {
+    pub fn new(signaller: Box<dyn Fn(Signal)>, settings: Settings) -> Self {
         Self {
             signaller,
+            settings,
 
             windows: Vec::new(),
 
             should_trace: cfg!(debug_assertions),
-            touch_settings: TouchSettings::default(),
             recorder: Recorder::new(),
         }
     }

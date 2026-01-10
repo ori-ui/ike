@@ -1,3 +1,4 @@
+use ike_core::Settings;
 use ike_ori::Effect;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt};
 
@@ -14,7 +15,9 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub struct App {}
+pub struct App {
+    settings: Settings,
+}
 
 impl Default for App {
     fn default() -> Self {
@@ -24,7 +27,14 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            settings: Settings::default(),
+        }
+    }
+
+    pub fn recorder_overlay(mut self, enabled: bool) -> Self {
+        self.settings.debug.recorder_overlay = enabled;
+        self
     }
 
     pub fn install_log() {
@@ -66,10 +76,10 @@ impl App {
         let build: ike_ori::UiBuilder<T> = Box::new(move |data| Box::new(ui(data)));
 
         #[cfg(backend = "winit")]
-        ike_winit::run(data, build).map_err(Error::Winit)?;
+        ike_winit::run(data, build, self.settings).map_err(Error::Winit)?;
 
         #[cfg(backend = "android")]
-        ike_android::run(data, build).map_err(Error::Android)?;
+        ike_android::run(data, build, self.settings).map_err(Error::Android)?;
 
         Ok(())
     }

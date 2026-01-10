@@ -47,6 +47,11 @@ pub(crate) fn pressed(
         passes::focus::next(world, window_id, !modifiers.shift());
     }
 
+    if key == Key::Named(NamedKey::F7) && pressed && !handled && cfg!(debug_assertions) {
+        world.settings_mut().debug.recorder_overlay ^= true;
+        world.state.request_redraw(window_id);
+    }
+
     handled
 }
 

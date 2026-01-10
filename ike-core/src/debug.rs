@@ -7,3 +7,8 @@ macro_rules! debug_panic {
 }
 
 pub(crate) use debug_panic;
+
+#[derive(Debug, Default)]
+pub struct DebugSettings {
+    pub recorder_overlay: bool,
+}

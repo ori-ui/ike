@@ -1,3 +1,4 @@
+mod settings;
 mod signal;
 mod state;
 mod widget_mut;
@@ -14,15 +15,16 @@ use std::{
 pub(crate) use state::WorldState;
 pub(crate) use widgets::Widgets;
 
+pub use settings::Settings;
 pub use signal::{ImeSignal, Signal, WindowUpdate};
 pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
 pub use widgets::AnyWidget;
 
 use crate::{
-    AnyWidgetId, Builder, Canvas, Color, CursorIcon, Key, Layer, Modifiers, Offset, Padding, Point,
-    PointerButton, PointerId, Recorder, ScrollDelta, Size, TouchId, Update, WidgetId, Window,
-    WindowId, WindowSizing, debug::debug_panic, event::TouchSettings, passes, window::LayerId,
+    AnyWidgetId, Builder, Canvas, Color, CursorIcon, Key, Layer, LayerId, Modifiers, Offset,
+    Padding, Point, PointerButton, PointerId, Recorder, ScrollDelta, Size, TouchId, Update,
+    WidgetId, Window, WindowId, WindowSizing, debug::debug_panic, passes,
 };
 
 pub struct World {
@@ -31,21 +33,21 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(signaller: Box<dyn Fn(Signal)>) -> Self {
+    pub fn new(signaller: Box<dyn Fn(Signal)>, settings: Settings) -> Self {
         Self {
             widgets: Widgets::new(),
-            state:   WorldState::new(signaller),
+            state:   WorldState::new(signaller, settings),
         }
     }
 }
 
 impl World {
-    pub fn touch_settings(&self) -> &TouchSettings {
-        &self.state.touch_settings
+    pub fn settings(&self) -> &Settings {
+        &self.state.settings
     }
 
-    pub fn touch_settings_mut(&mut self) -> &mut TouchSettings {
-        &mut self.state.touch_settings
+    pub fn settings_mut(&mut self) -> &mut Settings {
+        &mut self.state.settings
     }
 
     pub fn recorder(&mut self) -> &Recorder {

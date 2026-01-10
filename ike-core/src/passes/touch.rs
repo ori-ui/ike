@@ -70,10 +70,10 @@ pub(crate) fn up(world: &mut World, window: WindowId, touch: TouchId, position: 
     let window_id = window;
     let touch_id = touch;
 
-    let tap_slop = world.state.touch_settings.tap_slop;
-    let tap_time = world.state.touch_settings.tap_time;
-    let double_tap_slop = world.state.touch_settings.double_tap_slop;
-    let double_tap_time = world.state.touch_settings.double_tap_time;
+    let tap_slop = world.settings().touch.tap_slop;
+    let tap_time = world.settings().touch.tap_time;
+    let double_tap_slop = world.settings().touch.double_tap_slop;
+    let double_tap_time = world.settings().touch.double_tap_time;
 
     let Some(window) = world.state.window_mut(window_id) else {
         return false;
@@ -170,7 +170,7 @@ pub(crate) fn moved(world: &mut World, window: WindowId, touch: TouchId, positio
     let window_id = window;
     let touch_id = touch;
 
-    let pan_distance = world.state.touch_settings.pan_distance;
+    let pan_distance = world.settings().touch.pan_distance;
 
     let Some(window) = world.state.window_mut(window_id) else {
         return false;

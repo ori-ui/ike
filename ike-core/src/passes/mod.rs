@@ -1,5 +1,6 @@
 pub(crate) mod animate;
 pub(crate) mod compose;
+pub(crate) mod debug;
 pub(crate) mod draw;
 pub(crate) mod event;
 pub(crate) mod focus;

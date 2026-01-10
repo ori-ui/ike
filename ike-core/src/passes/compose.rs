@@ -1,4 +1,4 @@
-use crate::{Affine, WidgetMut, WindowId, World, passes};
+use crate::{Affine, ComposeCx, WidgetMut, WindowId, World, passes};
 
 pub(crate) fn compose_window(world: &mut World, window: WindowId) {
     let window_id = window;
@@ -47,13 +47,19 @@ pub(crate) fn compose_widget(widget: &mut WidgetMut<'_>, transform: Affine, scal
     passes::hierarchy::update_flags(widget);
 }
 
-pub(crate) fn place_widget(widget: &mut WidgetMut<'_>, mut transform: Affine, scale: f32) {
-    if !widget.cx.is_subpixel() {
-        transform.offset = transform.offset.pixel_align(scale);
-    }
+pub(crate) fn place_child(cx: &mut ComposeCx<'_>, index: usize, mut transform: Affine) {
+    if let Some(child) = cx.hierarchy.children.get(index)
+        && let Some(child) = cx.widgets.get_mut(cx.world, *child)
+    {
+        if !child.cx.is_subpixel() {
+            transform.offset = transform.offset.pixel_align(cx.scale);
+        }
 
-    if widget.cx.state.transform != transform {
-        widget.cx.state.transform = transform;
-        widget.cx.hierarchy.request_draw();
+        if child.cx.state.transform != transform {
+            child.cx.state.transform = transform;
+            cx.hierarchy.request_draw();
+        }
+    } else {
+        tracing::error!("`ComposeCx::place_child` called on invalid child");
     }
 }
