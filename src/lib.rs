@@ -19,7 +19,7 @@ pub mod prelude {
     pub use ike_core::{
         Axis, BorderWidth, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Padding, Svg,
         TextAlign, TextWrap, Transition, WindowSizing, include_svg,
-        widgets::{Align, Fit, Justify, NewlineBehaviour, SubmitBehaviour},
+        widgets::{Align, Fit, Justify, NewlineBehaviour, Picturable, SubmitBehaviour},
     };
 
     pub use ike_ori::{Effect, Palette, View, views::*};
