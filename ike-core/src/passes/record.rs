@@ -13,7 +13,10 @@ pub(crate) fn record_window(world: &mut World, window: WindowId, canvas: &mut dy
         record_widget(&mut widget, canvas);
     }
 
-    world.state.recorder.frame(&world.widgets);
+    world.state.recorder.frame(
+        &world.state.settings.record,
+        &world.widgets,
+    );
 }
 
 fn record_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
@@ -33,10 +36,10 @@ fn record_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
     let memory_estimate = (widget.cx.size().area() * scale * scale * 4.0) as u64;
     let total_memory_estimate = widget.cx.world.recorder.memory_usage() + memory_estimate;
 
-    if draw_cost >= widget.cx.world.recorder.cost_threshold
+    if draw_cost >= widget.cx.world.settings.record.cost_threshold
         && widget.cx.state.stable_draws >= 3
         && widget.cx.size().area() > 256.0
-        && total_memory_estimate < widget.cx.world.recorder.max_memory_usage
+        && total_memory_estimate < widget.cx.world.settings.record.max_memory_usage
     {
         tracing::trace!(
             widget = ?widget.cx.id(),

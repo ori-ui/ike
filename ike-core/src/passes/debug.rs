@@ -1,6 +1,7 @@
 use crate::{
     BorderWidth, Canvas, Clip, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Offset,
     Paint, Paragraph, TextAlign, TextStyle, TextWrap, WidgetRef, WindowId, World,
+    record::DisplayMemorySize,
 };
 
 pub(crate) fn recorder_overlay_window(world: &World, window: WindowId, canvas: &mut dyn Canvas) {
@@ -13,6 +14,29 @@ pub(crate) fn recorder_overlay_window(world: &World, window: WindowId, canvas: &
             recorder_overlay_widget(&widget, canvas);
         }
     }
+
+    let mut paragraph = Paragraph::new(1.0, TextAlign::Start, TextWrap::Word);
+    paragraph.push(
+        format!(
+            "{} / {}",
+            DisplayMemorySize(world.recorder().memory_usage()),
+            DisplayMemorySize(world.settings().record.max_memory_usage),
+        ),
+        TextStyle {
+            font_size:    16.0,
+            font_family:  String::from("Inter Variable"),
+            font_weight:  FontWeight::NORMAL,
+            font_stretch: FontStretch::Normal,
+            font_style:   FontStyle::Normal,
+            paint:        Paint::from(Color::RED),
+        },
+    );
+
+    canvas.draw_text(
+        &paragraph,
+        f32::INFINITY,
+        Offset::all(4.0),
+    );
 }
 
 pub(crate) fn recorder_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) {
@@ -27,8 +51,8 @@ pub(crate) fn recorder_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn C
         canvas.transform(
             widget.cx.global_transform(),
             &mut |canvas| {
-                let spoilage =
-                    frames_unused as f32 / widget.cx.world.recorder.max_frames_unused as f32;
+                let spoilage = frames_unused as f32 // compute the stale the recording is
+                    / widget.cx.world.settings.record.max_frames_unused as f32;
 
                 let color = Color::GREEN.mix(Color::RED, spoilage);
 

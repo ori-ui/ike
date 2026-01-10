@@ -50,7 +50,7 @@ impl World {
         &mut self.state.settings
     }
 
-    pub fn recorder(&mut self) -> &Recorder {
+    pub fn recorder(&self) -> &Recorder {
         &self.state.recorder
     }
 
@@ -399,8 +399,8 @@ impl World {
         let size = passes::layout::layout_window(self, window, canvas.painter());
         passes::compose::compose_window(self, window);
         passes::pointer::update_window_hovered(self, window);
-        passes::draw::draw_window(self, window, canvas);
         passes::record::record_window(self, window, canvas);
+        passes::draw::draw_window(self, window, canvas);
 
         if self.settings().debug.recorder_overlay {
             passes::debug::recorder_overlay_window(self, window, canvas);

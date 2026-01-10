@@ -11,17 +11,37 @@ use seahash::SeaHasher;
 
 use crate::{Size, WidgetId, world::Widgets};
 
+/// Settings that pertain to recording.
 #[derive(Debug)]
-pub struct Recorder {
+pub struct RecordSettings {
     /// Threshold for when a widget should be recorded, common values `50..200`.
+    ///
+    /// Default is `65.0`.
     pub cost_threshold: f32,
 
     /// Threshold for the number of frame a recording can go unused.
+    ///
+    /// Default is `30`.
     pub max_frames_unused: u64,
 
     /// The maximum total memory used for recordings.
+    ///
+    /// Default is `96 MiB`.
     pub max_memory_usage: u64,
+}
 
+impl Default for RecordSettings {
+    fn default() -> Self {
+        Self {
+            cost_threshold:    65.0,
+            max_frames_unused: 30,
+            max_memory_usage:  96 * 1024u64.pow(2),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Recorder {
     memory_usage: u64,
     frame_count:  u64,
     entries:      HashMap<WidgetId, RecorderEntry, BuildSeaHasher>,
@@ -45,12 +65,9 @@ impl Default for Recorder {
 impl Recorder {
     pub fn new() -> Self {
         Self {
-            cost_threshold:    65.0,
-            max_frames_unused: 30,
-            max_memory_usage:  512 * 1024u64.pow(2), // 512 MiB (quite large)
-            memory_usage:      0,
-            frame_count:       0,
-            entries:           HashMap::default(),
+            memory_usage: 0,
+            frame_count:  0,
+            entries:      HashMap::default(),
         }
     }
 
@@ -118,17 +135,18 @@ impl Recorder {
         self.entries.clear();
     }
 
+    /// Remove recordings of destroyed widgets.
     pub(crate) fn cleanup(&mut self, widgets: &Widgets) {
         self.entries.retain(|id, _| widgets.contains(*id));
     }
 
-    pub(crate) fn frame(&mut self, widgets: &Widgets) {
+    pub(crate) fn frame(&mut self, settings: &RecordSettings, widgets: &Widgets) {
         self.cleanup(widgets);
         self.frame_count += 1;
 
         self.entries.retain(|widget, entry| {
             let frames_unused = self.frame_count - entry.frame_last_used;
-            let should_remove = frames_unused >= self.max_frames_unused;
+            let should_remove = frames_unused >= settings.max_frames_unused;
 
             if should_remove {
                 tracing::trace!(?widget, "recording unused");
@@ -139,21 +157,21 @@ impl Recorder {
             !should_remove
         });
 
-        self.cull_memory();
+        self.cull_memory(settings);
 
-        let memory_fraction = self.memory_usage as f32 / self.max_memory_usage as f32;
+        let memory_fraction = self.memory_usage as f32 / settings.max_memory_usage as f32;
 
         tracing::trace!(
             "recorder memory usage {:.1}% ({}/{})",
             memory_fraction * 100.0,
-            MemorySize(self.memory_usage),
-            MemorySize(self.max_memory_usage),
+            DisplayMemorySize(self.memory_usage),
+            DisplayMemorySize(settings.max_memory_usage),
         );
     }
 
     /// Cull recordings if memory usage exceeds `3/4` of `max_memory_usage`.
-    fn cull_memory(&mut self) {
-        let cull_threshold = self.max_memory_usage * 3 / 4;
+    fn cull_memory(&mut self, settings: &RecordSettings) {
+        let cull_threshold = settings.max_memory_usage * 3 / 4;
 
         if self.memory_usage <= cull_threshold {
             return;
@@ -161,8 +179,8 @@ impl Recorder {
 
         tracing::debug!(
             "recorder memory usage exceeds 75% ({}/{}), consider increasing",
-            MemorySize(self.memory_usage),
-            MemorySize(self.max_memory_usage)
+            DisplayMemorySize(self.memory_usage),
+            DisplayMemorySize(settings.max_memory_usage)
         );
 
         let mut widgets = Vec::new();
@@ -190,29 +208,30 @@ impl Recorder {
     }
 }
 
+/// Helper type for displaying memory sizes, e.g. `32.3 MiB`.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MemorySize(pub u64);
+pub struct DisplayMemorySize(pub u64);
 
-impl fmt::Display for MemorySize {
+impl fmt::Display for DisplayMemorySize {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self, f)
     }
 }
 
-impl fmt::Debug for MemorySize {
+impl fmt::Debug for DisplayMemorySize {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self(size) = *self;
 
         if size > 1024u64.pow(3) {
             let gibs = size as f32 / 1024f32.powi(3);
-            write!(f, "{:.1}GiB", gibs)
+            write!(f, "{:.1} GiB", gibs)
         } else if size > 1024u64.pow(2) {
             let mibs = size as f32 / 1024f32.powi(2);
-            write!(f, "{:.1}MiB", mibs)
+            write!(f, "{:.1} MiB", mibs)
         } else if size > 1024 {
-            write!(f, "{:.1}KiB", size as f32 / 1024.0)
+            write!(f, "{:.1} KiB", size as f32 / 1024.0)
         } else {
-            write!(f, "{}B", size)
+            write!(f, "{} B", size)
         }
     }
 }
@@ -222,6 +241,7 @@ pub struct Recording {
     data: Arc<RecordingData>,
 }
 
+/// The data of a [`Recording`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecordingData {
     /// Size in logical pixels.
