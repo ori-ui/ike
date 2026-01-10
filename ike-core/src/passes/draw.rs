@@ -37,10 +37,6 @@ pub(crate) fn draw_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
             draw_widget_clipped(widget, canvas);
         });
     }
-
-    canvas.transform(widget.cx.transform(), &mut |canvas| {
-        widget.widget.draw_over(&mut widget.cx.as_draw_cx(), canvas);
-    });
 }
 
 pub(crate) fn draw_widget_clipped(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
@@ -59,4 +55,6 @@ pub(crate) fn draw_widget_raw(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canva
     widget.cx.for_each_child_mut(|child| {
         draw_widget(child, canvas);
     });
+
+    widget.widget.draw_over(&mut widget.cx.as_draw_cx(), canvas);
 }
