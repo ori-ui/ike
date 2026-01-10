@@ -187,7 +187,11 @@ impl MutCx<'_> {
     }
 
     pub(crate) fn enter_span(&self) -> Option<tracing::span::EnteredSpan> {
-        (self.world.should_trace).then(|| self.state.tracing_span.clone().entered())
+        self.world
+            .settings
+            .debug
+            .trace_widgets
+            .then(|| self.state.tracing_span.clone().entered())
     }
 }
 

@@ -11,10 +11,8 @@ pub(crate) struct WorldState {
     pub signaller: Box<dyn Fn(Signal)>,
     pub settings:  Settings,
 
-    pub windows: Vec<Window>,
-
-    pub should_trace: bool,
-    pub recorder:     Recorder,
+    pub windows:  Vec<Window>,
+    pub recorder: Recorder,
 }
 
 impl WorldState {
@@ -24,8 +22,6 @@ impl WorldState {
             settings,
 
             windows: Vec::new(),
-
-            should_trace: cfg!(debug_assertions),
             recorder: Recorder::new(),
         }
     }

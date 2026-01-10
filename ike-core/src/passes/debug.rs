@@ -1,11 +1,23 @@
 use crate::{
-    BorderWidth, Canvas, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Offset, Paint,
-    Paragraph, TextAlign, TextStyle, TextWrap, WidgetRef,
+    BorderWidth, Canvas, Clip, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Offset,
+    Paint, Paragraph, TextAlign, TextStyle, TextWrap, WidgetRef, WindowId, World,
 };
 
-pub(crate) fn recorder_overlay(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) {
+pub(crate) fn recorder_overlay_window(world: &World, window: WindowId, canvas: &mut dyn Canvas) {
+    let Some(window) = world.window(window) else {
+        return;
+    };
+
+    for layer in window.layers() {
+        if let Some(widget) = world.widget(layer.widget) {
+            recorder_overlay_widget(&widget, canvas);
+        }
+    }
+}
+
+pub(crate) fn recorder_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) {
     for child in widget.cx.iter_children() {
-        recorder_overlay(&child, canvas);
+        recorder_overlay_widget(&child, canvas);
     }
 
     if let Some(recording) = widget.cx.world.recorder.get_recording_unmarked(widget.id())
@@ -39,7 +51,7 @@ pub(crate) fn recorder_overlay(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) 
                         "{}x{} - {:.2}% mem - {:.2} cost",
                         recording.width,
                         recording.height,
-                        recording.memory as f32 / widget.cx.world.recorder.max_memory_usage as f32
+                        recording.memory as f32 / widget.cx.world.recorder.memory_usage() as f32
                             * 100.0,
                         cost_estimate,
                     ),
@@ -53,10 +65,18 @@ pub(crate) fn recorder_overlay(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) 
                     },
                 );
 
-                canvas.draw_text(
-                    &paragraph,
-                    widget.cx.width() - 4.0,
-                    Offset::new(2.0, 0.0),
+                canvas.clip(
+                    &Clip::Rect(
+                        widget.cx.rect().shrink(2.0),
+                        CornerRadius::all(0.0),
+                    ),
+                    &mut |canvas| {
+                        canvas.draw_text(
+                            &paragraph,
+                            widget.cx.width() - 4.0,
+                            Offset::new(2.0, 0.0),
+                        );
+                    },
                 );
             },
         );

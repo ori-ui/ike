@@ -402,6 +402,10 @@ impl World {
         passes::draw::draw_window(self, window, canvas);
         passes::record::record_window(self, window, canvas);
 
+        if self.settings().debug.recorder_overlay {
+            passes::debug::recorder_overlay_window(self, window, canvas);
+        }
+
         size
     }
 }

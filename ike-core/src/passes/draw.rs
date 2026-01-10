@@ -1,4 +1,4 @@
-use crate::{Canvas, WidgetMut, WindowId, World, passes};
+use crate::{Canvas, WidgetMut, WindowId, World};
 
 pub(crate) fn draw_window(world: &mut World, window: WindowId, canvas: &mut dyn Canvas) {
     let Some(window) = world.window(window) else {
@@ -8,12 +8,6 @@ pub(crate) fn draw_window(world: &mut World, window: WindowId, canvas: &mut dyn 
     for layer in window.layers.clone().iter() {
         if let Some(mut widget) = world.widget_mut(layer.widget) {
             draw_widget(&mut widget, canvas);
-        }
-
-        if world.settings().debug.recorder_overlay
-            && let Some(widget) = world.widget(layer.widget)
-        {
-            passes::debug::recorder_overlay(&widget, canvas);
         }
     }
 }
