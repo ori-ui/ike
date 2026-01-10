@@ -47,6 +47,16 @@ impl<V> Window<V> {
         self
     }
 
+    pub fn size(mut self, width: f32, height: f32) -> Self {
+        self.sizing = WindowSizing::Resizable {
+            default_size: Size::new(width, height),
+            min_size:     Size::new(width, height),
+            max_size:     Size::new(width, height),
+        };
+
+        self
+    }
+
     pub fn fit_content(mut self) -> Self {
         self.sizing = WindowSizing::FitContent;
         self
