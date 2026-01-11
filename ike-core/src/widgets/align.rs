@@ -25,9 +25,13 @@ impl Aligned {
 }
 
 impl Widget for Aligned {
-    fn layout(&mut self, cx: &mut LayoutCx<'_>, mut space: Space) -> Size {
-        space.min = Size::ZERO;
-        let child_size = cx.layout_child(0, space);
+    fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
+        let child_size = {
+            let mut space = space;
+            space.min = Size::ZERO;
+
+            cx.layout_child(0, space)
+        };
 
         let mut size = child_size;
 
