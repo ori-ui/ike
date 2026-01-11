@@ -33,7 +33,7 @@ impl Widget for Aligned {
             cx.layout_child(0, space)
         };
 
-        let mut size = child_size;
+        let mut size = space.constrain(child_size);
 
         if space.max.width.is_finite() {
             size.width = space.max.width;
@@ -52,6 +52,7 @@ impl Widget for Aligned {
         );
 
         cx.place_child(0, position);
-        space.constrain(size)
+
+        size
     }
 }
