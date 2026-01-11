@@ -48,7 +48,6 @@ impl Widget for Aligned {
         );
 
         cx.place_child(0, position);
-
-        size
+        space.constrain(size)
     }
 }
