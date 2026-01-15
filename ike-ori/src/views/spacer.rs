@@ -5,11 +5,11 @@ pub fn spacer(size: impl Into<Size>) -> Spacer {
     Spacer::new(size)
 }
 
-pub fn vspacer(size: f32) -> Spacer {
+pub fn hspacer(size: f32) -> Spacer {
     Spacer::new(Size::new(size, 0.0))
 }
 
-pub fn hspacer(size: f32) -> Spacer {
+pub fn vspacer(size: f32) -> Spacer {
     Spacer::new(Size::new(0.0, size))
 }
 
