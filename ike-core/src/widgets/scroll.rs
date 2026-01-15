@@ -75,11 +75,21 @@ impl Scroll {
         if let Ok(mut vbar) = this.cx.get_widget_mut(this.widget.vbar) {
             vbar.set_stashed(!enabled);
         }
+
+        if let Ok(mut portal) = this.cx.get_widget_mut(this.widget.portal) {
+            portal.widget.loosen_height = enabled;
+            portal.cx.request_layout();
+        }
     }
 
     pub fn set_horizontal(this: &mut WidgetMut<Self>, enabled: bool) {
         if let Ok(mut hbar) = this.cx.get_widget_mut(this.widget.hbar) {
             hbar.set_stashed(!enabled);
+        }
+
+        if let Ok(mut portal) = this.cx.get_widget_mut(this.widget.portal) {
+            portal.widget.loosen_width = enabled;
+            portal.cx.request_layout();
         }
     }
 
@@ -187,12 +197,20 @@ impl Scroll {
 impl Widget for Scroll {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let vbar_width = cx.get_child(self.vbar).map_or(0.0, |vbar| {
+            if vbar.cx.is_stashed() || self.overlay {
+                return 0.0;
+            }
+
             vbar.widget.thickness
                 + vbar.widget.padding.size().width
                 + vbar.widget.border_width.size().height
         });
 
         let hbar_height = cx.get_child(self.hbar).map_or(0.0, |hbar| {
+            if hbar.cx.is_stashed() || self.overlay {
+                return 0.0;
+            }
+
             hbar.widget.thickness
                 + hbar.widget.padding.size().height
                 + hbar.widget.border_width.size().height
@@ -259,10 +277,8 @@ impl Widget for Scroll {
 
         let mut size = child_size;
 
-        if !self.overlay {
-            size.width += vbar_size.width;
-            size.height += hbar_size.height;
-        }
+        size.width += vbar_size.width;
+        size.height += hbar_size.height;
 
         space.constrain(size)
     }
@@ -290,30 +306,40 @@ impl Widget for Scroll {
             hbar_scroll = 0.0;
         }
 
-        if let Ok(mut vbar) = cx.get_child_mut(self.vbar) {
+        if let Ok(mut vbar) = cx.get_child_mut(self.vbar)
+            && vbar.widget.scroll != vbar_scroll
+        {
             vbar.widget.scroll = vbar_scroll;
             vbar.cx.request_draw();
         }
 
-        if let Ok(mut hbar) = cx.get_child_mut(self.hbar) {
+        if let Ok(mut hbar) = cx.get_child_mut(self.hbar)
+            && hbar.widget.scroll != hbar_scroll
+        {
             hbar.widget.scroll = hbar_scroll;
             hbar.cx.request_draw();
         }
 
         let vbar_knob_length = cx.height() / (cx.height() + overflow.height);
-        if let Ok(mut vbar) = cx.get_child_mut(self.vbar) {
+        if let Ok(mut vbar) = cx.get_child_mut(self.vbar)
+            && vbar.widget.knob_length != vbar_knob_length
+        {
             vbar.widget.knob_length = vbar_knob_length;
             vbar.cx.request_draw();
         }
 
         let hbar_knob_length = cx.width() / (cx.width() + overflow.width);
-        if let Ok(mut hbar) = cx.get_child_mut(self.hbar) {
+        if let Ok(mut hbar) = cx.get_child_mut(self.hbar)
+            && hbar.widget.knob_length != hbar_knob_length
+        {
             hbar.widget.knob_length = hbar_knob_length;
             hbar.cx.request_draw();
         }
 
-        if let Ok(mut portal) = cx.get_child_mut(self.portal) {
-            portal.widget.offset = self.scroll.get();
+        if let Ok(mut portal) = cx.get_child_mut(self.portal)
+            && portal.widget.offset != *self.scroll
+        {
+            portal.widget.offset = *self.scroll;
             portal.cx.request_compose();
         }
 
@@ -384,12 +410,29 @@ impl Widget for Scroll {
             return PointerPropagate::Bubble;
         };
 
+        let vbar_enabled = cx
+            .get_child(self.hbar)
+            .is_ok_and(|vbar| vbar.cx.is_stashed());
+
         match event {
             PointerEvent::Scroll(event) => {
                 let mut scroll = self.scroll.end();
                 scroll += match event.delta {
-                    ScrollDelta::Line(offset) => -offset * 120.0,
-                    ScrollDelta::Pixel(offset) => -offset,
+                    ScrollDelta::Line(mut offset) => {
+                        if offset.x == 0.0 && !vbar_enabled {
+                            offset.x = offset.y;
+                        }
+
+                        -offset * 120.0
+                    }
+
+                    ScrollDelta::Pixel(mut offset) => {
+                        if offset.x == 0.0 && !vbar_enabled {
+                            offset.x = offset.y;
+                        }
+
+                        -offset
+                    }
                 };
 
                 scroll.x = scroll.x.clamp(0.0, overflow.width);
@@ -601,6 +644,7 @@ impl Widget for ScrollBar {
                 self.scroll = position / space;
                 self.scroll = self.scroll.clamp(0.0, 1.0);
                 set_scroll(self, cx);
+                cx.request_draw();
 
                 PointerPropagate::Bubble
             }

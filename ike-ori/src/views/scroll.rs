@@ -10,7 +10,7 @@ pub fn vscroll<V>(contents: V) -> Scroll<V> {
 }
 
 pub fn hscroll<V>(contents: V) -> Scroll<V> {
-    Scroll::new(contents).horizontal(false)
+    Scroll::new(contents).horizontal(true)
 }
 
 #[derive(Clone, Debug)]
@@ -204,6 +204,7 @@ where
         let bar_color = self.get_bar_paint(&theme, &palette);
         let knob_color = self.get_knob_paint(&theme, &palette);
 
+        widgets::Scroll::set_overlay(&mut widget, self.overlay);
         widgets::Scroll::set_vertical(&mut widget, self.vertical);
         widgets::Scroll::set_horizontal(&mut widget, self.horizontal);
         widgets::Scroll::set_bar_thickness(&mut widget, bar_width);
@@ -245,6 +246,10 @@ where
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
+
+        if self.overlay != old.overlay {
+            widgets::Scroll::set_overlay(&mut widget, self.overlay);
+        }
 
         if self.vertical != old.vertical {
             widgets::Scroll::set_vertical(&mut widget, self.vertical);
