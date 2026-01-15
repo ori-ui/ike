@@ -1,7 +1,7 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
-use ori::{Action, Event, IntoAction, Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
+use ori::{Action, Event, IntoAction, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
 use crate::Palette;
 
@@ -183,7 +183,7 @@ enum ButtonEvent {
 impl<T, V> ViewMarker for Button<T, V> {}
 impl<C, T, V> View<C, T> for Button<T, V>
 where
-    C: Builder + Proxyable + Providable,
+    C: Builder + Proxied + Provider,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Button>;

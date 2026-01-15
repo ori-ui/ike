@@ -1,5 +1,5 @@
 use ike_core::{Axis, Builder, Color, CornerRadius, WidgetId, widgets};
-use ori::{Action, Event, Providable, View, ViewMarker};
+use ori::{Action, Event, Provider, View, ViewMarker};
 
 use crate::Palette;
 
@@ -94,7 +94,7 @@ impl Divider {
 impl ViewMarker for Divider {}
 impl<C, T> View<C, T> for Divider
 where
-    C: Builder + Providable,
+    C: Builder + Provider,
 {
     type Element = WidgetId<widgets::Divider>;
     type State = ();

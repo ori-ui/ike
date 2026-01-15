@@ -2,7 +2,7 @@ use ike_core::{
     Builder, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::{Action, Providable, View, ViewMarker};
+use ori::{Action, Provider, View, ViewMarker};
 
 use crate::{Palette, views::TextTheme};
 
@@ -116,7 +116,7 @@ impl Label {
 impl ViewMarker for Label {}
 impl<C, T> View<C, T> for Label
 where
-    C: Builder + Providable,
+    C: Builder + Provider,
 {
     type Element = WidgetId<widgets::Label>;
     type State = ();

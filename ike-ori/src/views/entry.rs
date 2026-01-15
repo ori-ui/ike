@@ -3,7 +3,7 @@ use ike_core::{
     Paragraph, TextAlign, TextStyle, TextWrap, WidgetId,
     widgets::{self, NewlineBehaviour, SubmitBehaviour},
 };
-use ori::{Action, Event, IntoAction, Providable, Proxy, Proxyable, View, ViewId, ViewMarker};
+use ori::{Action, Event, IntoAction, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
 use crate::{Palette, views::TextTheme};
 
@@ -386,7 +386,7 @@ enum EntryEvent {
 impl<T> ViewMarker for Entry<T> {}
 impl<C, T> View<C, T> for Entry<T>
 where
-    C: Builder + Proxyable + Providable,
+    C: Builder + Proxied + Provider,
 {
     type Element = WidgetId<widgets::Entry>;
     type State = ViewId;

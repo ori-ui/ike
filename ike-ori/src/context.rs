@@ -1,7 +1,7 @@
 use std::{any::Any, sync::Arc};
 
 use ike_core::{AnyWidgetId, Builder, WidgetId, World};
-use ori::{Providable, Proxy, Proxyable, Super};
+use ori::{BaseElement, Provider, Proxied, Proxy, Super};
 
 use crate::Resources;
 
@@ -21,7 +21,11 @@ impl Builder for Context {
     }
 }
 
-impl Proxyable for Context {
+impl BaseElement for Context {
+    type Element = WidgetId;
+}
+
+impl Proxied for Context {
     type Proxy = Arc<dyn Proxy>;
 
     fn proxy(&mut self) -> Self::Proxy {
@@ -29,7 +33,7 @@ impl Proxyable for Context {
     }
 }
 
-impl Providable for Context {
+impl Provider for Context {
     fn push<T: Any>(&mut self, resource: Box<T>) {
         self.resources.push(resource);
     }

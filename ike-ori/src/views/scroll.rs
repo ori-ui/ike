@@ -1,7 +1,7 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
-use ori::{Action, Event, Providable, View, ViewMarker};
+use ori::{Action, Event, Provider, View, ViewMarker};
 
 use crate::Palette;
 
@@ -180,7 +180,7 @@ impl<V> Scroll<V> {
 impl<V> ViewMarker for Scroll<V> {}
 impl<C, T, V> View<C, T> for Scroll<V>
 where
-    C: Builder + Providable,
+    C: Builder + Provider,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Scroll>;

@@ -2,7 +2,7 @@ use ike_core::{
     Builder, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::{Action, Providable, View, ViewId, ViewMarker};
+use ori::{Action, Provider, View, ViewId, ViewMarker};
 
 use crate::{Palette, views::TextTheme};
 
@@ -214,7 +214,7 @@ impl Prose {
 impl ViewMarker for Prose {}
 impl<C, T> View<C, T> for Prose
 where
-    C: Builder + Providable,
+    C: Builder + Provider,
 {
     type Element = WidgetId<widgets::TextArea<false>>;
     type State = ViewId;

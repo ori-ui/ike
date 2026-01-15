@@ -1,7 +1,7 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, WidgetId, widgets,
 };
-use ori::{Action, Event, Providable, View, ViewMarker};
+use ori::{Action, Event, Provider, View, ViewMarker};
 
 use crate::Palette;
 
@@ -103,7 +103,7 @@ impl<V> Container<V> {
 impl<V> ViewMarker for Container<V> {}
 impl<C, T, V> View<C, T> for Container<V>
 where
-    C: Builder + Providable,
+    C: Builder + Provider,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = WidgetId<widgets::Container>;

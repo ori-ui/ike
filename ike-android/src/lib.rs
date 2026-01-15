@@ -25,7 +25,7 @@ use jni::JavaVM;
 pub use log::MakeAndroidWriter;
 
 use ike_core::{Padding, Signal, Size, WindowId, WindowUpdate, World};
-use ori::Proxyable;
+use ori::Proxied;
 use parking_lot::Mutex;
 use raw_window_handle::DisplayHandle;
 

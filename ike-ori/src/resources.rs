@@ -1,6 +1,6 @@
 use std::any::{Any, TypeId};
 
-use ori::Providable;
+use ori::Provider;
 
 pub struct Resources {
     entries: Vec<Entry>,
@@ -25,7 +25,7 @@ impl Resources {
     }
 }
 
-impl Providable for Resources {
+impl Provider for Resources {
     fn push<T: Any>(&mut self, context: Box<T>) {
         self.entries.push(Entry {
             value:   context,
