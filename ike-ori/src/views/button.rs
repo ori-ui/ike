@@ -1,13 +1,13 @@
 use ike_core::{
     AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
-use ori::{Action, Event, IntoAction, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
+use ori::{Action, Event, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
 use crate::Palette;
 
-pub fn button<T, V, A, I>(contents: V, on_click: impl FnMut(&mut T) -> A + 'static) -> Button<T, V>
+pub fn button<T, V, A>(contents: V, on_click: impl FnMut(&mut T) -> A + 'static) -> Button<T, V>
 where
-    A: IntoAction<I>,
+    A: Into<Action>,
 {
     Button::new(contents, on_click)
 }
@@ -57,13 +57,13 @@ pub struct Button<T, V> {
 }
 
 impl<T, V> Button<T, V> {
-    pub fn new<A, I>(contents: V, mut on_click: impl FnMut(&mut T) -> A + 'static) -> Self
+    pub fn new<A>(contents: V, mut on_click: impl FnMut(&mut T) -> A + 'static) -> Self
     where
-        A: IntoAction<I>,
+        A: Into<Action>,
     {
         Button {
             contents,
-            on_click: Box::new(move |data| on_click(data).into_action()),
+            on_click: Box::new(move |data| on_click(data).into()),
             padding: None,
             border_width: None,
             corner_radius: None,
