@@ -35,7 +35,7 @@ pub use picture::{Picture, picture};
 pub use prose::{Prose, ProseTheme, prose};
 pub use safe_area::{SafeArea, safe_area};
 pub use scroll::{Scroll, hscroll, vscroll};
-pub use spacer::{Spacer, spacer};
+pub use spacer::{Spacer, hspacer, spacer, vspacer};
 pub use stack::{Flex, Stack, expand, flex, hstack, stack, vstack};
 pub use text::TextTheme;
 pub use window::{Window, window};
