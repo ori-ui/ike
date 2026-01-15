@@ -90,7 +90,7 @@ pub(crate) fn layout_widget(
     let mut size = widget.widget.layout(&mut cx, space);
 
     if !widget.cx.is_subpixel() && widget.cx.settings().render.pixel_align {
-        size = size.pixel_align(scale);
+        size = size.pixel_ceil(scale);
 
         if size.width > space.max.width {
             size.width -= scale.recip();
@@ -128,7 +128,7 @@ pub(crate) fn place_child(cx: &mut LayoutCx<'_>, child: WidgetId, mut transform:
         debug_assert!(child.cx.parent() == Some(id));
 
         if !child.cx.is_subpixel() && child.cx.settings().render.pixel_align {
-            transform.offset = transform.offset.pixel_align(cx.scale);
+            transform.offset = transform.offset.pixel_round(cx.scale);
         }
 
         if child.cx.state.transform != transform {

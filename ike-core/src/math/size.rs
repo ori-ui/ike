@@ -45,7 +45,7 @@ impl Size {
         }
     }
 
-    pub const fn pixel_align(self, scale: f32) -> Self {
+    pub const fn pixel_ceil(self, scale: f32) -> Self {
         Self {
             width:  (self.width * scale).ceil() / scale,
             height: (self.height * scale).ceil() / scale,

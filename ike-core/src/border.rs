@@ -81,8 +81,8 @@ impl BorderWidth {
             return space.shrink(self.size());
         }
 
-        let size = Size::new(self.left, self.top).pixel_align(cx.scale())
-            + Size::new(self.right, self.bottom).pixel_align(cx.scale());
+        let size = Size::new(self.left, self.top).pixel_ceil(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_ceil(cx.scale());
 
         space.shrink(size)
     }
@@ -92,8 +92,8 @@ impl BorderWidth {
             return size + self.size();
         }
 
-        size + Size::new(self.left, self.top).pixel_align(cx.scale())
-            + Size::new(self.right, self.bottom).pixel_align(cx.scale())
+        size + Size::new(self.left, self.top).pixel_ceil(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_ceil(cx.scale())
     }
 
     pub const fn offset(self) -> Offset {
@@ -106,7 +106,7 @@ impl BorderWidth {
             return self.offset();
         }
 
-        self.offset().pixel_align(cx.scale())
+        self.offset().pixel_ceil(cx.scale())
     }
 }
 
@@ -168,8 +168,8 @@ impl Padding {
             return space.shrink(self.size());
         }
 
-        let size = Size::new(self.left, self.top).pixel_align(cx.scale())
-            + Size::new(self.right, self.bottom).pixel_align(cx.scale());
+        let size = Size::new(self.left, self.top).pixel_ceil(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_ceil(cx.scale());
 
         space.shrink(size)
     }
@@ -179,8 +179,8 @@ impl Padding {
             return size + self.size();
         }
 
-        size + Size::new(self.left, self.top).pixel_align(cx.scale())
-            + Size::new(self.right, self.bottom).pixel_align(cx.scale())
+        size + Size::new(self.left, self.top).pixel_ceil(cx.scale())
+            + Size::new(self.right, self.bottom).pixel_ceil(cx.scale())
     }
 
     pub const fn offset(self) -> Offset {
@@ -193,7 +193,7 @@ impl Padding {
             return self.offset();
         }
 
-        self.offset().pixel_align(cx.scale())
+        self.offset().pixel_ceil(cx.scale())
     }
 }
 

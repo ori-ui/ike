@@ -31,10 +31,18 @@ impl Offset {
     }
 
     /// Compute `self` aligned to the pixel grid for a certain scale factor.
-    pub const fn pixel_align(self, scale: f32) -> Self {
+    pub const fn pixel_round(self, scale: f32) -> Self {
         Self {
             x: (self.x * scale).round() / scale,
             y: (self.y * scale).round() / scale,
+        }
+    }
+
+    /// Compute `self` aligned to the pixel grid for a certain scale factor.
+    pub const fn pixel_ceil(self, scale: f32) -> Self {
+        Self {
+            x: (self.x * scale).ceil() / scale,
+            y: (self.y * scale).ceil() / scale,
         }
     }
 }
