@@ -32,6 +32,11 @@ impl App {
         }
     }
 
+    pub fn settings(mut self, settings: Settings) -> Self {
+        self.settings = settings;
+        self
+    }
+
     pub fn recorder_overlay(mut self, enabled: bool) -> Self {
         self.settings.debug.recorder_overlay = enabled;
         self
