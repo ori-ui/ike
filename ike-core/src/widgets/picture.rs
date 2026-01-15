@@ -1,6 +1,6 @@
 use crate::{
-    Affine, Blend, Builder, Canvas, Color, CornerRadius, DrawCx, LayoutCx, Offset, Paint,
-    Recording, Shader, Size, Space, Svg, SvgData, Widget, WidgetMut,
+    Affine, Blend, Builder, Canvas, Color, DrawCx, LayoutCx, Offset, Paint, Recording, Shader,
+    Size, Space, Svg, SvgData, Widget, WidgetMut,
 };
 
 #[derive(Clone, Debug, PartialEq)]

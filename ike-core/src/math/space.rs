@@ -7,6 +7,8 @@ pub struct Space {
 }
 
 impl Space {
+    const EPSILON: f32 = 0.0001;
+
     pub const fn new(min: Size, max: Size) -> Self {
         Self { min, max }
     }
@@ -19,10 +21,10 @@ impl Space {
     }
 
     pub const fn contains(self, size: Size) -> bool {
-        size.width >= self.min.width
-            && size.width <= self.max.width
-            && size.height >= self.min.height
-            && size.height <= self.max.height
+        size.width >= self.min.width - Self::EPSILON
+            && size.width <= self.max.width + Self::EPSILON
+            && size.height >= self.min.height - Self::EPSILON
+            && size.height <= self.max.height + Self::EPSILON
     }
 
     pub const fn constrain(self, size: Size) -> Size {
