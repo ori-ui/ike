@@ -5,8 +5,8 @@ use std::{
 
 use crate::{
     Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, GetError, ImeSignal, Painter, Paragraph,
-    Point, Rect, Signal, Size, Space, Svg, TextLayoutLine, WidgetId, WidgetMut, WidgetRef, Window,
-    WindowId, World, passes,
+    Point, Rect, Settings, Signal, Size, Space, Svg, TextLayoutLine, WidgetId, WidgetMut,
+    WidgetRef, Window, WindowId, World, passes,
     widget::{WidgetHierarchy, WidgetState},
     world::{Widgets, WorldState},
 };
@@ -534,6 +534,10 @@ impl_contexts! {
 
         pub fn is_window_focused(&self) -> bool {
             self.get_window().is_some_and(|window| window.is_focused())
+        }
+
+        pub fn settings(&self) -> &Settings {
+            &self.world.settings
         }
 
         pub fn is_subpixel(&self) -> bool {

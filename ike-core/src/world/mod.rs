@@ -15,7 +15,7 @@ use std::{
 pub(crate) use state::WorldState;
 pub(crate) use widgets::Widgets;
 
-pub use settings::Settings;
+pub use settings::{RenderSettings, Settings};
 pub use signal::{ImeSignal, Signal, WindowUpdate};
 pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;

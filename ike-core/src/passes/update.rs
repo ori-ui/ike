@@ -17,6 +17,7 @@ pub(crate) fn widget_recursive(mut widget: WidgetMut<'_>, update: &Update) {
 
     if let Update::WindowScaled(..) = update
         && !widget.cx.is_subpixel()
+        && widget.cx.settings().render.pixel_align
     {
         widget.cx.hierarchy.request_layout();
     }

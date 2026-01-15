@@ -77,6 +77,10 @@ impl BorderWidth {
     }
 
     pub fn layout_down(self, cx: &LayoutCx<'_>, space: Space) -> Space {
+        if cx.is_subpixel() || !cx.settings().render.pixel_align {
+            return space.shrink(self.size());
+        }
+
         let size = Size::new(self.left, self.top).pixel_align(cx.scale())
             + Size::new(self.right, self.bottom).pixel_align(cx.scale());
 
@@ -84,6 +88,10 @@ impl BorderWidth {
     }
 
     pub fn layout_up(self, cx: &LayoutCx<'_>, size: Size) -> Size {
+        if cx.is_subpixel() || !cx.settings().render.pixel_align {
+            return size + self.size();
+        }
+
         size + Size::new(self.left, self.top).pixel_align(cx.scale())
             + Size::new(self.right, self.bottom).pixel_align(cx.scale())
     }
@@ -94,6 +102,10 @@ impl BorderWidth {
 
     /// Compute the offset aligned to the device pixel grid.
     pub fn aligned_offset(self, cx: &LayoutCx<'_>) -> Offset {
+        if cx.is_subpixel() || !cx.settings().render.pixel_align {
+            return self.offset();
+        }
+
         self.offset().pixel_align(cx.scale())
     }
 }
@@ -152,6 +164,10 @@ impl Padding {
     }
 
     pub fn layout_down(self, cx: &LayoutCx<'_>, space: Space) -> Space {
+        if cx.is_subpixel() || !cx.settings().render.pixel_align {
+            return space.shrink(self.size());
+        }
+
         let size = Size::new(self.left, self.top).pixel_align(cx.scale())
             + Size::new(self.right, self.bottom).pixel_align(cx.scale());
 
@@ -159,6 +175,10 @@ impl Padding {
     }
 
     pub fn layout_up(self, cx: &LayoutCx<'_>, size: Size) -> Size {
+        if cx.is_subpixel() || !cx.settings().render.pixel_align {
+            return size + self.size();
+        }
+
         size + Size::new(self.left, self.top).pixel_align(cx.scale())
             + Size::new(self.right, self.bottom).pixel_align(cx.scale())
     }
@@ -169,6 +189,10 @@ impl Padding {
 
     /// Compute the offset aligned to the device pixel grid.
     pub fn aligned_offset(self, cx: &LayoutCx<'_>) -> Offset {
+        if cx.is_subpixel() || !cx.settings().render.pixel_align {
+            return self.offset();
+        }
+
         self.offset().pixel_align(cx.scale())
     }
 }

@@ -52,7 +52,7 @@ pub(crate) fn place_child(cx: &mut ComposeCx<'_>, child: WidgetId, mut transform
     if let Ok(mut child) = cx.widgets.get_mut(cx.world, child) {
         debug_assert!(child.cx.parent() == Some(id));
 
-        if !child.cx.is_subpixel() {
+        if !child.cx.is_subpixel() && child.cx.settings().render.pixel_align {
             transform.offset = transform.offset.pixel_align(cx.scale);
         }
 

@@ -41,7 +41,7 @@ pub use event::{
 };
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
-pub use record::{Recorder, Recording, RecordingData, WeakRecording};
+pub use record::{RecordSettings, Recorder, Recording, RecordingData, WeakRecording};
 pub use svg::{Svg, SvgData, WeakSvg};
 pub use text::{
     FontStretch, FontStyle, FontWeight, GlyphCluster, Paragraph, TextAlign, TextDirection,
@@ -51,5 +51,6 @@ pub use transition::{Interpolate, Transition, TransitionCurve, Transitioned};
 pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
 pub use window::{Layer, LayerId, Window, WindowId, WindowSizing};
 pub use world::{
-    AnyWidget, GetError, ImeSignal, Settings, Signal, WidgetMut, WidgetRef, WindowUpdate, World,
+    AnyWidget, GetError, ImeSignal, RenderSettings, Settings, Signal, WidgetMut, WidgetRef,
+    WindowUpdate, World,
 };
