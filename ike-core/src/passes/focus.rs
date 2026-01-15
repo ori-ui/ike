@@ -1,7 +1,7 @@
 use std::mem;
 
 use crate::{
-    ImeEvent, ImeSignal, Signal, TextEvent, WidgetId, Window, WindowId, World,
+    ImeEvent, ImeSignal, Signal, TextEvent, WidgetId, WidgetRef, Window, WindowId, World,
     context::FocusUpdate, passes,
 };
 
@@ -96,13 +96,17 @@ pub(crate) fn transfer(world: &mut World, window: WindowId, target: Option<Widge
 fn find_first(world: &World, window: &Window, forward: bool) -> Option<WidgetId> {
     if forward {
         for layer in window.layers.iter() {
-            if let Some(focusable) = find_first_from(world, layer.widget, forward) {
+            if let Ok(widget) = world.widget(layer.widget)
+                && let Some(focusable) = find_first_from(&widget, forward)
+            {
                 return Some(focusable);
             }
         }
     } else {
         for layer in window.layers.iter().rev() {
-            if let Some(focusable) = find_first_from(world, layer.widget, forward) {
+            if let Ok(widget) = world.widget(layer.widget)
+                && let Some(focusable) = find_first_from(&widget, forward)
+            {
                 return Some(focusable);
             }
         }
@@ -111,22 +115,24 @@ fn find_first(world: &World, window: &Window, forward: bool) -> Option<WidgetId>
     None
 }
 
-fn find_first_from(world: &World, widget: WidgetId, forward: bool) -> Option<WidgetId> {
-    let widget = world.widget(widget).ok()?;
-
+fn find_first_from(widget: &WidgetRef, forward: bool) -> Option<WidgetId> {
     if widget.cx.hierarchy.accepts_focus() {
         return Some(widget.cx.id());
     }
 
+    find_first_child_from(widget, forward)
+}
+
+fn find_first_child_from(widget: &WidgetRef, forward: bool) -> Option<WidgetId> {
     if forward {
-        for &child in widget.cx.children().iter() {
-            if let Some(focusable) = find_first_from(world, child, forward) {
+        for child in widget.cx.iter_children().flatten() {
+            if let Some(focusable) = find_first_from(&child, forward) {
                 return Some(focusable);
             }
         }
     } else {
-        for &child in widget.cx.children().iter().rev() {
-            if let Some(focusable) = find_first_from(world, child, forward) {
+        for child in widget.cx.iter_children().flatten().rev() {
+            if let Some(focusable) = find_first_from(&child, forward) {
                 return Some(focusable);
             }
         }
@@ -136,8 +142,14 @@ fn find_first_from(world: &World, widget: WidgetId, forward: bool) -> Option<Wid
 }
 
 fn find_next(world: &World, window: &Window, forward: bool) -> Option<WidgetId> {
-    if window.focused.is_none() {
+    let Some(focused) = window.focused else {
         return find_first(world, window, forward);
+    };
+
+    if let Ok(widget) = world.widget(focused)
+        && let Some(focusable) = find_first_child_from(&widget, forward)
+    {
+        return Some(focusable);
     }
 
     if forward {
@@ -156,7 +168,9 @@ fn find_next(world: &World, window: &Window, forward: bool) -> Option<WidgetId> 
         }
 
         for layer in layers {
-            if let Some(focusable) = find_first_from(world, layer.widget, forward) {
+            if let Ok(widget) = world.widget(layer.widget)
+                && let Some(focusable) = find_first_from(&widget, forward)
+            {
                 return Some(focusable);
             }
         }
@@ -176,7 +190,9 @@ fn find_next(world: &World, window: &Window, forward: bool) -> Option<WidgetId> 
         }
 
         for layer in layers {
-            if let Some(focusable) = find_first_from(world, layer.widget, forward) {
+            if let Ok(widget) = world.widget(layer.widget)
+                && let Some(focusable) = find_first_from(&widget, forward)
+            {
                 return Some(focusable);
             }
         }
@@ -189,7 +205,7 @@ fn find_next_from(world: &World, current: WidgetId, forward: bool) -> Option<Wid
     let widget = world.widget(current).ok()?;
 
     if !widget.cx.hierarchy.has_focused() {
-        return find_first_from(world, current, forward);
+        return find_first_from(&widget, forward);
     }
 
     if forward {
@@ -208,7 +224,9 @@ fn find_next_from(world: &World, current: WidgetId, forward: bool) -> Option<Wid
         }
 
         for child in children {
-            if let Some(focusable) = find_first_from(world, child, forward) {
+            if let Ok(child) = world.widget(child)
+                && let Some(focusable) = find_first_from(&child, forward)
+            {
                 return Some(focusable);
             }
         }
@@ -228,7 +246,9 @@ fn find_next_from(world: &World, current: WidgetId, forward: bool) -> Option<Wid
         }
 
         for child in children {
-            if let Some(focusable) = find_first_from(world, child, forward) {
+            if let Ok(child) = world.widget(child)
+                && let Some(focusable) = find_first_from(&child, forward)
+            {
                 return Some(focusable);
             }
         }
