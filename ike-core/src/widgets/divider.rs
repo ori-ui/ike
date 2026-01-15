@@ -6,7 +6,8 @@ use crate::{
 pub struct Divider {
     axis:          Axis,
     thickness:     f32,
-    indent:        f32,
+    inset:         f32,
+    padding:       f32,
     corner_radius: CornerRadius,
     color:         Color,
 }
@@ -16,7 +17,8 @@ impl Divider {
         cx.build_widget(Self {
             axis:          Axis::Horizontal,
             thickness:     1.0,
-            indent:        8.0,
+            inset:         8.0,
+            padding:       4.0,
             corner_radius: CornerRadius::all(0.0),
             color:         Color::BLACK,
         })
@@ -33,8 +35,13 @@ impl Divider {
         this.cx.request_layout();
     }
 
-    pub fn set_indent(this: &mut WidgetMut<Self>, indent: f32) {
-        this.widget.indent = indent;
+    pub fn set_inset(this: &mut WidgetMut<Self>, inset: f32) {
+        this.widget.inset = inset;
+        this.cx.request_layout();
+    }
+
+    pub fn set_padding(this: &mut WidgetMut<Self>, padding: f32) {
+        this.widget.padding = padding;
         this.cx.request_layout();
     }
 
@@ -54,7 +61,7 @@ impl Widget for Divider {
         let (_, minor) = self.axis.unpack_size(space.max);
 
         self.axis.pack_size(
-            self.thickness + self.indent * 2.0,
+            self.thickness + self.padding * 2.0,
             minor,
         )
     }
@@ -62,12 +69,10 @@ impl Widget for Divider {
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {
         let (_, minor) = self.axis.unpack_size(cx.size());
 
+        let length = minor - self.inset * 2.0;
         let rect = Rect::min_size(
-            self.axis.pack_point(self.indent, self.indent),
-            self.axis.pack_size(
-                self.thickness,
-                minor - self.indent * 2.0,
-            ),
+            self.axis.pack_point(self.padding, self.inset),
+            self.axis.pack_size(self.thickness, length),
         );
 
         canvas.draw_rect(

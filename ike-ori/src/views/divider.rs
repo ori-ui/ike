@@ -18,7 +18,8 @@ pub fn vdivider() -> Divider {
 #[derive(Clone, Debug)]
 pub struct DividerTheme {
     pub thickness:     f32,
-    pub indent:        f32,
+    pub inset:         f32,
+    pub padding:       f32,
     pub corner_radius: CornerRadius,
     pub color:         Option<Color>,
 }
@@ -27,7 +28,8 @@ impl Default for DividerTheme {
     fn default() -> Self {
         Self {
             thickness:     1.0,
-            indent:        8.0,
+            inset:         8.0,
+            padding:       4.0,
             corner_radius: CornerRadius::all(0.0),
             color:         None,
         }
@@ -37,7 +39,8 @@ impl Default for DividerTheme {
 pub struct Divider {
     axis:          Axis,
     thickness:     Option<f32>,
-    indent:        Option<f32>,
+    inset:         Option<f32>,
+    padding:       Option<f32>,
     corner_radius: Option<CornerRadius>,
     color:         Option<Color>,
 }
@@ -47,7 +50,8 @@ impl Divider {
         Self {
             axis,
             thickness: None,
-            indent: None,
+            inset: None,
+            padding: None,
             corner_radius: None,
             color: None,
         }
@@ -58,8 +62,13 @@ impl Divider {
         self
     }
 
-    pub fn indent(mut self, indent: f32) -> Self {
-        self.indent = Some(indent);
+    pub fn inset(mut self, inset: f32) -> Self {
+        self.inset = Some(inset);
+        self
+    }
+
+    pub fn padding(mut self, padding: f32) -> Self {
+        self.padding = Some(padding);
         self
     }
 
@@ -77,8 +86,12 @@ impl Divider {
         self.thickness.unwrap_or(theme.thickness)
     }
 
-    fn get_indent(&self, theme: &DividerTheme) -> f32 {
-        self.indent.unwrap_or(theme.indent)
+    fn get_inset(&self, theme: &DividerTheme) -> f32 {
+        self.inset.unwrap_or(theme.inset)
+    }
+
+    fn get_padding(&self, theme: &DividerTheme) -> f32 {
+        self.padding.unwrap_or(theme.padding)
     }
 
     fn get_corner_radius(&self, theme: &DividerTheme) -> CornerRadius {
@@ -106,13 +119,15 @@ where
         let mut widget = widgets::Divider::new(cx);
 
         let thickness = self.get_thickness(&theme);
-        let indent = self.get_indent(&theme);
+        let inset = self.get_inset(&theme);
+        let padding = self.get_padding(&theme);
         let corner_radius = self.get_corner_radius(&theme);
         let color = self.get_color(&theme, &palette);
 
         widgets::Divider::set_axis(&mut widget, self.axis);
         widgets::Divider::set_thickness(&mut widget, thickness);
-        widgets::Divider::set_indent(&mut widget, indent);
+        widgets::Divider::set_inset(&mut widget, inset);
+        widgets::Divider::set_padding(&mut widget, padding);
         widgets::Divider::set_corner_radius(&mut widget, corner_radius);
         widgets::Divider::set_color(&mut widget, color);
 
@@ -143,9 +158,14 @@ where
             widgets::Divider::set_thickness(&mut widget, thickness);
         }
 
-        if self.indent != old.indent {
-            let indent = self.get_indent(&theme);
-            widgets::Divider::set_indent(&mut widget, indent);
+        if self.inset != old.inset {
+            let inset = self.get_inset(&theme);
+            widgets::Divider::set_inset(&mut widget, inset);
+        }
+
+        if self.padding != old.padding {
+            let padding = self.get_padding(&theme);
+            widgets::Divider::set_padding(&mut widget, padding);
         }
 
         if self.corner_radius != old.corner_radius {
