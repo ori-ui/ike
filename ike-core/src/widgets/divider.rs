@@ -18,7 +18,7 @@ impl Divider {
             axis:          Axis::Horizontal,
             thickness:     1.0,
             inset:         8.0,
-            padding:       4.0,
+            padding:       8.0,
             corner_radius: CornerRadius::all(0.0),
             color:         Color::BLACK,
         })
