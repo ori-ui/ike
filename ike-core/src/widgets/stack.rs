@@ -1,5 +1,5 @@
 use crate::{
-    Axis, Builder, LayoutCx, Size, Space, Update, UpdateCx, Widget, WidgetMut, widget::ChildUpdate,
+    Axis, Builder, ChildUpdate, LayoutCx, Size, Space, Update, UpdateCx, Widget, WidgetMut,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

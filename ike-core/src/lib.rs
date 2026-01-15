@@ -48,7 +48,7 @@ pub use text::{
     TextLayoutLine, TextStyle, TextWrap, WeakParagraph,
 };
 pub use transition::{Interpolate, Transition, TransitionCurve, Transitioned};
-pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
+pub use widget::{AnyWidgetId, ChildUpdate, Update, Widget, WidgetId, WidgetState};
 pub use window::{Layer, LayerId, Window, WindowId, WindowSizing};
 pub use world::{
     AnyWidget, GetError, ImeSignal, RenderSettings, Settings, Signal, WidgetMut, WidgetRef,
