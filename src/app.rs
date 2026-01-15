@@ -42,6 +42,11 @@ impl App {
         self
     }
 
+    pub fn pixel_align(mut self, enabled: bool) -> Self {
+        self.settings.render.pixel_align = enabled;
+        self
+    }
+
     pub fn install_log() {
         let mut filter = EnvFilter::default();
 
