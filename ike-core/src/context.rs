@@ -271,6 +271,16 @@ impl LayoutCx<'_> {
     }
 }
 
+impl LayoutCx<'_> {
+    pub fn request_compose(&mut self) {
+        self.hierarchy.request_compose();
+    }
+
+    pub fn request_draw(&mut self) {
+        self.hierarchy.request_draw();
+    }
+}
+
 impl ComposeCx<'_> {
     pub fn scale(&self) -> f32 {
         self.scale
@@ -286,6 +296,12 @@ impl ComposeCx<'_> {
         } else {
             tracing::error!("`ComposeCx::place_nth_child` called on invalid child");
         }
+    }
+}
+
+impl ComposeCx<'_> {
+    pub fn request_draw(&mut self) {
+        self.hierarchy.request_draw();
     }
 }
 
@@ -343,6 +359,14 @@ impl_contexts! {
             }
         }
 
+        pub fn request_draw(&mut self) {
+            self.hierarchy.request_draw();
+
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_redraw(window);
+            }
+        }
+
         pub fn set_subpixel(&mut self, subpixel: bool) {
             if self.is_subpixel() != subpixel {
                 self.state.is_subpixel = subpixel;
@@ -368,6 +392,7 @@ impl_contexts! {
             self.widgets.get_mut(self.world, id)
         }
 
+        /// Get a child
         pub fn get_child_mut<T>(&mut self, child: WidgetId<T>) -> Result<WidgetMut<'_, T>, GetError>
         where
             T: AnyWidget + ?Sized,
@@ -381,21 +406,6 @@ impl_contexts! {
         pub fn get_nth_child_mut<T>(&mut self, index: usize) -> Result<WidgetMut<'_>, GetError> {
             let child = self.hierarchy.children.get(index).ok_or(GetError::InvalidChild)?;
             self.widgets.get_mut(self.world, *child)
-        }
-    }
-}
-
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_>,
-    LayoutCx<'_>,
-    ComposeCx<'_> {
-        pub fn request_draw(&mut self) {
-            self.hierarchy.request_draw();
-
-            if let Some(window) = self.hierarchy.window {
-                self.world.request_redraw(window);
-            }
         }
     }
 }
@@ -445,6 +455,19 @@ impl_contexts! {
     MutCx<'_>,
     EventCx<'_>,
     UpdateCx<'_>,
+    ComposeCx<'_> {
+        pub fn get_parent(&self) -> Result<WidgetRef<'_>, GetError> {
+            let parent = self.hierarchy.parent.ok_or(GetError::InvalidParent)?;
+            self.widgets.get(self.world, parent)
+        }
+    }
+}
+
+impl_contexts! {
+    RefCx<'_>,
+    MutCx<'_>,
+    EventCx<'_>,
+    UpdateCx<'_>,
     LayoutCx<'_>,
     ComposeCx<'_>,
     DrawCx<'_> {
@@ -482,17 +505,23 @@ impl_contexts! {
                 .is_some_and(|child| child.parent == Some(self.id()))
         }
 
+        pub fn get_child<T>(&self, child: WidgetId<T>) -> Result<WidgetRef<'_, T>, GetError>
+        where
+            T: AnyWidget + ?Sized,
+        {
+            let id = self.id();
+            let child = self.widgets.get(self.world, child)?;
+            debug_assert!(child.cx.parent() == Some(id));
+            Ok(child)
+        }
+
         pub fn get_nth_child(&self, index: usize) -> Result<WidgetRef<'_>, GetError> {
-            self.widgets.get(self.world, self.hierarchy.children[index])
+            let child = self.hierarchy.children.get(index).ok_or(GetError::InvalidChild)?;
+            self.widgets.get(self.world, *child)
         }
 
         pub fn parent(&self) -> Option<WidgetId> {
             self.hierarchy.parent
-        }
-
-        pub fn get_parent(&self) -> Result<WidgetRef<'_>, GetError> {
-            let parent = self.hierarchy.parent.ok_or(GetError::InvalidParent)?;
-            self.widgets.get(self.world, parent)
         }
 
         pub fn window(&self) -> Option<WindowId> {

@@ -186,13 +186,13 @@ impl Scroll {
 
 impl Widget for Scroll {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
-        let vbar_width = cx.get_widget(self.vbar).map_or(0.0, |vbar| {
+        let vbar_width = cx.get_child(self.vbar).map_or(0.0, |vbar| {
             vbar.widget.thickness
                 + vbar.widget.padding.size().width
                 + vbar.widget.border_width.size().height
         });
 
-        let hbar_height = cx.get_widget(self.hbar).map_or(0.0, |hbar| {
+        let hbar_height = cx.get_child(self.hbar).map_or(0.0, |hbar| {
             hbar.widget.thickness
                 + hbar.widget.padding.size().height
                 + hbar.widget.border_width.size().height
@@ -269,7 +269,7 @@ impl Widget for Scroll {
 
     fn compose(&mut self, cx: &mut ComposeCx<'_>) {
         let Ok(overflow) = cx
-            .get_widget(self.portal)
+            .get_child(self.portal)
             .map(|portal| portal.widget.overflow)
         else {
             return;
@@ -335,9 +335,9 @@ impl Widget for Scroll {
 
     fn update(&mut self, cx: &mut UpdateCx<'_>, update: Update) {
         if let Update::ScrollTo(mut target) = update
-            && let Ok(size) = cx.get_widget(self.portal).map(|portal| portal.cx.size())
+            && let Ok(size) = cx.get_child(self.portal).map(|portal| portal.cx.size())
             && let Ok(overflow) = cx
-                .get_widget(self.portal)
+                .get_child(self.portal)
                 .map(|portal| portal.widget.overflow)
         {
             target.min += Offset::all(-8.0);
@@ -378,7 +378,7 @@ impl Widget for Scroll {
 
     fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
         let Ok(overflow) = cx
-            .get_widget(self.portal)
+            .get_child(self.portal)
             .map(|portal| portal.widget.overflow)
         else {
             return PointerPropagate::Bubble;
@@ -408,7 +408,7 @@ impl Widget for Scroll {
 
     fn on_touch_event(&mut self, cx: &mut EventCx<'_>, event: &TouchEvent) -> TouchPropagate {
         let Ok(overflow) = cx
-            .get_widget(self.portal)
+            .get_child(self.portal)
             .map(|portal| portal.widget.overflow)
         else {
             return TouchPropagate::Bubble;
