@@ -91,6 +91,11 @@ impl BorderWidth {
     pub const fn offset(self) -> Offset {
         Offset::new(self.left, self.top)
     }
+
+    /// Compute the offset aligned to the device pixel grid.
+    pub fn aligned_offset(self, cx: &LayoutCx<'_>) -> Offset {
+        self.offset().pixel_align(cx.scale())
+    }
 }
 
 impl From<[f32; 4]> for BorderWidth {
@@ -160,6 +165,11 @@ impl Padding {
 
     pub const fn offset(self) -> Offset {
         Offset::new(self.left, self.top)
+    }
+
+    /// Compute the offset aligned to the device pixel grid.
+    pub fn aligned_offset(self, cx: &LayoutCx<'_>) -> Offset {
+        self.offset().pixel_align(cx.scale())
     }
 }
 

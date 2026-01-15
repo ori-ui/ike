@@ -182,18 +182,13 @@ impl Widget for Entry {
 
         cx.set_child_stashed(1, !has_text);
 
-        let placeholder_size = cx.layout_nth_child(1, space);
+        let placeholder_size = cx.layout_child(self.placeholder, space);
         space.min.width = space.min.width.max(placeholder_size.width);
-        let text_size = cx.layout_nth_child(0, space);
+        let text_size = cx.layout_child(self.text_area, space);
 
-        cx.place_nth_child(
-            0,
-            self.padding.offset() + self.border_width.offset(),
-        );
-        cx.place_nth_child(
-            1,
-            self.padding.offset() + self.border_width.offset(),
-        );
+        let offset = self.padding.aligned_offset(cx) + self.border_width.aligned_offset(cx);
+        cx.place_child(self.text_area, offset);
+        cx.place_child(self.placeholder, offset);
 
         let size = text_size.max(placeholder_size);
         let size = self.padding.layout_up(cx, size);

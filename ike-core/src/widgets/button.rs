@@ -109,10 +109,8 @@ impl Widget for Button {
         let space = self.border_width.layout_down(cx, space);
         let size = cx.layout_nth_child(0, space);
 
-        cx.place_nth_child(
-            0,
-            self.padding.offset() + self.border_width.offset(),
-        );
+        let offset = self.padding.aligned_offset(cx) + self.border_width.aligned_offset(cx);
+        cx.place_nth_child(0, offset);
 
         let size = self.padding.layout_up(cx, size);
         self.border_width.layout_up(cx, size)
