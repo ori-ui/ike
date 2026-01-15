@@ -113,7 +113,8 @@ impl Widget for Button {
         cx.place_nth_child(0, offset);
 
         let size = self.padding.layout_up(cx, size);
-        self.border_width.layout_up(cx, size)
+        let size = self.border_width.layout_up(cx, size);
+        space.constrain(size)
     }
 
     fn draw(&mut self, cx: &mut DrawCx<'_>, canvas: &mut dyn Canvas) {

@@ -1,6 +1,6 @@
 use std::{
     fmt,
-    ops::{Add, AddAssign, Sub, SubAssign},
+    ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -10,6 +10,8 @@ pub struct Size {
 }
 
 impl Size {
+    const EPSILON: f32 = 0.0001;
+
     pub const ZERO: Self = Self::all(0.0);
     pub const INFINITY: Self = Self::all(f32::INFINITY);
 
@@ -47,8 +49,8 @@ impl Size {
 
     pub const fn pixel_ceil(self, scale: f32) -> Self {
         Self {
-            width:  (self.width * scale).ceil() / scale,
-            height: (self.height * scale).ceil() / scale,
+            width:  (self.width * scale - Self::EPSILON).ceil() / scale,
+            height: (self.height * scale - Self::EPSILON).ceil() / scale,
         }
     }
 
@@ -137,5 +139,23 @@ impl Sub for Size {
 impl SubAssign for Size {
     fn sub_assign(&mut self, rhs: Self) {
         *self = *self - rhs;
+    }
+}
+
+impl Mul<f32> for Size {
+    type Output = Size;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Size {
+            width:  self.width * rhs,
+            height: self.height * rhs,
+        }
+    }
+}
+
+impl MulAssign<f32> for Size {
+    fn mul_assign(&mut self, rhs: f32) {
+        self.width *= rhs;
+        self.height *= rhs;
     }
 }

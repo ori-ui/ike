@@ -10,6 +10,8 @@ pub struct Offset {
 }
 
 impl Offset {
+    const EPSILON: f32 = 0.0001;
+
     pub const ZERO: Self = Self::all(0.0);
 
     pub const fn new(x: f32, y: f32) -> Self {
@@ -41,8 +43,8 @@ impl Offset {
     /// Compute `self` aligned to the pixel grid for a certain scale factor.
     pub const fn pixel_ceil(self, scale: f32) -> Self {
         Self {
-            x: (self.x * scale).ceil() / scale,
-            y: (self.y * scale).ceil() / scale,
+            x: (self.x * scale - Self::EPSILON).ceil() / scale,
+            y: (self.y * scale - Self::EPSILON).ceil() / scale,
         }
     }
 }
