@@ -53,7 +53,7 @@ where
         _data: &mut T,
         old: &mut Self,
     ) {
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
+        let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 

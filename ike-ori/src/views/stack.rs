@@ -103,7 +103,7 @@ where
 
         update_children(cx, *element, children);
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
+        let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
@@ -195,7 +195,7 @@ fn update_flex(
     widget: WidgetId<widgets::Stack>,
     children: &impl ElementSeq<Flex<WidgetId>>,
 ) {
-    if let Some(mut widget) = cx.get_widget_mut(widget) {
+    if let Ok(mut widget) = cx.get_widget_mut(widget) {
         for (i, child) in children.iter().enumerate() {
             let (flex, tight) = widget.widget.get_flex(i);
 

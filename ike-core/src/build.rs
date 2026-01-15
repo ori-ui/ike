@@ -1,13 +1,13 @@
 use crate::{
-    AnyWidget, AnyWidgetId, Color, Update, Widget, WidgetId, WidgetMut, WidgetRef, WindowId,
-    WindowSizing, World, passes,
+    AnyWidget, AnyWidgetId, Color, GetError, Update, Widget, WidgetId, WidgetMut, WidgetRef,
+    WindowId, WindowSizing, World, passes,
 };
 
 pub trait Builder {
     fn world(&self) -> &World;
     fn world_mut(&mut self) -> &mut World;
 
-    fn get_widget<T>(&self, id: WidgetId<T>) -> Option<WidgetRef<'_, T>>
+    fn get_widget<T>(&self, id: WidgetId<T>) -> Result<WidgetRef<'_, T>, GetError>
     where
         Self: Sized,
         T: ?Sized + AnyWidget,
@@ -16,7 +16,7 @@ pub trait Builder {
         world.widgets.get(&world.state, id)
     }
 
-    fn get_widget_mut<T>(&mut self, id: WidgetId<T>) -> Option<WidgetMut<'_, T>>
+    fn get_widget_mut<T>(&mut self, id: WidgetId<T>) -> Result<WidgetMut<'_, T>, GetError>
     where
         Self: Sized,
         T: ?Sized + AnyWidget,
@@ -33,7 +33,7 @@ pub trait Builder {
         let world = self.world_mut();
         let id = world.widgets.insert(widget);
 
-        if let Some(mut widget) = world.widget_mut(id.upcast()) {
+        if let Ok(mut widget) = world.widget_mut(id.upcast()) {
             passes::update::widget(&mut widget, Update::Added);
             passes::hierarchy::propagate_down(widget.cx.widgets, id.upcast());
         }
@@ -86,6 +86,18 @@ pub trait Builder {
         );
     }
 
+    fn set_stashed(&mut self, widget: impl AnyWidgetId, is_stashed: bool)
+    where
+        Self: Sized,
+    {
+        let world = self.world_mut();
+        let widget = widget.upcast();
+
+        if let Ok(mut widget) = world.widget_mut(widget) {
+            passes::hierarchy::set_stashed(&mut widget, is_stashed);
+        }
+    }
+
     fn children(&self, parent: impl AnyWidgetId) -> &[WidgetId]
     where
         Self: Sized,
@@ -106,7 +118,7 @@ pub trait Builder {
         let child = child.upcast();
 
         self.get_widget(child)
-            .is_some_and(|child| child.cx.parent() == Some(parent))
+            .is_ok_and(|child| child.cx.parent() == Some(parent))
     }
 
     fn set_window_base_layer(&mut self, window: WindowId, contents: impl AnyWidgetId)

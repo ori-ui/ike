@@ -48,7 +48,7 @@ pub(crate) fn down(world: &mut World, window: WindowId, touch: TouchId, position
             TouchPropagate::Handled => true,
 
             TouchPropagate::Capture => {
-                if let Some(mut widget) = world.widget_mut(target) {
+                if let Ok(mut widget) = world.widget_mut(target) {
                     widget.set_active(true);
                 }
 
@@ -141,7 +141,7 @@ pub(crate) fn up(world: &mut World, window: WindowId, touch: TouchId, position: 
         && !handled
         && let Some(window) = world.window(window_id)
         && let Some(focused) = window.focused
-        && world.widget(focused).is_some_and(|widget| {
+        && world.widget(focused).is_ok_and(|widget| {
             let local = widget.cx.global_transform().inverse() * position;
             !widget.cx.rect().contains(local)
         })
@@ -152,7 +152,7 @@ pub(crate) fn up(world: &mut World, window: WindowId, touch: TouchId, position: 
     if let Some(window) = world.window(window_id)
         && let Some(touch) = window.touch(touch_id)
         && let Some(target) = find_touch_target(world, window, touch, position)
-        && let Some(mut widget) = world.widget_mut(target)
+        && let Ok(mut widget) = world.widget_mut(target)
     {
         widget.set_active(false);
     }
@@ -212,7 +212,7 @@ pub(crate) fn moved(world: &mut World, window: WindowId, touch: TouchId, positio
                 TouchPropagate::Handled => true,
 
                 TouchPropagate::Capture => {
-                    if let Some(mut widget) = world.widget_mut(target) {
+                    if let Ok(mut widget) = world.widget_mut(target) {
                         widget.set_active(true);
                     }
 

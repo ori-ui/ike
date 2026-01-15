@@ -10,7 +10,7 @@ pub(crate) fn recorder_overlay_window(world: &World, window: WindowId, canvas: &
     };
 
     for layer in window.layers() {
-        if let Some(widget) = world.widget(layer.widget) {
+        if let Ok(widget) = world.widget(layer.widget) {
             recorder_overlay_widget(&widget, canvas);
         }
     }
@@ -40,7 +40,7 @@ pub(crate) fn recorder_overlay_window(world: &World, window: WindowId, canvas: &
 }
 
 pub(crate) fn recorder_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) {
-    for child in widget.cx.iter_children() {
+    for child in widget.cx.iter_children().flatten() {
         recorder_overlay_widget(&child, canvas);
     }
 

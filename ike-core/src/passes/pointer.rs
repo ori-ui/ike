@@ -24,7 +24,7 @@ pub(crate) fn left(world: &mut World, window: WindowId, pointer: PointerId) -> b
         let pointer = window.pointers.swap_remove(index);
 
         if let Some(hovered) = pointer.hovering
-            && let Some(mut widget) = world.widget_mut(hovered)
+            && let Ok(mut widget) = world.widget_mut(hovered)
         {
             widget.set_hovered(false);
         }
@@ -110,7 +110,7 @@ pub(crate) fn pressed(
             PointerPropagate::Handled => true,
 
             PointerPropagate::Capture if pressed => {
-                if let Some(mut widget) = world.widget_mut(target) {
+                if let Ok(mut widget) = world.widget_mut(target) {
                     widget.set_active(true);
                 }
 
@@ -130,10 +130,10 @@ pub(crate) fn pressed(
             }
         };
 
-        let target_is_active = world.widget(target).is_some_and(|t| t.cx.is_active());
+        let target_is_active = world.widget(target).is_ok_and(|t| t.cx.is_active());
 
         if !pressed && target_is_active {
-            if let Some(mut widget) = world.widget_mut(target) {
+            if let Ok(mut widget) = world.widget_mut(target) {
                 widget.set_active(false);
             }
 
@@ -153,7 +153,7 @@ pub(crate) fn pressed(
         && !handled
         && let Some(window) = world.window(window_id)
         && let Some(focused) = window.focused
-        && world.widget(focused).is_some_and(|widget| {
+        && world.widget(focused).is_ok_and(|widget| {
             let local = widget.cx.global_transform().inverse() * position;
             !widget.cx.rect().contains(local)
         })
@@ -243,7 +243,7 @@ pub(crate) fn update_pointer_hovered(
     let position = pointer.position;
 
     if let Some(active) = pointer.capturer {
-        if let Some(mut widget) = world.widget_mut(active) {
+        if let Ok(mut widget) = world.widget_mut(active) {
             (widget.cx.world).set_window_cursor(window_id, widget.cx.cursor());
 
             let local = widget.cx.global_transform().inverse() * position;
@@ -260,13 +260,13 @@ pub(crate) fn update_pointer_hovered(
 
     if pointer.hovering != hovered {
         if let Some(current) = pointer.hovering
-            && let Some(mut widget) = world.widget_mut(current)
+            && let Ok(mut widget) = world.widget_mut(current)
         {
             widget.set_hovered(false);
         }
 
         if let Some(hovered) = hovered
-            && let Some(mut widget) = world.widget_mut(hovered)
+            && let Ok(mut widget) = world.widget_mut(hovered)
         {
             widget.set_hovered(true);
         }
@@ -279,7 +279,7 @@ pub(crate) fn update_pointer_hovered(
     }
 
     if let Some(hovered) = hovered
-        && let Some(widget) = world.widget_mut(hovered)
+        && let Ok(widget) = world.widget_mut(hovered)
     {
         (widget.cx.world).set_window_cursor(window_id, widget.cx.cursor());
     } else {

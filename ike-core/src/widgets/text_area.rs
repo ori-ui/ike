@@ -143,14 +143,14 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         this.widget.handle_color = color;
 
         if let Some((_layer, handle)) = this.widget.cursor_handle
-            && let Some(mut handle) = this.cx.get_widget_mut(handle)
+            && let Ok(mut handle) = this.cx.get_widget_mut(handle)
         {
             handle.widget.color = color;
             handle.cx.request_draw();
         }
 
         if let Some((_layer, handle)) = this.widget.selection_handle
-            && let Some(mut handle) = this.cx.get_widget_mut(handle)
+            && let Ok(mut handle) = this.cx.get_widget_mut(handle)
         {
             handle.widget.color = color;
             handle.cx.request_draw();
@@ -162,14 +162,14 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
         this.cx.request_compose();
 
         if let Some((_layer, handle)) = this.widget.cursor_handle
-            && let Some(mut handle) = this.cx.get_widget_mut(handle)
+            && let Ok(mut handle) = this.cx.get_widget_mut(handle)
         {
             handle.widget.size = size;
             handle.cx.request_layout();
         }
 
         if let Some((_layer, handle)) = this.widget.selection_handle
-            && let Some(mut handle) = this.cx.get_widget_mut(handle)
+            && let Ok(mut handle) = this.cx.get_widget_mut(handle)
         {
             handle.widget.size = size;
             handle.cx.request_layout();
@@ -600,7 +600,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             let this = WidgetId::<Self>::downcast_unchecked(cx.id());
 
             cx.defer(move |world| {
-                if let Some(text_area) = world.get_widget(this) {
+                if let Ok(text_area) = world.get_widget(this) {
                     if is_cursor && text_area.widget.cursor_handle.is_some() {
                         return;
                     }
@@ -623,7 +623,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
 
                 let layer = world.add_layer(window, position, handle);
 
-                if let Some(text_area) = world.get_widget_mut(this) {
+                if let Ok(mut text_area) = world.get_widget_mut(this) {
                     if is_cursor {
                         text_area.widget.cursor_handle = Some((layer, handle));
                     } else {
@@ -651,6 +651,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             if let Some((layer, widget)) = cursor_handle
                 && let Some(window) = world
                     .get_widget(widget)
+                    .ok()
                     .and_then(|widget| widget.cx.window())
             {
                 world.remove_layer(window, layer);
@@ -665,6 +666,7 @@ impl<const EDITABLE: bool> TextArea<EDITABLE> {
             if let Some((layer, widget)) = selection_handle
                 && let Some(window) = world
                     .get_widget(widget)
+                    .ok()
                     .and_then(|widget| widget.cx.window())
             {
                 world.remove_layer(window, layer);
@@ -1148,7 +1150,7 @@ impl<const EDITABLE: bool> Widget for Handle<EDITABLE> {
                 let is_cursor = self.is_cursor;
 
                 cx.defer(move |world| {
-                    if let Some(mut text_area) = world.get_widget_mut(text_area) {
+                    if let Ok(mut text_area) = world.get_widget_mut(text_area) {
                         let position = text_area.cx.global_transform().inverse() * position;
 
                         let cursor = text_area.widget.find_point(position, true);

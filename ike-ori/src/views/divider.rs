@@ -130,7 +130,7 @@ where
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<DividerTheme>();
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
+        let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 

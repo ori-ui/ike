@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::{cell::Cell, rc::Rc};
 
 use crate::{Affine, Clip, CursorIcon, Size, Space, Widget, WidgetId, WindowId, world::Widgets};
 
@@ -84,7 +84,7 @@ impl WidgetFlags {
 pub struct WidgetHierarchy {
     pub(crate) window:   Option<WindowId>,
     pub(crate) parent:   Option<WidgetId>,
-    pub(crate) children: Vec<WidgetId>,
+    pub(crate) children: Rc<Vec<WidgetId>>,
     pub(crate) flags:    Cell<WidgetFlags>,
 }
 
@@ -93,18 +93,18 @@ impl WidgetHierarchy {
         Self {
             window:   None,
             parent:   None,
-            children: Vec::new(),
+            children: Rc::new(Vec::new()),
             flags:    Cell::new(WidgetFlags::new::<T>()),
         }
     }
 
-    pub fn update(&self, widgets: &Widgets) {
+    pub fn propagate_down(&self, widgets: &Widgets) {
         self.flags.update(|mut flags| {
             flags.reset();
             flags
         });
 
-        for &child in &self.children {
+        for &child in self.children.iter() {
             let Some(child) = widgets.get_hierarchy(child) else {
                 continue;
             };
@@ -114,6 +114,10 @@ impl WidgetHierarchy {
                 flags
             });
         }
+    }
+
+    pub fn children_mut(&mut self) -> &mut Vec<WidgetId> {
+        Rc::make_mut(&mut self.children)
     }
 
     pub fn request_compose(&self) {

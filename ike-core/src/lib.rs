@@ -51,5 +51,5 @@ pub use transition::{Interpolate, Transition, TransitionCurve, Transitioned};
 pub use widget::{AnyWidgetId, Update, Widget, WidgetId, WidgetState};
 pub use window::{Layer, LayerId, Window, WindowId, WindowSizing};
 pub use world::{
-    AnyWidget, ImeSignal, Settings, Signal, WidgetMut, WidgetRef, WindowUpdate, World,
+    AnyWidget, GetError, ImeSignal, Settings, Signal, WidgetMut, WidgetRef, WindowUpdate, World,
 };

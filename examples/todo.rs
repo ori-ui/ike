@@ -116,7 +116,7 @@ fn todos(data: &Data) -> Option<Flex<impl View<Data> + use<>>> {
     Some(expand(
         container(max_height(
             400.0,
-            vscroll(vstack(todos)).bar_border_width(0.0),
+            vscroll(vstack(todos).align(Align::Fill)).bar_border_width(0.0),
         ))
         .padding(0.0)
         .border_width([0.0, 1.0, 1.0, 1.0])
@@ -168,8 +168,9 @@ fn ui(data: &mut Data) -> impl Effect<Data> + use<> {
             vstack((
                 name_entry(),
                 todos(data),
-                width(240.0, filters()),
-            )),
+                center(width(240.0, filters())),
+            ))
+            .align(Align::Fill),
         ))),
     )
 }

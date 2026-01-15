@@ -61,7 +61,7 @@ impl Widget for Constrain {
         space.max = space.max.min(*self.max_size);
         space.min = space.min.min(space.max);
 
-        cx.layout_child(0, space)
+        cx.layout_nth_child(0, space)
     }
 
     fn animate(&mut self, cx: &mut UpdateCx<'_>, dt: Duration) {

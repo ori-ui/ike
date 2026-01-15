@@ -1,8 +1,11 @@
-use std::ops::Range;
+use std::{
+    cell::{Ref, RefMut},
+    ops::Range,
+};
 
 use crate::{
-    Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, ImeSignal, Painter, Paragraph, Point, Rect,
-    Signal, Size, Space, Svg, TextLayoutLine, Widget, WidgetId, WidgetMut, WidgetRef, Window,
+    Affine, AnyWidget, AnyWidgetId, Clip, CursorIcon, GetError, ImeSignal, Painter, Paragraph,
+    Point, Rect, Signal, Size, Space, Svg, TextLayoutLine, WidgetId, WidgetMut, WidgetRef, Window,
     WindowId, World, passes,
     widget::{WidgetHierarchy, WidgetState},
     world::{Widgets, WorldState},
@@ -19,14 +22,14 @@ pub(crate) enum FocusUpdate {
 pub struct RefCx<'a> {
     pub(crate) widgets:   &'a Widgets,
     pub(crate) world:     &'a WorldState,
-    pub(crate) state:     &'a WidgetState,
+    pub(crate) state:     Ref<'a, WidgetState>,
     pub(crate) hierarchy: &'a WidgetHierarchy,
 }
 
 pub struct MutCx<'a> {
     pub(crate) widgets:   &'a Widgets,
     pub(crate) world:     &'a mut WorldState,
-    pub(crate) state:     &'a mut WidgetState,
+    pub(crate) state:     RefMut<'a, WidgetState>,
     pub(crate) hierarchy: &'a WidgetHierarchy,
 }
 
@@ -70,32 +73,6 @@ pub struct DrawCx<'a> {
 }
 
 impl MutCx<'_> {
-    pub fn get_widget_mut<U>(&mut self, id: WidgetId<U>) -> Option<WidgetMut<'_, U>>
-    where
-        U: ?Sized + AnyWidget,
-    {
-        self.widgets.get_mut(self.world, id)
-    }
-
-    pub fn get_child_mut(&mut self, index: usize) -> Option<WidgetMut<'_, dyn Widget>> {
-        self.widgets.get_mut(
-            self.world,
-            *self.hierarchy.children.get(index)?,
-        )
-    }
-
-    pub fn get_parent_mut(&mut self) -> Option<WidgetMut<'_>> {
-        self.widgets.get_mut(self.world, self.hierarchy.parent?)
-    }
-
-    pub fn for_each_child_mut(&mut self, mut f: impl FnMut(&mut WidgetMut)) {
-        for &child in &self.hierarchy.children {
-            if let Some(mut child) = self.widgets.get_mut(self.world, child) {
-                f(&mut child);
-            }
-        }
-    }
-
     pub fn request_compose(&mut self) {
         self.hierarchy.request_compose();
         passes::hierarchy::propagate_down(self.widgets, self.id());
@@ -147,7 +124,7 @@ impl MutCx<'_> {
         UpdateCx {
             widgets:   self.widgets,
             world:     self.world,
-            state:     self.state,
+            state:     &mut self.state,
             hierarchy: self.hierarchy,
         }
     }
@@ -160,7 +137,7 @@ impl MutCx<'_> {
         LayoutCx {
             widgets: self.widgets,
             world: self.world,
-            state: self.state,
+            state: &mut self.state,
             hierarchy: self.hierarchy,
             painter,
             scale,
@@ -171,7 +148,7 @@ impl MutCx<'_> {
         ComposeCx {
             widgets: self.widgets,
             world: self.world,
-            state: self.state,
+            state: &mut self.state,
             hierarchy: self.hierarchy,
             scale,
         }
@@ -181,7 +158,7 @@ impl MutCx<'_> {
         DrawCx {
             widgets:   self.widgets,
             world:     self.world,
-            state:     self.state,
+            state:     &mut self.state,
             hierarchy: self.hierarchy,
         }
     }
@@ -236,7 +213,7 @@ impl LayoutCx<'_> {
 
     pub fn set_child_stashed(&mut self, index: usize, is_stashed: bool) {
         if let Some(child) = self.hierarchy.children.get(index)
-            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
+            && let Ok(mut child) = self.widgets.get_mut(self.world, *child)
         {
             passes::hierarchy::set_stashed(&mut child, is_stashed);
         } else {
@@ -244,10 +221,11 @@ impl LayoutCx<'_> {
         }
     }
 
-    pub fn layout_child(&mut self, index: usize, space: Space) -> Size {
-        if let Some(child) = self.hierarchy.children.get(index)
-            && let Some(mut child) = self.widgets.get_mut(self.world, *child)
-        {
+    pub fn layout_child(&mut self, child: impl AnyWidgetId, space: Space) -> Size {
+        let id = self.id();
+        if let Ok(mut child) = self.widgets.get_mut(self.world, child.upcast()) {
+            debug_assert!(child.cx.parent() == Some(id));
+
             passes::layout::layout_widget(
                 &mut child,
                 space,
@@ -256,13 +234,36 @@ impl LayoutCx<'_> {
             )
         } else {
             tracing::error!("`LayoutCx::layout_child` called on invalid child");
-
             Size::ZERO
         }
     }
 
-    pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
-        passes::layout::place_child(self, index, transform.into());
+    pub fn layout_nth_child(&mut self, index: usize, space: Space) -> Size {
+        if let Some(child) = self.hierarchy.children.get(index)
+            && let Ok(mut child) = self.widgets.get_mut(self.world, *child)
+        {
+            passes::layout::layout_widget(
+                &mut child,
+                space,
+                self.painter,
+                self.scale,
+            )
+        } else {
+            tracing::error!("`LayoutCx::layout_nth_child` called on invalid child");
+            Size::ZERO
+        }
+    }
+
+    pub fn place_child(&mut self, child: impl AnyWidgetId, transform: impl Into<Affine>) {
+        passes::layout::place_child(self, child.upcast(), transform.into());
+    }
+
+    pub fn place_nth_child(&mut self, index: usize, transform: impl Into<Affine>) {
+        if let Some(child) = self.hierarchy.children.get(index) {
+            passes::layout::place_child(self, *child, transform.into());
+        } else {
+            tracing::error!("`LayoutCx::place_nth_child` called on invalid child");
+        }
     }
 
     pub fn set_clip(&mut self, rect: impl Into<Option<Clip>>) {
@@ -275,8 +276,16 @@ impl ComposeCx<'_> {
         self.scale
     }
 
-    pub fn place_child(&mut self, index: usize, transform: impl Into<Affine>) {
-        passes::compose::place_child(self, index, transform.into());
+    pub fn place_child(&mut self, child: impl AnyWidgetId, transform: impl Into<Affine>) {
+        passes::compose::place_child(self, child.upcast(), transform.into());
+    }
+
+    pub fn place_nth_child(&mut self, index: usize, transform: impl Into<Affine>) {
+        if let Some(child) = self.hierarchy.children.get(index) {
+            passes::compose::place_child(self, *child, transform.into());
+        } else {
+            tracing::error!("`ComposeCx::place_nth_child` called on invalid child");
+        }
     }
 }
 
@@ -297,15 +306,136 @@ macro_rules! impl_contexts {
 }
 
 impl_contexts! {
-    RefCx<'_>,
+    MutCx<'_>,
+    EventCx<'_>,
+    UpdateCx<'_> {
+        pub fn get_parent_mut(&mut self) -> Result<WidgetMut<'_>, GetError> {
+            let parent = self.hierarchy.parent.ok_or(GetError::InvalidParent)?;
+            self.widgets.get_mut(self.world, parent)
+        }
+    }
+}
+
+impl_contexts! {
+    EventCx<'_>,
+    UpdateCx<'_> {
+        pub fn request_compose(&mut self) {
+            self.hierarchy.request_compose();
+
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_redraw(window);
+            }
+        }
+
+        pub fn request_animate(&mut self) {
+            self.hierarchy.request_animate();
+
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_animate(window);
+            }
+        }
+
+        pub fn request_layout(&mut self) {
+            self.hierarchy.request_layout();
+
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_redraw(window);
+            }
+        }
+
+        pub fn set_subpixel(&mut self, subpixel: bool) {
+            if self.is_subpixel() != subpixel {
+                self.state.is_subpixel = subpixel;
+                self.request_layout();
+            }
+        }
+
+        pub fn set_cursor(&mut self, cursor: CursorIcon) {
+            self.state.cursor = cursor;
+        }
+    }
+}
+
+impl_contexts! {
     MutCx<'_>,
     EventCx<'_>,
     UpdateCx<'_>,
+    ComposeCx<'_> {
+        pub fn get_widget_mut<U>(&mut self, id: WidgetId<U>) -> Result<WidgetMut<'_, U>, GetError>
+        where
+            U: ?Sized + AnyWidget,
+        {
+            self.widgets.get_mut(self.world, id)
+        }
+
+        pub fn get_child_mut<T>(&mut self, child: WidgetId<T>) -> Result<WidgetMut<'_, T>, GetError>
+        where
+            T: AnyWidget + ?Sized,
+        {
+            let id = self.id();
+            let child = self.widgets.get_mut(self.world, child)?;
+            debug_assert!(child.cx.parent() == Some(id));
+            Ok(child)
+        }
+
+        pub fn get_nth_child_mut<T>(&mut self, index: usize) -> Result<WidgetMut<'_>, GetError> {
+            let child = self.hierarchy.children.get(index).ok_or(GetError::InvalidChild)?;
+            self.widgets.get_mut(self.world, *child)
+        }
+    }
+}
+
+impl_contexts! {
+    EventCx<'_>,
+    UpdateCx<'_>,
     LayoutCx<'_>,
-    ComposeCx<'_>,
-    DrawCx<'_> {
-        pub fn id(&self) -> WidgetId {
-            self.state.id
+    ComposeCx<'_> {
+        pub fn request_draw(&mut self) {
+            self.hierarchy.request_draw();
+
+            if let Some(window) = self.hierarchy.window {
+                self.world.request_redraw(window);
+            }
+        }
+    }
+}
+
+impl_contexts! {
+    MutCx<'_>,
+    EventCx<'_>,
+    UpdateCx<'_> {
+        pub fn restart_ime(&mut self) {
+            if !self.is_focused() || !self.hierarchy.accepts_text() {
+                tracing::warn!("`restart_ime` can only be called on a focused view that accepts text");
+                return;
+            }
+
+            self.world.emit_signal(Signal::Ime(ImeSignal::Start));
+        }
+
+        pub fn set_ime_text(&mut self, text: String) {
+            if !self.is_focused() || !self.hierarchy.accepts_text() {
+                tracing::warn!("`set_ime_text` can only be called on a focused view that accepts text");
+                return;
+            }
+
+            self.world.emit_signal(Signal::Ime(ImeSignal::Text(text)));
+        }
+
+        pub fn set_ime_selection(
+            &mut self,
+            selection: Range<usize>,
+            composing: Option<Range<usize>>,
+        ) {
+            if !self.is_focused() || !self.hierarchy.accepts_text() {
+                tracing::warn!("`set_ime_selection` can only be called on a focused view that accepts text");
+                return;
+            }
+
+            self.world.emit_signal(Signal::Ime(ImeSignal::Selection {
+                selection,
+                composing,
+            }));
         }
     }
 }
@@ -318,6 +448,10 @@ impl_contexts! {
     LayoutCx<'_>,
     ComposeCx<'_>,
     DrawCx<'_> {
+        pub fn id(&self) -> WidgetId {
+            self.state.id
+        }
+
         /// Mutate the [`World`] at an unspecified time in the future.
         ///
         /// This is useful for when a widget needs to insert or remove other widgets, but use with
@@ -326,7 +460,7 @@ impl_contexts! {
             self.world.emit_signal(Signal::Mutate(Box::new(f)));
         }
 
-        pub fn get_widget<U>(&self, id: WidgetId<U>) -> Option<WidgetRef<'_, U>>
+        pub fn get_widget<U>(&self, id: WidgetId<U>) -> Result<WidgetRef<'_, U>, GetError>
         where
             U: ?Sized + AnyWidget,
         {
@@ -337,17 +471,18 @@ impl_contexts! {
             &self.hierarchy.children
         }
 
-        pub fn iter_children(&self) -> impl DoubleEndedIterator<Item = WidgetRef<'_>> {
-            self.hierarchy.children.iter().filter_map(|child| {
+        pub fn iter_children(&self) -> impl DoubleEndedIterator<Item = Result<WidgetRef<'_>, GetError>> {
+            self.hierarchy.children.iter().map(|child| {
                 self.widgets.get(self.world, *child)
             })
         }
 
         pub fn is_child(&self, id: impl AnyWidgetId) -> bool {
-            self.get_widget(id.upcast()).is_some_and(|w| w.cx.hierarchy.parent == Some(self.id().upcast()))
+            self.widgets.get_hierarchy(id.upcast())
+                .is_some_and(|child| child.parent == Some(self.id()))
         }
 
-        pub fn get_child(&self, index: usize) -> Option<WidgetRef<'_>> {
+        pub fn get_nth_child(&self, index: usize) -> Result<WidgetRef<'_>, GetError> {
             self.widgets.get(self.world, self.hierarchy.children[index])
         }
 
@@ -355,8 +490,9 @@ impl_contexts! {
             self.hierarchy.parent
         }
 
-        pub fn get_parent(&self) -> Option<WidgetRef<'_>> {
-            self.widgets.get(self.world, self.hierarchy.parent?)
+        pub fn get_parent(&self) -> Result<WidgetRef<'_>, GetError> {
+            let parent = self.hierarchy.parent.ok_or(GetError::InvalidParent)?;
+            self.widgets.get(self.world, parent)
         }
 
         pub fn window(&self) -> Option<WindowId> {
@@ -413,101 +549,6 @@ impl_contexts! {
 
         pub fn cursor(&self) -> CursorIcon{
             self.state.cursor
-        }
-    }
-}
-
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_> {
-        pub fn request_compose(&mut self) {
-            self.hierarchy.request_compose();
-
-            if let Some(window) = self.hierarchy.window {
-                self.world.request_redraw(window);
-            }
-        }
-
-        pub fn request_animate(&mut self) {
-            self.hierarchy.request_animate();
-
-            if let Some(window) = self.hierarchy.window {
-                self.world.request_animate(window);
-            }
-        }
-
-        pub fn request_layout(&mut self) {
-            self.hierarchy.request_layout();
-
-            if let Some(window) = self.hierarchy.window {
-                self.world.request_redraw(window);
-            }
-        }
-
-        pub fn set_subpixel(&mut self, subpixel: bool) {
-            if self.is_subpixel() != subpixel {
-                self.state.is_subpixel = subpixel;
-                self.request_layout();
-            }
-        }
-
-        pub fn set_cursor(&mut self, cursor: CursorIcon) {
-            self.state.cursor = cursor;
-        }
-    }
-}
-
-impl_contexts! {
-    EventCx<'_>,
-    UpdateCx<'_>,
-    LayoutCx<'_>,
-    ComposeCx<'_> {
-        pub fn request_draw(&mut self) {
-            self.hierarchy.request_draw();
-
-            if let Some(window) = self.hierarchy.window {
-                self.world.request_redraw(window);
-            }
-        }
-    }
-}
-
-impl_contexts! {
-    MutCx<'_>,
-    EventCx<'_>,
-    UpdateCx<'_> {
-        pub fn restart_ime(&mut self) {
-            if !self.is_focused() || !self.hierarchy.accepts_text() {
-                tracing::warn!("`restart_ime` can only be called on a focused view that accepts text");
-                return;
-            }
-
-            self.world.emit_signal(Signal::Ime(ImeSignal::Start));
-        }
-
-        pub fn set_ime_text(&mut self, text: String) {
-            if !self.is_focused() || !self.hierarchy.accepts_text() {
-                tracing::warn!("`set_ime_text` can only be called on a focused view that accepts text");
-                return;
-            }
-
-            self.world.emit_signal(Signal::Ime(ImeSignal::Text(text)));
-        }
-
-        pub fn set_ime_selection(
-            &mut self,
-            selection: Range<usize>,
-            composing: Option<Range<usize>>,
-        ) {
-            if !self.is_focused() || !self.hierarchy.accepts_text() {
-                tracing::warn!("`set_ime_selection` can only be called on a focused view that accepts text");
-                return;
-            }
-
-            self.world.emit_signal(Signal::Ime(ImeSignal::Selection {
-                selection,
-                composing,
-            }));
         }
     }
 }

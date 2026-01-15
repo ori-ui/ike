@@ -153,7 +153,7 @@ where
             let palette = cx.get_or_default::<Palette>();
             let theme = cx.get_or_default::<TextTheme>();
 
-            if let Some(mut widget) = cx.get_widget_mut(*element) {
+            if let Ok(mut widget) = cx.get_widget_mut(*element) {
                 let paragraph = self.build_paragraph(&palette, &theme);
                 widgets::Label::set_text(&mut widget, paragraph);
             }

@@ -19,7 +19,7 @@ pub use settings::Settings;
 pub use signal::{ImeSignal, Signal, WindowUpdate};
 pub use widget_mut::WidgetMut;
 pub use widget_ref::WidgetRef;
-pub use widgets::AnyWidget;
+pub use widgets::{AnyWidget, GetError};
 
 use crate::{
     AnyWidgetId, Builder, Canvas, Color, CursorIcon, Key, Layer, LayerId, Modifiers, Offset,
@@ -160,7 +160,7 @@ impl World {
             layers.push(layer);
         }
 
-        if let Some(mut widget) = self.widget_mut(widget) {
+        if let Ok(mut widget) = self.widget_mut(widget) {
             debug_assert!(
                 widget.cx.parent().is_none(),
                 "layer widgets mut be orphans",
@@ -184,7 +184,7 @@ impl World {
             layer.position = position;
             let widget = layer.widget;
 
-            if let Some(mut widget) = self.widget_mut(widget) {
+            if let Ok(mut widget) = self.widget_mut(widget) {
                 widget.cx.state.transform.offset = Offset {
                     x: position.x,
                     y: position.y,
@@ -205,7 +205,7 @@ impl World {
         {
             layer.widget = widget;
 
-            if let Some(mut widget) = self.widget_mut(widget) {
+            if let Ok(mut widget) = self.widget_mut(widget) {
                 widget.cx.request_compose();
             }
         }
@@ -304,7 +304,7 @@ impl World {
 
         if let Some(window) = self.state.window_mut(window_id)
             && let Some(focused) = window.focused
-            && let Some(widget) = self.widget(focused)
+            && let Ok(widget) = self.widget(focused)
             && widget.cx.hierarchy.accepts_text()
         {
             widget.cx.world.emit_signal(Signal::Ime(ImeSignal::Start));
@@ -412,27 +412,19 @@ impl World {
 
 impl World {
     #[track_caller]
-    pub(crate) fn widget(&self, id: WidgetId) -> Option<WidgetRef<'_>> {
-        match self.get_widget(id) {
-            Some(widget) => Some(widget),
-            None => {
-                debug_panic!("invalid widget {id:?}");
-
-                None
-            }
-        }
+    pub(crate) fn widget(&self, id: WidgetId) -> Result<WidgetRef<'_>, GetError> {
+        self.get_widget(id).map_err(|err| {
+            debug_panic!("failed getting widget {id:?}: {err}");
+            err
+        })
     }
 
     #[track_caller]
-    pub(crate) fn widget_mut(&mut self, id: WidgetId) -> Option<WidgetMut<'_>> {
-        match self.get_widget_mut(id) {
-            Some(widget) => Some(widget),
-            None => {
-                debug_panic!("invalid widget {id:?}");
-
-                None
-            }
-        }
+    pub(crate) fn widget_mut(&mut self, id: WidgetId) -> Result<WidgetMut<'_>, GetError> {
+        self.get_widget_mut(id).map_err(|err| {
+            debug_panic!("failed getting widget {id:?}: {err}");
+            err
+        })
     }
 }
 

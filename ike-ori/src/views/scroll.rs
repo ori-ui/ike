@@ -1,17 +1,16 @@
 use ike_core::{
-    AnyWidgetId, Axis, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId,
-    widgets,
+    AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
 };
 use ori::{Action, Event, Providable, View, ViewMarker};
 
 use crate::Palette;
 
 pub fn vscroll<V>(contents: V) -> Scroll<V> {
-    Scroll::new(Axis::Vertical, contents)
+    Scroll::new(contents).vertical(true)
 }
 
 pub fn hscroll<V>(contents: V) -> Scroll<V> {
-    Scroll::new(Axis::Horizontal, contents)
+    Scroll::new(contents).horizontal(false)
 }
 
 #[derive(Clone, Debug)]
@@ -30,11 +29,11 @@ pub struct ScrollTheme {
 impl Default for ScrollTheme {
     fn default() -> Self {
         Self {
-            bar_width:          16.0,
-            bar_padding:        Padding::all(5.0),
+            bar_width:          8.0,
+            bar_padding:        Padding::all(4.0),
             bar_border_width:   BorderWidth::all(0.0),
             bar_corner_radius:  CornerRadius::all(0.0),
-            knob_corner_radius: CornerRadius::all(3.0),
+            knob_corner_radius: CornerRadius::all(4.0),
             transition:         Transition::ease(0.1),
             bar_border_color:   None,
             bar_color:          None,
@@ -44,9 +43,10 @@ impl Default for ScrollTheme {
 }
 
 pub struct Scroll<V> {
-    contents: V,
-    axis:     Axis,
-
+    contents:           V,
+    vertical:           bool,
+    horizontal:         bool,
+    overlay:            bool,
     bar_width:          Option<f32>,
     bar_padding:        Option<Padding>,
     bar_border_width:   Option<BorderWidth>,
@@ -59,11 +59,12 @@ pub struct Scroll<V> {
 }
 
 impl<V> Scroll<V> {
-    pub fn new(axis: Axis, contents: V) -> Self {
+    pub fn new(contents: V) -> Self {
         Self {
             contents,
-            axis,
-
+            vertical: false,
+            horizontal: false,
+            overlay: false,
             bar_width: None,
             bar_padding: None,
             bar_border_width: None,
@@ -74,6 +75,21 @@ impl<V> Scroll<V> {
             bar_color: None,
             knob_color: None,
         }
+    }
+
+    pub fn vertical(mut self, vertical: bool) -> Self {
+        self.vertical = vertical;
+        self
+    }
+
+    pub fn horizontal(mut self, horizontal: bool) -> Self {
+        self.horizontal = horizontal;
+        self
+    }
+
+    pub fn overlay(mut self, overlay: bool) -> Self {
+        self.overlay = overlay;
+        self
     }
 
     pub fn bar_width(mut self, width: f32) -> Self {
@@ -188,8 +204,9 @@ where
         let bar_color = self.get_bar_paint(&theme, &palette);
         let knob_color = self.get_knob_paint(&theme, &palette);
 
-        widgets::Scroll::set_axis(&mut widget, self.axis);
-        widgets::Scroll::set_bar_width(&mut widget, bar_width);
+        widgets::Scroll::set_vertical(&mut widget, self.vertical);
+        widgets::Scroll::set_horizontal(&mut widget, self.horizontal);
+        widgets::Scroll::set_bar_thickness(&mut widget, bar_width);
         widgets::Scroll::set_bar_padding(&mut widget, bar_padding);
         widgets::Scroll::set_bar_border_width(&mut widget, bar_border_width);
         widgets::Scroll::set_bar_corner_radius(&mut widget, bar_corner_radius);
@@ -221,21 +238,25 @@ where
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ScrollTheme>();
 
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
+        if !widgets::Scroll::is_child(cx, *element, *contents) {
+            widgets::Scroll::set_child(cx, *element, *contents);
         }
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
+        let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
-        if self.axis != old.axis {
-            widgets::Scroll::set_axis(&mut widget, self.axis);
+        if self.vertical != old.vertical {
+            widgets::Scroll::set_vertical(&mut widget, self.vertical);
+        }
+
+        if self.horizontal != old.horizontal {
+            widgets::Scroll::set_horizontal(&mut widget, self.horizontal);
         }
 
         if self.bar_width != old.bar_width {
             let bar_width = self.get_bar_width(&theme);
-            widgets::Scroll::set_bar_width(&mut widget, bar_width);
+            widgets::Scroll::set_bar_thickness(&mut widget, bar_width);
         }
 
         if self.bar_padding != old.bar_padding {
@@ -300,8 +321,8 @@ where
     ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
+        if !widgets::Scroll::is_child(cx, *element, *contents) {
+            widgets::Scroll::set_child(cx, *element, *contents);
         }
 
         action

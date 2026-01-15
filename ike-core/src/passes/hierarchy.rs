@@ -1,8 +1,8 @@
 use std::mem;
 
 use crate::{
-    Builder, Update, Widget, WidgetId, WidgetMut, WindowId, World, debug::debug_panic, passes,
-    widget::ChildUpdate, world::Widgets,
+    Builder, GetError, Update, Widget, WidgetId, WidgetMut, WindowId, World, debug::debug_panic,
+    passes, widget::ChildUpdate, world::Widgets,
 };
 
 pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
@@ -11,12 +11,12 @@ pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
     }
 
     if let Some(parent) = world.widgets.get_hierarchy_mut(parent) {
-        parent.children.push(child);
+        parent.children_mut().push(child);
     }
 
     propagate_up(world, parent);
 
-    if let Some(mut parent) = world.widget_mut(parent) {
+    if let Ok(mut parent) = world.widget_mut(parent) {
         let index = parent.cx.hierarchy.children.len() - 1;
         let update = Update::Children(ChildUpdate::Added(index));
         passes::update::widget(&mut parent, update);
@@ -34,7 +34,7 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
     };
 
     // get the current child
-    let Some(current) = parent.children.get_mut(index) else {
+    let Some(current) = parent.children_mut().get_mut(index) else {
         debug_panic!("set_child called with invalid index");
         return;
     };
@@ -55,7 +55,7 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
     propagate_up(world, parent_id);
 
     // run update pass on the parent widget
-    if let Some(mut parent) = world.widget_mut(parent_id) {
+    if let Ok(mut parent) = world.widget_mut(parent_id) {
         let update = Update::Children(ChildUpdate::Replaced(index));
         passes::update::widget(&mut parent, update);
         parent.cx.request_layout();
@@ -66,11 +66,11 @@ pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize,
     let parent_id = parent;
 
     if let Some(parent) = world.widgets.get_hierarchy_mut(parent) {
-        parent.children.swap(index_a, index_b);
+        parent.children_mut().swap(index_a, index_b);
     }
 
     // run update pass on the parent widget
-    if let Some(mut parent) = world.widget_mut(parent_id) {
+    if let Ok(mut parent) = world.widget_mut(parent_id) {
         let update = Update::Children(ChildUpdate::Swapped(index_a, index_b));
         passes::update::widget(&mut parent, update);
         parent.cx.request_layout();
@@ -78,7 +78,7 @@ pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize,
 }
 
 pub(crate) fn remove(world: &mut World, widget: WidgetId) {
-    let Some(widget) = world.get_widget(widget) else {
+    let Ok(widget) = world.get_widget(widget) else {
         return;
     };
 
@@ -87,7 +87,7 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
 
     drop(widget);
 
-    if let Some(mut widget) = world.widget_mut(id) {
+    if let Ok(mut widget) = world.widget_mut(id) {
         passes::update::widget(&mut widget, Update::Removed);
     }
 
@@ -98,9 +98,9 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
         && let Some(hierarchy) = world.widgets.get_hierarchy_mut(parent)
         && let Some(index) = hierarchy.children.iter().position(|child| *child == id)
     {
-        hierarchy.children.remove(index);
+        hierarchy.children_mut().remove(index);
 
-        if let Some(mut parent) = world.widget_mut(parent) {
+        if let Ok(mut parent) = world.widget_mut(parent) {
             let update = Update::Children(ChildUpdate::Removed(index));
             passes::update::widget(&mut parent, update);
             parent.cx.request_layout();
@@ -133,7 +133,7 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
             {
                 pointer.hovering = None;
 
-                if let Some(mut widget) = world.widget_mut(hovered) {
+                if let Ok(mut widget) = world.widget_mut(hovered) {
                     widget.set_hovered(false);
                 }
 
@@ -153,7 +153,7 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
                 {
                     pointer.capturer = None;
 
-                    if let Some(mut widget) = world.widget_mut(capturer) {
+                    if let Ok(mut widget) = world.widget_mut(capturer) {
                         widget.set_active(false);
                     }
 
@@ -172,7 +172,7 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
                 {
                     touch.capturer = None;
 
-                    if let Some(mut widget) = world.widget_mut(capturer) {
+                    if let Ok(mut widget) = world.widget_mut(capturer) {
                         widget.set_active(false);
                     }
 
@@ -190,7 +190,7 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
     {
         window.focused = None;
 
-        if let Some(mut widget) = world.widget_mut(focused) {
+        if let Ok(mut widget) = world.widget_mut(focused) {
             widget.set_focused(false);
         }
     }
@@ -202,7 +202,7 @@ pub(crate) fn set_window(world: &mut World, widget: WidgetId, window: Option<Win
     propagate_up(world, widget);
 }
 
-fn is_descendant(widgets: &Widgets, ancestor: WidgetId, descendant: WidgetId) -> bool {
+pub(crate) fn is_descendant(widgets: &Widgets, ancestor: WidgetId, descendant: WidgetId) -> bool {
     let mut current = Some(descendant);
 
     while let Some(widget) = current
@@ -218,6 +218,20 @@ fn is_descendant(widgets: &Widgets, ancestor: WidgetId, descendant: WidgetId) ->
     false
 }
 
+pub(crate) fn for_each_child(
+    widget: WidgetMut<'_>,
+    mut f: impl FnMut(Result<WidgetMut<'_>, GetError>),
+) {
+    drop(widget.widget);
+    drop(widget.cx.state);
+
+    for &child in widget.cx.hierarchy.children.iter() {
+        f(widget.cx.widgets.get_mut(widget.cx.world, child));
+    }
+
+    widget.cx.hierarchy.propagate_down(widget.cx.widgets);
+}
+
 pub(crate) fn propagate_up(world: &mut World, widget: WidgetId) {
     let Some(hierarchy) = world.widgets.get_hierarchy_mut(widget) else {
         return;
@@ -226,19 +240,13 @@ pub(crate) fn propagate_up(world: &mut World, widget: WidgetId) {
     let window = hierarchy.window;
     let flags = hierarchy.flags.get();
 
-    let children = mem::take(&mut hierarchy.children);
-    for &child in &children {
+    for &child in hierarchy.children.clone().iter() {
         if let Some(child) = world.widgets.get_hierarchy_mut(child) {
             flags.propagate_up(child.flags.get_mut());
             child.window = window;
         }
 
         propagate_up(world, child);
-    }
-
-    if let Some(hierarchy) = world.widgets.get_hierarchy_mut(widget) {
-        debug_assert!(hierarchy.children.is_empty());
-        hierarchy.children = children;
     }
 }
 
@@ -248,34 +256,33 @@ pub(crate) fn propagate_down(widgets: &Widgets, widget: WidgetId) {
     while let Some(widget) = current
         && let Some(hierarchy) = widgets.get_hierarchy(widget)
     {
-        hierarchy.update(widgets);
+        hierarchy.propagate_down(widgets);
         current = hierarchy.parent;
     }
 }
 
-pub(crate) fn update_flags<T>(widget: &WidgetMut<'_, T>)
+pub(crate) fn set_stashed<T>(widget: &mut WidgetMut<'_, T>, is_stashed: bool)
 where
     T: Widget + ?Sized,
 {
-    widget.cx.hierarchy.update(widget.cx.widgets)
-}
-
-pub(crate) fn set_stashed(widget: &mut WidgetMut<'_>, is_stashed: bool) {
     // if we want to be un-stashed, but our parent is stashed, do nothing
     if !widget.cx.is_stashed()
-        && let Some(parent) = widget.cx.get_parent()
+        && let Ok(parent) = widget.cx.get_parent()
         && parent.cx.is_stashed()
     {
         return;
     }
 
     set_stashed_recursive(widget, is_stashed);
-    propagate_down(widget.cx.widgets, widget.id());
+    propagate_down(widget.cx.widgets, widget.cx.id());
 }
 
-pub(crate) fn set_stashed_recursive(widget: &mut WidgetMut<'_>, is_stashed: bool) {
-    for &child in &widget.cx.hierarchy.children {
-        let Some(mut child) = widget.cx.get_widget_mut(child) else {
+pub(crate) fn set_stashed_recursive<T>(widget: &mut WidgetMut<'_, T>, is_stashed: bool)
+where
+    T: Widget + ?Sized,
+{
+    for &child in widget.cx.hierarchy.children.iter() {
+        let Ok(mut child) = widget.cx.get_widget_mut(child) else {
             debug_panic!("set_stashed called while descendant is borrowed");
             continue;
         };
@@ -283,7 +290,7 @@ pub(crate) fn set_stashed_recursive(widget: &mut WidgetMut<'_>, is_stashed: bool
         set_stashed_recursive(&mut child, is_stashed);
     }
 
-    update_flags(widget);
+    widget.cx.hierarchy.propagate_down(widget.cx.widgets);
 
     if widget.cx.hierarchy.is_stashed() != is_stashed {
         widget.widget.update(
@@ -301,7 +308,7 @@ where
 {
     // if we want to be un-disabled, but our parent is disabled, do nothing
     if !widget.cx.is_disabled()
-        && let Some(parent) = widget.cx.get_parent()
+        && let Ok(parent) = widget.cx.get_parent()
         && parent.cx.is_disabled()
     {
         return;
@@ -315,8 +322,8 @@ pub(crate) fn set_disabled_recursive<T>(widget: &mut WidgetMut<'_, T>, is_disabl
 where
     T: Widget + ?Sized,
 {
-    for &child in &widget.cx.hierarchy.children {
-        let Some(mut child) = widget.cx.get_widget_mut(child) else {
+    for &child in widget.cx.hierarchy.children.iter() {
+        let Ok(mut child) = widget.cx.get_widget_mut(child) else {
             debug_panic!("set_disabled called while descendant is borrowed");
             continue;
         };
@@ -324,7 +331,7 @@ where
         set_disabled_recursive(&mut child, is_disabled);
     }
 
-    update_flags(widget);
+    widget.cx.hierarchy.propagate_down(widget.cx.widgets);
 
     if widget.cx.hierarchy.is_disabled() != is_disabled {
         widget.widget.update(

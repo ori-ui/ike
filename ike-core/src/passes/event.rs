@@ -15,18 +15,18 @@ where
     let mut propagate = bubble;
 
     while let Some(id) = current
-        && let Some(widget) = world.widget_mut(id)
+        && let Ok(mut widget) = world.widget_mut(id)
         && propagate == bubble
     {
         let mut cx = EventCx {
             widgets:   widget.cx.widgets,
             world:     widget.cx.world,
-            state:     widget.cx.state,
+            state:     &mut widget.cx.state,
             hierarchy: widget.cx.hierarchy,
             focus:     &mut focus,
         };
 
-        propagate = on_event(widget.widget, &mut cx);
+        propagate = on_event(&mut *widget.widget, &mut cx);
         current = widget.cx.parent();
     }
 

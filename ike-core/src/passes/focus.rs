@@ -49,7 +49,7 @@ pub(crate) fn transfer(world: &mut World, window: WindowId, target: Option<Widge
 
     // remove focus from the current widget
     if let Some(current) = current
-        && let Some(mut widget) = world.widget_mut(current)
+        && let Ok(mut widget) = world.widget_mut(current)
     {
         widget.set_focused(false);
 
@@ -62,7 +62,7 @@ pub(crate) fn transfer(world: &mut World, window: WindowId, target: Option<Widge
     if let Some(current) = current
         && world
             .widget(current)
-            .is_some_and(|current| current.cx.hierarchy.accepts_text())
+            .is_ok_and(|current| current.cx.hierarchy.accepts_text())
     {
         let event = TextEvent::Ime(ImeEvent::End);
         passes::text::send_event(world, window_id, current, &event);
@@ -81,13 +81,13 @@ pub(crate) fn transfer(world: &mut World, window: WindowId, target: Option<Widge
 
         if world
             .widget(target)
-            .is_some_and(|widget| widget.cx.hierarchy.accepts_text())
+            .is_ok_and(|widget| widget.cx.hierarchy.accepts_text())
         {
             let event = TextEvent::Ime(ImeEvent::Start);
             passes::text::send_event(world, window_id, target, &event);
         }
 
-        if let Some(rect) = rect {
+        if let Ok(rect) = rect {
             passes::scroll::scroll_to(world, target, rect);
         }
     }
@@ -112,7 +112,7 @@ fn find_first(world: &World, window: &Window, forward: bool) -> Option<WidgetId>
 }
 
 fn find_first_from(world: &World, widget: WidgetId, forward: bool) -> Option<WidgetId> {
-    let widget = world.widget(widget)?;
+    let widget = world.widget(widget).ok()?;
 
     if widget.cx.hierarchy.accepts_focus() {
         return Some(widget.cx.id());
@@ -144,7 +144,7 @@ fn find_next(world: &World, window: &Window, forward: bool) -> Option<WidgetId> 
         let mut layers = window.layers().iter();
 
         for layer in layers.by_ref() {
-            let widget = world.widget(layer.widget)?;
+            let widget = world.widget(layer.widget).ok()?;
 
             if widget.cx.hierarchy.has_focused() {
                 if let Some(focusable) = find_next_from(world, layer.widget, forward) {
@@ -164,7 +164,7 @@ fn find_next(world: &World, window: &Window, forward: bool) -> Option<WidgetId> 
         let mut layers = window.layers().iter().rev();
 
         for layer in layers.by_ref() {
-            let widget = world.widget(layer.widget)?;
+            let widget = world.widget(layer.widget).ok()?;
 
             if widget.cx.hierarchy.has_focused() {
                 if let Some(focusable) = find_next_from(world, layer.widget, forward) {
@@ -186,7 +186,7 @@ fn find_next(world: &World, window: &Window, forward: bool) -> Option<WidgetId> 
 }
 
 fn find_next_from(world: &World, current: WidgetId, forward: bool) -> Option<WidgetId> {
-    let widget = world.widget(current)?;
+    let widget = world.widget(current).ok()?;
 
     if !widget.cx.hierarchy.has_focused() {
         return find_first_from(world, current, forward);
@@ -196,7 +196,7 @@ fn find_next_from(world: &World, current: WidgetId, forward: bool) -> Option<Wid
         let mut children = widget.cx.children().iter().copied();
 
         for child in children.by_ref() {
-            let child = world.widget(child)?;
+            let child = world.widget(child).ok()?;
 
             if child.cx.hierarchy.has_focused() {
                 if let Some(focusable) = find_next_from(world, child.cx.id(), forward) {
@@ -216,7 +216,7 @@ fn find_next_from(world: &World, current: WidgetId, forward: bool) -> Option<Wid
         let mut children = widget.cx.children().iter().copied().rev();
 
         for child in children.by_ref() {
-            let child = world.widget(child)?;
+            let child = world.widget(child).ok()?;
 
             if child.cx.hierarchy.has_focused() {
                 if let Some(focusable) = find_next_from(world, child.cx.id(), forward) {

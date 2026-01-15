@@ -6,20 +6,14 @@ pub(crate) fn window(world: &mut World, window: WindowId, update: &Update) {
     };
 
     for layer in window.layers.clone().iter() {
-        if let Some(mut widget) = world.widget_mut(layer.widget) {
-            widget_recursive(&mut widget, update);
+        if let Ok(widget) = world.widget_mut(layer.widget) {
+            widget_recursive(widget, update);
         }
     }
 }
 
-pub(crate) fn widget_recursive(widget: &mut WidgetMut<'_>, update: &Update) {
+pub(crate) fn widget_recursive(mut widget: WidgetMut<'_>, update: &Update) {
     let _span = widget.cx.enter_span();
-
-    widget.cx.for_each_child_mut(|child| {
-        widget_recursive(child, update);
-    });
-
-    passes::hierarchy::update_flags(widget);
 
     if let Update::WindowScaled(..) = update
         && !widget.cx.is_subpixel()
@@ -27,7 +21,13 @@ pub(crate) fn widget_recursive(widget: &mut WidgetMut<'_>, update: &Update) {
         widget.cx.hierarchy.request_layout();
     }
 
-    self::widget(widget, update.clone());
+    self::widget(&mut widget, update.clone());
+
+    passes::hierarchy::for_each_child(widget, |child| {
+        if let Ok(child) = child {
+            widget_recursive(child, update);
+        }
+    });
 }
 
 pub(crate) fn widget(widget: &mut WidgetMut<'_>, update: Update) {

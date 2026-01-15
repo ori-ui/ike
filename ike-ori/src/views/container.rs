@@ -155,7 +155,7 @@ where
             cx.set_child(*element, 0, *contents);
         }
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
+        let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 

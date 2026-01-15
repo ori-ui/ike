@@ -1,6 +1,6 @@
 use std::{ops::Deref, time::Duration};
 
-use crate::{Color, Padding, Size};
+use crate::{Color, Offset, Padding, Size};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TransitionCurve {
@@ -169,6 +169,15 @@ impl Interpolate for Color {
             g: f32::interpolate(&start.g, &end.g, x),
             b: f32::interpolate(&start.b, &end.b, x),
             a: f32::interpolate(&start.a, &end.a, x),
+        }
+    }
+}
+
+impl Interpolate for Offset {
+    fn interpolate(from: &Self, to: &Self, x: f32) -> Self {
+        Self {
+            x: f32::interpolate(&from.x, &to.x, x),
+            y: f32::interpolate(&from.y, &to.y, x),
         }
     }
 }

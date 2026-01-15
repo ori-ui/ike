@@ -6,11 +6,9 @@ pub(crate) fn record_window(world: &mut World, window: WindowId, canvas: &mut dy
     };
 
     for layer in window.layers.clone().iter() {
-        let Some(mut widget) = world.widget_mut(layer.widget) else {
-            return;
-        };
-
-        record_widget(&mut widget, canvas);
+        if let Ok(widget) = world.widget_mut(layer.widget) {
+            record_widget(widget, canvas);
+        }
     }
 
     world.state.recorder.frame(
@@ -19,7 +17,7 @@ pub(crate) fn record_window(world: &mut World, window: WindowId, canvas: &mut dy
     );
 }
 
-fn record_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
+fn record_widget(mut widget: WidgetMut<'_>, canvas: &mut dyn Canvas) {
     if widget.cx.world.recorder.contains(widget.id()) {
         return;
     }
@@ -48,7 +46,7 @@ fn record_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
         );
 
         let recording = canvas.record(widget.cx.size(), &mut |canvas| {
-            passes::draw::draw_widget_clipped(widget, canvas);
+            passes::draw::draw_widget_clipped(&mut widget, canvas);
         });
 
         if let Some(recording) = recording {
@@ -60,7 +58,9 @@ fn record_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
 
     widget.cx.world.recorder.remove(widget.id());
 
-    widget.cx.for_each_child_mut(|child| {
-        record_widget(child, canvas);
+    passes::hierarchy::for_each_child(widget, |child| {
+        if let Ok(child) = child {
+            record_widget(child, canvas);
+        }
     });
 }

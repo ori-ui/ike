@@ -30,7 +30,7 @@ impl Widget for Aligned {
             let mut space = space;
             space.min = Size::ZERO;
 
-            cx.layout_child(0, space)
+            cx.layout_nth_child(0, space)
         };
 
         let mut size = space.constrain(child_size);
@@ -51,7 +51,7 @@ impl Widget for Aligned {
             excess_height * self.y,
         );
 
-        cx.place_child(0, position);
+        cx.place_nth_child(0, position);
 
         size
     }

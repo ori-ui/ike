@@ -1,28 +1,34 @@
-use std::marker::PhantomData;
+use std::{cell::RefMut, marker::PhantomData};
 
 use crate::{AnyWidget, MutCx, Update, Widget, WidgetId, passes};
 
-#[non_exhaustive]
 pub struct WidgetMut<'a, T = dyn Widget>
 where
     T: Widget + ?Sized,
 {
-    pub widget: &'a mut T,
-
-    pub cx: MutCx<'a>,
+    pub widget: RefMut<'a, T>,
+    pub cx:     MutCx<'a>,
 }
 
-impl<'a, T> Drop for WidgetMut<'a, T>
-where
-    T: Widget + ?Sized,
-{
-    fn drop(&mut self) {
-        let index = self.cx.state.id.index as usize;
-        unsafe { self.cx.widgets.release_mut(index) };
+impl<'a> WidgetMut<'a, dyn Widget> {
+    pub fn downcast<T>(self) -> Option<WidgetMut<'a, T>>
+    where
+        T: Widget,
+    {
+        Some(WidgetMut {
+            widget: RefMut::filter_map(self.widget, T::downcast_mut).ok()?,
+
+            cx: MutCx {
+                widgets:   self.cx.widgets,
+                world:     self.cx.world,
+                state:     self.cx.state,
+                hierarchy: self.cx.hierarchy,
+            },
+        })
     }
 }
 
-impl<T> WidgetMut<'_, T>
+impl<'a, T> WidgetMut<'a, T>
 where
     T: Widget + ?Sized,
 {
@@ -36,12 +42,12 @@ where
         }
     }
 
-    pub fn upcast(&mut self) -> WidgetMut<'_>
+    pub fn upcast(self) -> WidgetMut<'a>
     where
-        T: AnyWidget,
+        T: Sized,
     {
         WidgetMut {
-            widget: AnyWidget::upcast_mut(self.widget),
+            widget: RefMut::map(self.widget, T::upcast_mut),
 
             cx: MutCx {
                 widgets:   self.cx.widgets,
@@ -50,6 +56,10 @@ where
                 hierarchy: self.cx.hierarchy,
             },
         }
+    }
+
+    pub fn set_stashed(&mut self, is_stashed: bool) {
+        passes::hierarchy::set_stashed(self, is_stashed);
     }
 
     pub fn set_disabled(&mut self, is_disabled: bool) {

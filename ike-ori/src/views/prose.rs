@@ -257,7 +257,7 @@ where
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<ProseTheme>();
 
-        let Some(mut widget) = cx.get_widget_mut(*element) else {
+        let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 

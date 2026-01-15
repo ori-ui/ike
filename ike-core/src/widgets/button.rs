@@ -107,9 +107,9 @@ impl Widget for Button {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let space = self.padding.layout_down(cx, space);
         let space = self.border_width.layout_down(cx, space);
-        let size = cx.layout_child(0, space);
+        let size = cx.layout_nth_child(0, space);
 
-        cx.place_child(
+        cx.place_nth_child(
             0,
             self.padding.offset() + self.border_width.offset(),
         );

@@ -6,7 +6,7 @@ pub(crate) fn draw_window(world: &mut World, window: WindowId, canvas: &mut dyn 
     };
 
     for layer in window.layers.clone().iter() {
-        if let Some(mut widget) = world.widget_mut(layer.widget) {
+        if let Ok(mut widget) = world.widget_mut(layer.widget) {
             draw_widget(&mut widget, canvas);
         }
     }
@@ -52,9 +52,11 @@ pub(crate) fn draw_widget_clipped(widget: &mut WidgetMut<'_>, canvas: &mut dyn C
 pub(crate) fn draw_widget_raw(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas) {
     widget.widget.draw(&mut widget.cx.as_draw_cx(), canvas);
 
-    widget.cx.for_each_child_mut(|child| {
-        draw_widget(child, canvas);
-    });
+    for &child in widget.cx.hierarchy.children.iter() {
+        if let Ok(mut child) = widget.cx.get_widget_mut(child) {
+            draw_widget(&mut child, canvas);
+        }
+    }
 
     widget.widget.draw_over(&mut widget.cx.as_draw_cx(), canvas);
 }

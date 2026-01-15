@@ -26,8 +26,8 @@ impl SafeArea {
 impl Widget for SafeArea {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
         let space = self.insets.layout_down(cx, space);
-        let size = cx.layout_child(0, space);
-        cx.place_child(0, self.insets.offset());
+        let size = cx.layout_nth_child(0, space);
+        cx.place_nth_child(0, self.insets.offset());
         self.insets.layout_up(cx, size)
     }
 

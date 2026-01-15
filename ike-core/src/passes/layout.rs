@@ -1,5 +1,5 @@
 use crate::{
-    Affine, LayoutCx, Painter, Size, Space, WidgetMut, WindowId, WindowSizing, World, passes,
+    Affine, LayoutCx, Painter, Size, Space, WidgetId, WidgetMut, WindowId, WindowSizing, World,
 };
 
 pub(crate) fn layout_window(
@@ -24,7 +24,7 @@ pub(crate) fn layout_window(
 
     // compute layout of the base layer
     let size = if let Some(layer) = window.get_base_layer()
-        && let Some(mut widget) = world.widget_mut(layer.widget)
+        && let Ok(mut widget) = world.widget_mut(layer.widget)
     {
         let space = Space::new(Size::ZERO, max_size);
         layout_widget(&mut widget, space, painter, scale)
@@ -49,7 +49,7 @@ pub(crate) fn layout_window(
         // compute the size of the layers widget
         let size = if let Some(window) = world.window(window_id)
             && let Some(layer) = window.layers().get(i)
-            && let Some(mut widget) = world.widget_mut(layer.widget)
+            && let Ok(mut widget) = world.widget_mut(layer.widget)
         {
             let space = Space::new(Size::ZERO, Size::INFINITY);
             layout_widget(&mut widget, space, painter, scale)
@@ -101,25 +101,32 @@ pub(crate) fn layout_widget(
         }
     }
 
-    if !size.is_finite() {
-        tracing::warn!(size = ?size, "size is not finite");
+    if cfg!(debug_assertions) {
+        if !size.is_finite() {
+            tracing::warn!(?size, "size is not finite");
+        }
+
+        if !space.contains(size) {
+            tracing::warn!(?size, ?space, "size does not fit space");
+        }
     }
 
     if widget.cx.state.size != size {
         widget.cx.hierarchy.request_draw();
     }
 
-    passes::hierarchy::update_flags(widget);
+    widget.cx.hierarchy.propagate_down(widget.cx.widgets);
     widget.cx.state.size = size;
     widget.cx.state.previous_space = Some(space);
 
     size
 }
 
-pub(crate) fn place_child(cx: &mut LayoutCx<'_>, index: usize, mut transform: Affine) {
-    if let Some(child) = cx.hierarchy.children.get(index)
-        && let Some(child) = cx.widgets.get_mut(cx.world, *child)
-    {
+pub(crate) fn place_child(cx: &mut LayoutCx<'_>, child: WidgetId, mut transform: Affine) {
+    let id = cx.id();
+    if let Ok(mut child) = cx.widgets.get_mut(cx.world, child) {
+        debug_assert!(child.cx.parent() == Some(id));
+
         if !child.cx.is_subpixel() {
             transform.offset = transform.offset.pixel_align(cx.scale);
         }
@@ -129,7 +136,5 @@ pub(crate) fn place_child(cx: &mut LayoutCx<'_>, index: usize, mut transform: Af
             child.cx.hierarchy.request_compose();
             cx.hierarchy.request_draw();
         }
-    } else {
-        tracing::error!("`ComposeCx::place_child` called on invalid child");
     }
 }

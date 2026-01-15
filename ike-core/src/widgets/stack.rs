@@ -74,12 +74,13 @@ impl Stack {
 
 impl Widget for Stack {
     fn layout(&mut self, cx: &mut LayoutCx<'_>, space: Space) -> Size {
-        let (min_major, mut min_minor) = self.axis.unpack_size(space.min);
+        let (min_major, min_minor) = self.axis.unpack_size(space.min);
         let (max_major, max_minor) = self.axis.unpack_size(space.max);
 
-        if let Align::Fill = self.align {
-            min_minor = max_minor;
-        }
+        let child_min_minor = match self.align {
+            Align::Fill => max_minor,
+            _ => 0.0,
+        };
 
         let child_count = cx.children().len();
         let total_gap = self.gap * child_count.saturating_sub(1) as f32;
@@ -97,11 +98,11 @@ impl Widget for Stack {
             };
 
             let space = Space::new(
-                self.axis.pack_size(0.0, min_minor),
+                self.axis.pack_size(0.0, child_min_minor),
                 self.axis.pack_size(f32::INFINITY, max_minor),
             );
 
-            let size = cx.layout_child(i, space);
+            let size = cx.layout_nth_child(i, space);
             let (major, minor) = self.axis.unpack_size(size);
 
             major_sum += major;
@@ -121,11 +122,11 @@ impl Widget for Stack {
             let max_major = per_flex * flex;
 
             let space = Space::new(
-                self.axis.pack_size(0.0, min_minor),
+                self.axis.pack_size(0.0, child_min_minor),
                 self.axis.pack_size(max_major, max_minor),
             );
 
-            let size = cx.layout_child(i, space);
+            let size = cx.layout_nth_child(i, space);
             let (major, minor) = self.axis.unpack_size(size);
 
             major_sum += major;
@@ -145,11 +146,11 @@ impl Widget for Stack {
             let major = per_flex * flex;
 
             let space = Space::new(
-                self.axis.pack_size(major, min_minor),
+                self.axis.pack_size(major, child_min_minor),
                 self.axis.pack_size(major, max_minor),
             );
 
-            let size = cx.layout_child(i, space);
+            let size = cx.layout_nth_child(i, space);
             let (major, minor) = self.axis.unpack_size(size);
 
             major_sum += major;
@@ -177,7 +178,9 @@ impl Widget for Stack {
         };
 
         for i in 0..child_count {
-            let size = cx.get_child(i).map_or(Size::ZERO, |child| child.cx.size());
+            let size = cx
+                .get_nth_child(i)
+                .map_or(Size::ZERO, |child| child.cx.size());
             let (child_major, child_minor) = self.axis.unpack_size(size);
 
             let excess_minor = minor - child_minor;
@@ -189,7 +192,7 @@ impl Widget for Stack {
             };
 
             let offset = self.axis.pack_offset(justify, align);
-            cx.place_child(i, offset);
+            cx.place_nth_child(i, offset);
 
             justify += child_major + gap;
         }

@@ -1,19 +1,41 @@
 use std::{
     any::Any,
-    cell::{Cell, UnsafeCell},
+    cell::{Ref, RefCell, RefMut},
+    fmt,
     marker::PhantomData,
 };
 
 use crate::{
-    LayoutCx, MutCx, RefCx, Size, Space, Widget, WidgetId, WidgetRef, WidgetState,
+    AnyWidgetId, LayoutCx, MutCx, RefCx, Size, Space, Widget, WidgetId, WidgetRef, WidgetState,
     widget::WidgetHierarchy,
     world::{WidgetMut, WorldState},
 };
 
+#[derive(Debug)]
+pub enum GetError {
+    InvalidId,
+    InvalidType,
+    InvalidChild,
+    InvalidParent,
+    Borrowed,
+}
+
+impl fmt::Display for GetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidId => write!(f, "widget id is invalid"),
+            Self::InvalidType => write!(f, "widget has the wrong type"),
+            Self::InvalidChild => write!(f, "child is not valid for the parent"),
+            Self::InvalidParent => write!(f, "widget is an orphan"),
+            Self::Borrowed => write!(f, "widget already borrowed"),
+        }
+    }
+}
+
 pub(crate) struct Widgets {
     entities:  Entities,
-    widgets:   Vec<UnsafeCell<Box<dyn Widget>>>,
-    states:    Vec<UnsafeCell<WidgetState>>,
+    widgets:   Vec<RefCell<Box<dyn Widget>>>,
+    states:    Vec<RefCell<WidgetState>>,
     hierarchy: Vec<WidgetHierarchy>,
 }
 
@@ -37,7 +59,7 @@ impl Widgets {
         self.entities.contains(widget)
     }
 
-    pub(crate) fn insert<T>(&mut self, widget: T) -> WidgetId<T>
+    pub fn insert<T>(&mut self, widget: T) -> WidgetId<T>
     where
         T: Widget,
     {
@@ -47,13 +69,13 @@ impl Widgets {
         if id.index as usize >= self.widgets.len() {
             debug_assert_eq!(id.index as usize, self.widgets.len());
 
-            self.widgets.push(UnsafeCell::new(Box::new(widget)));
-            self.states.push(UnsafeCell::new(state));
+            self.widgets.push(RefCell::new(Box::new(widget)));
+            self.states.push(RefCell::new(state));
             self.hierarchy.push(WidgetHierarchy::new::<T>());
         } else {
             let index = id.index as usize;
-            self.widgets[index] = UnsafeCell::new(Box::new(widget));
-            self.states[index] = UnsafeCell::new(state);
+            self.widgets[index] = RefCell::new(Box::new(widget));
+            self.states[index] = RefCell::new(state);
             self.hierarchy[index] = WidgetHierarchy::new::<T>();
         }
 
@@ -71,27 +93,37 @@ impl Widgets {
         }
 
         // insert a tombstone
-        self.widgets[id.index as usize] = UnsafeCell::new(Box::new(Tombstone));
+        self.widgets[id.index as usize] = RefCell::new(Box::new(Tombstone));
 
         true
     }
 
-    pub fn get<'a, T>(&'a self, world: &'a WorldState, id: WidgetId<T>) -> Option<WidgetRef<'a, T>>
+    pub fn get<'a, T>(
+        &'a self,
+        world: &'a WorldState,
+        id: WidgetId<T>,
+    ) -> Result<WidgetRef<'a, T>, GetError>
     where
         T: AnyWidget + ?Sized,
     {
-        if !self.borrow_ref(id) {
-            return None;
+        if !self.entities.contains(id.upcast()) {
+            return Err(GetError::InvalidId);
         }
 
-        let widget = unsafe { self.get_widget_unchecked(id.index as usize) };
-        let state = unsafe { self.get_state_unchecked(id.index as usize) };
-        let hierarchy = unsafe { self.get_hierarchy_unchecked(id.index as usize) };
+        let widget = self.widgets[id.index as usize]
+            .try_borrow()
+            .map_err(|_| GetError::Borrowed)?;
 
-        let Some(widget) = T::downcast_ref(widget) else {
-            unsafe { self.release_ref(id.index as usize) };
-            return None;
-        };
+        let widget = Ref::filter_map(widget, |widget| {
+            T::downcast_ref(widget.as_ref())
+        })
+        .map_err(|_| GetError::InvalidType)?;
+
+        let state = self.states[id.index as usize]
+            .try_borrow()
+            .map_err(|_| GetError::Borrowed)?;
+
+        let hierarchy = &self.hierarchy[id.index as usize];
 
         let cx = RefCx {
             widgets: self,
@@ -100,29 +132,35 @@ impl Widgets {
             hierarchy,
         };
 
-        Some(WidgetRef { widget, cx })
+        Ok(WidgetRef { widget, cx })
     }
 
     pub fn get_mut<'a, T>(
         &'a self,
         world: &'a mut WorldState,
         id: WidgetId<T>,
-    ) -> Option<WidgetMut<'a, T>>
+    ) -> Result<WidgetMut<'a, T>, GetError>
     where
         T: AnyWidget + ?Sized,
     {
-        if !self.borrow_mut(id) {
-            return None;
+        if !self.entities.contains(id.upcast()) {
+            return Err(GetError::InvalidId);
         }
 
-        let widget = unsafe { self.get_widget_unchecked_mut(id.index as usize) };
-        let state = unsafe { self.get_state_unchecked_mut(id.index as usize) };
-        let hierarchy = unsafe { self.get_hierarchy_unchecked(id.index as usize) };
+        let widget = self.widgets[id.index as usize]
+            .try_borrow_mut()
+            .map_err(|_| GetError::Borrowed)?;
 
-        let Some(widget) = T::downcast_mut(widget) else {
-            unsafe { self.release_mut(id.index as usize) };
-            return None;
-        };
+        let widget = RefMut::filter_map(widget, |widget| {
+            T::downcast_mut(widget.as_mut())
+        })
+        .map_err(|_| GetError::InvalidType)?;
+
+        let state = self.states[id.index as usize]
+            .try_borrow_mut()
+            .map_err(|_| GetError::Borrowed)?;
+
+        let hierarchy = &self.hierarchy[id.index as usize];
 
         let cx = MutCx {
             widgets: self,
@@ -131,67 +169,7 @@ impl Widgets {
             hierarchy,
         };
 
-        Some(WidgetMut { widget, cx })
-    }
-
-    pub fn borrow_ref<T>(&self, widget: WidgetId<T>) -> bool
-    where
-        T: ?Sized,
-    {
-        self.entities.borrow_ref(widget)
-    }
-
-    pub fn borrow_mut<T>(&self, widget: WidgetId<T>) -> bool
-    where
-        T: ?Sized,
-    {
-        self.entities.borrow_mut(widget)
-    }
-
-    /// # Safety
-    /// - Widget at `index` must first have been borrowed with [`Self::borrow_mut`], and no
-    ///   references may be held to the widget or state in question.
-    /// - `index` must be a valid index of a widget.
-    pub unsafe fn release_ref(&self, index: usize) {
-        self.entities.release_ref(index);
-    }
-
-    /// # Safety
-    /// - Widget at `index` must first have been borrowed with [`Self::borrow_mut`], and no mutable
-    ///   reference may be held to the widget or state in question.
-    /// - `index` must be a valid index of a widget.
-    pub unsafe fn release_mut(&self, index: usize) {
-        self.entities.release_mut(index);
-    }
-
-    /// # Safety
-    /// - Widget at `index` must be borrowed by [`Self::borrow_ref`].
-    /// - `index` must be a valid index of a widget.
-    pub unsafe fn get_widget_unchecked(&self, index: usize) -> &dyn Widget {
-        unsafe { &**self.widgets.get_unchecked(index).get() }
-    }
-
-    /// # Safety
-    /// - Widget at `index` must be borrowed by [`Self::borrow_mut`].
-    /// - `index` must be a valid index of a widget.
-    #[allow(clippy::mut_from_ref)]
-    pub unsafe fn get_widget_unchecked_mut(&self, index: usize) -> &mut dyn Widget {
-        unsafe { &mut **self.widgets.get_unchecked(index).get() }
-    }
-
-    /// # Safety
-    /// - Widget at `index` must be borrowed by [`Self::borrow_ref`].
-    /// - `index` must be a valid index of a widget.
-    pub unsafe fn get_state_unchecked(&self, index: usize) -> &WidgetState {
-        unsafe { &*self.states.get_unchecked(index).get() }
-    }
-
-    /// # Safety
-    /// - Widget at `index` must be borrowed by [`Self::borrow_mut`].
-    /// - `index` must be a valid index of a widget.
-    #[allow(clippy::mut_from_ref)]
-    pub unsafe fn get_state_unchecked_mut(&self, index: usize) -> &mut WidgetState {
-        unsafe { &mut *self.states.get_unchecked(index).get() }
+        Ok(WidgetMut { widget, cx })
     }
 
     pub fn get_hierarchy(&self, id: WidgetId) -> Option<&WidgetHierarchy> {
@@ -208,12 +186,6 @@ impl Widgets {
             "widget {id:?} not contained",
         );
         self.hierarchy.get_mut(id.index as usize)
-    }
-
-    /// # Safety
-    /// - `index` must be a valid index of a widget.
-    pub unsafe fn get_hierarchy_unchecked(&self, index: usize) -> &WidgetHierarchy {
-        unsafe { self.hierarchy.get_unchecked(index) }
     }
 }
 
@@ -241,7 +213,7 @@ impl Entities {
     fn alloc(&mut self) -> WidgetId {
         if let Some(index) = self.freed.pop() {
             let entity = &mut self.entities[index as usize];
-            entity.set_empty(false);
+            entity.is_empty = false;
             entity.generation += 1;
 
             return WidgetId {
@@ -267,13 +239,13 @@ impl Entities {
     }
 
     fn free(&mut self, widget: WidgetId) -> bool {
-        let entity = &self.entities[widget.index as usize];
+        let entity = &mut self.entities[widget.index as usize];
 
         if entity.generation != widget.generation {
             return false;
         }
 
-        entity.set_empty(true);
+        entity.is_empty = true;
         self.freed.push(widget.index);
 
         true
@@ -282,109 +254,27 @@ impl Entities {
     fn contains(&self, widget: WidgetId) -> bool {
         self.entities
             .get(widget.index as usize)
-            .is_some_and(|e| e.generation == widget.generation && !e.is_empty())
-    }
-
-    fn borrow_ref<T>(&self, widget: WidgetId<T>) -> bool
-    where
-        T: ?Sized,
-    {
-        self.entities
-            .get(widget.index as usize)
-            .is_some_and(|e| e.generation == widget.generation && e.borrow_ref())
-    }
-
-    fn borrow_mut<T>(&self, widget: WidgetId<T>) -> bool
-    where
-        T: ?Sized,
-    {
-        self.entities
-            .get(widget.index as usize)
-            .is_some_and(|e| e.generation == widget.generation && e.borrow_mut())
-    }
-
-    fn release_ref(&self, index: usize) {
-        self.entities[index].release_ref()
-    }
-
-    fn release_mut(&self, index: usize) {
-        self.entities[index].release_mut()
+            .is_some_and(|e| e.generation == widget.generation && !e.is_empty)
     }
 }
 
 struct Entity {
     generation: u32,
-    borrow:     Cell<u32>,
+    is_empty:   bool,
 }
 
 impl Entity {
-    const EMPTY: u32 = u32::MAX;
-    const MUT: u32 = u32::MAX - 1;
-
-    const fn new() -> Self {
+    fn new() -> Self {
         Self {
             generation: 0,
-            borrow:     Cell::new(0),
+            is_empty:   false,
         }
-    }
-
-    fn is_empty(&self) -> bool {
-        self.borrow.get() == Self::EMPTY
-    }
-
-    fn set_empty(&self, empty: bool) {
-        match empty {
-            true => {
-                debug_assert_eq!(self.borrow.get(), 0);
-                self.borrow.set(Self::EMPTY);
-            }
-
-            false => {
-                debug_assert_eq!(self.borrow.get(), Self::EMPTY);
-                self.borrow.set(0);
-            }
-        }
-    }
-
-    fn borrow_ref(&self) -> bool {
-        let count = self.borrow.get();
-
-        if count < Self::MUT {
-            self.borrow.update(|x| x + 1);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn borrow_mut(&self) -> bool {
-        let count = self.borrow.get();
-
-        if count == 0 {
-            self.borrow.set(Self::MUT);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn release_ref(&self) {
-        debug_assert!(self.borrow.get() > 0);
-        debug_assert_ne!(self.borrow.get(), Self::EMPTY);
-        debug_assert_ne!(self.borrow.get(), Self::MUT);
-
-        self.borrow.update(|x| x - 1);
-    }
-
-    fn release_mut(&self) {
-        debug_assert_ne!(self.borrow.get(), Self::EMPTY);
-        debug_assert_eq!(self.borrow.get(), Self::MUT);
-
-        self.borrow.set(0);
     }
 }
 
 pub trait AnyWidget: Widget {
+    fn upcast_ref(&self) -> &dyn Widget;
+
     fn upcast_mut(&mut self) -> &mut dyn Widget;
 
     fn downcast_ref(widget: &dyn Widget) -> Option<&Self>;
@@ -393,6 +283,10 @@ pub trait AnyWidget: Widget {
 }
 
 impl AnyWidget for dyn Widget {
+    fn upcast_ref(&self) -> &dyn Widget {
+        self
+    }
+
     fn upcast_mut(&mut self) -> &mut dyn Widget {
         self
     }
@@ -410,6 +304,10 @@ impl<T> AnyWidget for T
 where
     T: Widget,
 {
+    fn upcast_ref(&self) -> &dyn Widget {
+        self
+    }
+
     fn upcast_mut(&mut self) -> &mut dyn Widget {
         self
     }
@@ -420,29 +318,5 @@ where
 
     fn downcast_mut(widget: &mut dyn Widget) -> Option<&mut Self> {
         (widget as &mut dyn Any).downcast_mut()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn entity_borrow_release() {
-        let entity = Entity::new();
-
-        assert!(entity.borrow_ref());
-        assert!(entity.borrow_ref());
-        assert!(!entity.borrow_mut());
-
-        entity.release_ref();
-        entity.release_ref();
-
-        assert!(entity.borrow_mut());
-        assert!(!entity.borrow_ref());
-
-        entity.release_mut();
-
-        assert!(entity.borrow_ref());
     }
 }
