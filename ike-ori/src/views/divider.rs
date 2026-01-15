@@ -26,7 +26,7 @@ pub struct DividerTheme {
 impl Default for DividerTheme {
     fn default() -> Self {
         Self {
-            thickness:     2.0,
+            thickness:     1.0,
             indent:        8.0,
             corner_radius: CornerRadius::all(0.0),
             color:         None,

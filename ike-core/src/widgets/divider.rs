@@ -15,7 +15,7 @@ impl Divider {
     pub fn new(cx: &mut impl Builder) -> WidgetMut<'_, Self> {
         cx.build_widget(Self {
             axis:          Axis::Horizontal,
-            thickness:     2.0,
+            thickness:     1.0,
             indent:        8.0,
             corner_radius: CornerRadius::all(0.0),
             color:         Color::BLACK,
