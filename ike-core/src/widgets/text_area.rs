@@ -5,9 +5,9 @@ use keyboard_types::NamedKey;
 use crate::{
     Affine, AnyWidgetId, Builder, Canvas, Color, ComposeCx, CornerRadius, CursorIcon, DrawCx,
     EventCx, Gesture, ImeEvent, Key, KeyEvent, LayoutCx, MutCx, Offset, Paint, Paragraph, Point,
-    PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine, TouchEvent,
-    TouchPropagate, Update, UpdateCx, Widget, WidgetId, WidgetMut, World, event::TextEvent,
-    window::LayerId,
+    PointerButton, PointerEvent, PointerPropagate, Propagate, Rect, Size, Space, TextLayoutLine,
+    TouchEvent, TouchPropagate, Update, UpdateCx, Widget, WidgetId, WidgetMut, World,
+    event::TextEvent, window::LayerId,
 };
 
 /// When should newlines be inserted in a [`TextArea`].
@@ -793,7 +793,7 @@ impl<const EDITABLE: bool> Widget for TextArea<EDITABLE> {
 
     fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
         match event {
-            PointerEvent::Down(event) => {
+            PointerEvent::Down(event) if event.button == PointerButton::Primary => {
                 let local = cx.global_transform().inverse() * event.position;
                 let cursor = self.find_point(local, false);
 

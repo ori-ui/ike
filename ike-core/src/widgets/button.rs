@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use crate::{
     AnyWidgetId, BorderWidth, Builder, Canvas, Color, CornerRadius, DrawCx, EventCx, Gesture, Key,
-    KeyEvent, LayoutCx, NamedKey, Padding, Paint, PointerEvent, PointerPropagate, Propagate, Size,
-    Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget, WidgetMut,
-    context::UpdateCx, widget::Update,
+    KeyEvent, LayoutCx, NamedKey, Padding, Paint, PointerButton, PointerEvent, PointerPropagate,
+    Propagate, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Widget,
+    WidgetMut, context::UpdateCx, widget::Update,
 };
 
 pub struct Button {
@@ -177,7 +177,9 @@ impl Widget for Button {
 
     fn on_pointer_event(&mut self, cx: &mut EventCx<'_>, event: &PointerEvent) -> PointerPropagate {
         match event {
-            PointerEvent::Down(..) => PointerPropagate::Capture,
+            PointerEvent::Down(event) if event.button == PointerButton::Primary => {
+                PointerPropagate::Capture
+            }
 
             PointerEvent::Up(..) if cx.is_hovered() && cx.is_active() => {
                 (self.on_click)();

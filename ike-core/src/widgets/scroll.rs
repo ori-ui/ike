@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use crate::{
     AnyWidgetId, Axis, BorderWidth, Builder, Canvas, Color, ComposeCx, CornerRadius, DrawCx,
-    EventCx, Gesture, LayoutCx, Offset, Padding, Paint, Point, PointerEvent, PointerPropagate,
-    Rect, ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition, Transitioned, Update,
-    UpdateCx, Widget, WidgetId, WidgetMut,
+    EventCx, Gesture, LayoutCx, Offset, Padding, Paint, Point, PointerButton, PointerEvent,
+    PointerPropagate, Rect, ScrollDelta, Size, Space, TouchEvent, TouchPropagate, Transition,
+    Transitioned, Update, UpdateCx, Widget, WidgetId, WidgetMut,
 };
 
 pub struct Scroll {
@@ -620,7 +620,7 @@ impl Widget for ScrollBar {
         let end = start + length * self.knob_length;
 
         match event {
-            PointerEvent::Down(event) => {
+            PointerEvent::Down(event) if event.button == PointerButton::Primary => {
                 let local = cx.global_transform().inverse() * event.position;
                 let (local, _) = self.axis.unpack_point(local);
 
