@@ -173,18 +173,10 @@ impl Widgets {
     }
 
     pub fn get_hierarchy(&self, id: WidgetId) -> Option<&WidgetHierarchy> {
-        debug_assert!(
-            self.entities.contains(id),
-            "widget {id:?} not contained",
-        );
         self.hierarchy.get(id.index as usize)
     }
 
     pub fn get_hierarchy_mut(&mut self, id: WidgetId) -> Option<&mut WidgetHierarchy> {
-        debug_assert!(
-            self.entities.contains(id),
-            "widget {id:?} not contained",
-        );
         self.hierarchy.get_mut(id.index as usize)
     }
 }
