@@ -73,8 +73,8 @@ pub(crate) fn send_event(
         && let Some(window) = world.window_mut(window)
         && (window.on_key)(event)
     {
-        Propagate::Handled
-    } else {
-        Propagate::Bubble
+        return Propagate::Handled;
     }
+
+    propagate
 }

@@ -221,10 +221,10 @@ pub(crate) fn send_event(
         && let Some(window) = world.window_mut(window)
         && (window.on_pointer)(event)
     {
-        PointerPropagate::Handled
-    } else {
-        PointerPropagate::Bubble
+        return PointerPropagate::Handled;
     }
+
+    propagate
 }
 
 pub(crate) fn update_window_hovered(world: &mut World, window: WindowId) {
