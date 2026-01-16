@@ -187,7 +187,13 @@ impl<T> ApplicationHandler for AppState<'_, T> {
                 if let Some(animate) = window.animate.take() {
                     let delta_time = animate.elapsed();
                     self.context.world.animate(window.id, delta_time);
+                    self.handle_events(event_loop);
                 }
+
+                let Some(window) = self.windows.iter_mut().find(|w| w.window.id() == window_id)
+                else {
+                    return;
+                };
 
                 let Some(desc) = self.context.world.get_window(window.id) else {
                     tracing::error!("window redraw request before it has been created");
