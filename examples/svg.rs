@@ -1,6 +1,6 @@
 use ike::prelude::*;
 
-fn ui(_: &mut ()) -> impl Effect<()> + use<> {
+fn ui(_: &()) -> impl Effect<()> + use<> {
     window(picture(
         Fit::Cover,
         include_svg!("Ghostscript_Tiger.svg"),

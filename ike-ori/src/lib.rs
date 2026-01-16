@@ -18,4 +18,4 @@ pub use palette::Palette;
 pub use resources::Resources;
 
 pub type AnyEffect<T> = Box<dyn ori::AnyView<Context, T, ori::NoElement>>;
-pub type UiBuilder<T> = Box<dyn FnMut(&mut T) -> AnyEffect<T>>;
+pub type UiBuilder<T> = Box<dyn FnMut(&T) -> AnyEffect<T>>;

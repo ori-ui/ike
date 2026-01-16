@@ -41,21 +41,19 @@ fn name_entry() -> impl View<Data> + use<> {
 }
 
 fn todo_done(i: usize, _todo: &Todo) -> impl View<Data> + use<> {
-    let checkmark = using_or_default(
-        move |data: &mut Data, palette: &Palette| {
-            let color = if data.todos[i].done {
-                palette.success
-            } else {
-                Color::TRANSPARENT
-            };
+    let checkmark = palette(move |data: &Data, palette| {
+        let color = if data.todos[i].done {
+            palette.success
+        } else {
+            Color::TRANSPARENT
+        };
 
-            picture(
-                Fit::Contain,
-                include_svg!("../../check.svg"),
-            )
-            .color(color)
-        },
-    );
+        picture(
+            Fit::Contain,
+            include_svg!("../../check.svg"),
+        )
+        .color(color)
+    });
 
     let button = button(checkmark, move |data: &mut Data| {
         data.todos[i].done = !data.todos[i].done;
@@ -133,25 +131,23 @@ fn todos(data: &Data) -> Option<Flex<impl View<Data> + use<>>> {
 }
 
 fn filter(kind: Filter, name: &'static str) -> Flex<impl View<Data> + use<>> {
-    expand(using_or_default(
-        move |data: &mut Data, palette: &Palette| {
-            button(
-                center(
-                    label(name).color(if data.filter == kind {
-                        palette.success
-                    } else {
-                        palette.contrast
-                    }),
-                ),
-                move |data: &mut Data| {
-                    data.filter = kind;
-                },
-            )
-            .color(palette.surface(0))
-            .border_width([0.0, 0.0, 0.0, 1.0])
-            .corner_radius(0.0)
-        },
-    ))
+    expand(palette(move |data: &Data, palette| {
+        button(
+            center(
+                label(name).color(if data.filter == kind {
+                    palette.success
+                } else {
+                    palette.contrast
+                }),
+            ),
+            move |data: &mut Data| {
+                data.filter = kind;
+            },
+        )
+        .color(palette.surface(0))
+        .border_width([0.0, 0.0, 0.0, 1.0])
+        .corner_radius(0.0)
+    }))
 }
 
 fn filters() -> impl View<Data> + use<> {
@@ -168,7 +164,7 @@ fn filters() -> impl View<Data> + use<> {
     .corner_radius(0.0)
 }
 
-fn ui(data: &mut Data) -> impl Effect<Data> + use<> {
+fn ui(data: &Data) -> impl Effect<Data> + use<> {
     provide(
         |_| Palette::paper(),
         window(safe_area(center(width(

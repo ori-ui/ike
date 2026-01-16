@@ -76,7 +76,7 @@ impl App {
         let _ = tracing::subscriber::set_global_default(subscriber);
     }
 
-    pub fn run<T, V>(self, data: &mut T, mut ui: impl FnMut(&mut T) -> V + 'static) -> Result<()>
+    pub fn run<T, V>(self, data: &mut T, mut ui: impl FnMut(&T) -> V + 'static) -> Result<()>
     where
         V: Effect<T> + 'static,
         V::State: 'static,

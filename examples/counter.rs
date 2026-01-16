@@ -4,14 +4,14 @@ struct Data {
     count: u32,
 }
 
-fn counter(data: &mut Data) -> impl View<Data> + use<> {
+fn counter(data: &Data) -> impl View<Data> + use<> {
     center(button(
         label(format!("count {}", data.count)),
         |data: &mut Data| data.count += 1,
     ))
 }
 
-fn ui(data: &mut Data) -> impl Effect<Data> + use<> {
+fn ui(data: &Data) -> impl Effect<Data> + use<> {
     window(counter(data))
 }
 

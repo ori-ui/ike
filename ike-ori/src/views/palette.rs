@@ -1,6 +1,6 @@
 use crate::{Palette, View};
 
-pub fn palette<T, V>(f: impl FnOnce(&mut T, &Palette) -> V) -> impl View<T>
+pub fn palette<T, V>(f: impl FnOnce(&T, &Palette) -> V) -> impl View<T>
 where
     V: View<T>,
 {

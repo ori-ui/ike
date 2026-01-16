@@ -1,6 +1,6 @@
 use ike::prelude::*;
 
-fn ui(_: &mut ()) -> impl Effect<()> + use<> {
+fn ui(_: &()) -> impl Effect<()> + use<> {
     let mut rows = Vec::new();
 
     for _ in 0..50 {
