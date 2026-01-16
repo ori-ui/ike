@@ -188,8 +188,6 @@ impl Widget for Stack {
             minor_sum = minor_sum.max(minor);
         }
 
-        dbg!(remaining);
-
         let major = f32::clamp(major_sum, min_major, max_major);
         let minor = f32::clamp(minor_sum, min_minor, max_minor);
 
