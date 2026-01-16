@@ -1,8 +1,8 @@
 use std::mem;
 
 use crate::{
-    Builder, GetError, Update, Widget, WidgetId, WidgetMut, WindowId, World, debug::debug_panic,
-    passes, widget::ChildUpdate, world::Widgets,
+    Builder, ChildUpdate, GetError, Update, Widget, WidgetId, WidgetMut, WindowId, World,
+    debug::debug_panic, passes, world::Widgets,
 };
 
 pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
@@ -78,6 +78,12 @@ pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize,
 }
 
 pub(crate) fn remove(world: &mut World, widget: WidgetId) {
+    if let Some(hierarchy) = world.widgets.get_hierarchy(widget) {
+        for &child in hierarchy.children.clone().iter() {
+            remove(world, child);
+        }
+    }
+
     let Ok(widget) = world.get_widget(widget) else {
         return;
     };
