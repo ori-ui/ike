@@ -3,6 +3,8 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
+use crate::layout;
+
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Offset {
     pub x: f32,
@@ -10,8 +12,6 @@ pub struct Offset {
 }
 
 impl Offset {
-    const EPSILON: f32 = 0.0001;
-
     pub const ZERO: Self = Self::all(0.0);
 
     pub const fn new(x: f32, y: f32) -> Self {
@@ -35,16 +35,16 @@ impl Offset {
     /// Compute `self` aligned to the pixel grid for a certain scale factor.
     pub const fn pixel_round(self, scale: f32) -> Self {
         Self {
-            x: (self.x * scale).round() / scale,
-            y: (self.y * scale).round() / scale,
+            x: layout::pixel_round(self.x, scale),
+            y: layout::pixel_round(self.y, scale),
         }
     }
 
     /// Compute `self` aligned to the pixel grid for a certain scale factor.
     pub const fn pixel_ceil(self, scale: f32) -> Self {
         Self {
-            x: (self.x * scale - Self::EPSILON).ceil() / scale,
-            y: (self.y * scale - Self::EPSILON).ceil() / scale,
+            x: layout::pixel_ceil(self.x, scale),
+            y: layout::pixel_ceil(self.y, scale),
         }
     }
 }

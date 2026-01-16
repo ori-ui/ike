@@ -1,7 +1,6 @@
 #![warn(clippy::unwrap_used)]
 
 mod axis;
-mod border;
 mod build;
 mod canvas;
 mod color;
@@ -10,6 +9,7 @@ mod curve;
 mod debug;
 mod event;
 mod image;
+mod layout;
 mod math;
 mod painter;
 mod record;
@@ -25,7 +25,6 @@ pub(crate) mod passes;
 pub mod widgets;
 
 pub use axis::Axis;
-pub use border::{BorderWidth, CornerRadius, Padding};
 pub use build::Builder;
 pub use canvas::{Blend, Canvas, Cap, Clip, Join, Paint, Shader, Stroke};
 pub use color::Color;
@@ -39,6 +38,7 @@ pub use event::{
     TextPasteEvent, Touch, TouchEvent, TouchId, TouchMoveEvent, TouchPressEvent, TouchPropagate,
     TouchSettings,
 };
+pub use layout::{BorderWidth, CornerRadius, Padding, pixel_ceil, pixel_floor, pixel_round};
 pub use math::{Affine, Matrix, Offset, Point, Rect, Size, Space};
 pub use painter::Painter;
 pub use record::{RecordSettings, Recorder, Recording, RecordingData, WeakRecording};

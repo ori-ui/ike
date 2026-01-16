@@ -70,10 +70,17 @@ pub(crate) fn layout_window(
 
 pub(crate) fn layout_widget(
     widget: &mut WidgetMut<'_>,
-    space: Space,
+    mut space: Space,
     painter: &mut dyn Painter,
     scale: f32,
 ) -> Size {
+    let pixel_align = !widget.cx.is_subpixel() && widget.cx.settings().render.pixel_align;
+
+    if pixel_align {
+        space.min = space.min.pixel_floor(scale);
+        space.max = space.max.pixel_floor(scale);
+    }
+
     if widget.cx.is_stashed() {
         widget.cx.state.size = space.min;
         return space.min;
@@ -89,16 +96,8 @@ pub(crate) fn layout_widget(
     let mut cx = widget.cx.as_layout_cx(painter, scale);
     let mut size = widget.widget.layout(&mut cx, space);
 
-    if !widget.cx.is_subpixel() && widget.cx.settings().render.pixel_align {
+    if pixel_align {
         size = size.pixel_ceil(scale);
-
-        if size.width > space.max.width {
-            size.width -= scale.recip();
-        }
-
-        if size.height > space.max.height {
-            size.height -= scale.recip();
-        }
     }
 
     if cfg!(debug_assertions) {

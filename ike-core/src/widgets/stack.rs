@@ -1,5 +1,5 @@
 use crate::{
-    Axis, Builder, ChildUpdate, LayoutCx, Size, Space, Update, UpdateCx, Widget, WidgetMut,
+    Axis, Builder, ChildUpdate, LayoutCx, Size, Space, Update, UpdateCx, Widget, WidgetMut, layout,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -111,15 +111,38 @@ impl Widget for Stack {
 
         // measure expanding children
 
-        let remaining = f32::max(max_major - major_sum, 0.0);
-        let per_flex = remaining / flex_sum;
+        let mut remaining = f32::max(max_major - major_sum, 0.0);
 
         for (i, &(flex, tight)) in self.flex.iter().enumerate() {
             if flex == 0.0 || tight {
                 continue;
             }
 
-            let max_major = per_flex * flex;
+            let per_flex = remaining / flex_sum;
+            let subpixel_max_major = per_flex * flex;
+
+            let max_major = if cx.settings().render.pixel_align {
+                // imagine three children with a flex of 1.0 and a remaining size of 20.0, each
+                // child will is allotted 20.0 / 3.0 = 6.667.. pixels. since space is floored to
+                // device pixels, each child will only get a max size of 6.0, which when summed up
+                // to 3.0 * 6.0 = 18.0 leaves 2 pixels left over. to avoid this max_major is
+                // rounded to the nearest pixel, and the difference is added to remaining.
+                //
+                // for the child #1, round(20.0 / 3.0 = 6.667..) = 7.0
+                // remaining - 0.333.. = 19.667..
+                //
+                // for the child #2, round(19.667.. / 3.0 = 6.556..) = 7.0
+                // remaining - 0.444.. = 19.222..
+                //
+                // for the child #3, round(19.222.. / 3.0 = 6.407..) = 6.0
+                //
+                // leaving us with 0 pixels in excess.
+                let max_major = layout::pixel_round(subpixel_max_major, cx.scale());
+                remaining += subpixel_max_major - max_major;
+                max_major
+            } else {
+                subpixel_max_major
+            };
 
             let space = Space::new(
                 self.axis.pack_size(0.0, child_min_minor),
@@ -135,15 +158,23 @@ impl Widget for Stack {
 
         // measure tightly flexible children
 
-        let remaining = f32::max(max_major - major_sum, 0.0);
-        let per_flex = remaining / flex_sum;
+        let mut remaining = f32::max(max_major - major_sum, 0.0);
 
         for (i, &(flex, tight)) in self.flex.iter().enumerate() {
             if flex == 0.0 || !tight {
                 continue;
             }
 
-            let major = per_flex * flex;
+            let per_flex = remaining / flex_sum;
+            let subpixel_major = per_flex * flex;
+
+            let major = if cx.settings().render.pixel_align {
+                let major = layout::pixel_round(subpixel_major, cx.scale());
+                remaining += subpixel_major - major;
+                major
+            } else {
+                subpixel_major
+            };
 
             let space = Space::new(
                 self.axis.pack_size(major, child_min_minor),
@@ -156,6 +187,8 @@ impl Widget for Stack {
             major_sum += major;
             minor_sum = minor_sum.max(minor);
         }
+
+        dbg!(remaining);
 
         let major = f32::clamp(major_sum, min_major, max_major);
         let minor = f32::clamp(minor_sum, min_minor, max_minor);

@@ -2,6 +2,20 @@ use std::ops::Add;
 
 use crate::{LayoutCx, Offset, Size, Space};
 
+const EPSILON: f32 = 0.0001;
+
+pub const fn pixel_round(x: f32, scale: f32) -> f32 {
+    f32::round(x * scale) / scale
+}
+
+pub const fn pixel_ceil(x: f32, scale: f32) -> f32 {
+    f32::ceil(x * scale - EPSILON) / scale
+}
+
+pub const fn pixel_floor(x: f32, scale: f32) -> f32 {
+    f32::floor(x * scale + EPSILON) / scale
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CornerRadius {
     pub top_left:     f32,

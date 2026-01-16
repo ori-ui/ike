@@ -125,7 +125,7 @@ fn todos(data: &Data) -> Option<Flex<impl View<Data> + use<>>> {
 }
 
 fn filter(kind: Filter, name: &'static str) -> Flex<impl View<Data> + use<>> {
-    expand(using_or_default(
+    flex(using_or_default(
         move |data: &mut Data, palette: &Palette| {
             button(
                 center(
@@ -147,14 +147,11 @@ fn filter(kind: Filter, name: &'static str) -> Flex<impl View<Data> + use<>> {
 }
 
 fn filters() -> impl View<Data> + use<> {
-    container(
-        hstack((
-            filter(Filter::Done, "done"),
-            filter(Filter::Pending, "pending"),
-            filter(Filter::All, "all"),
-        ))
-        .justify(Justify::SpaceAround),
-    )
+    container(hstack((
+        filter(Filter::Done, "done").amount(2.0),
+        filter(Filter::Pending, "pending").amount(2.0),
+        filter(Filter::All, "all").amount(2.0),
+    )))
     .padding(0.0)
     .border_width([0.0, 1.0, 1.0, 0.0])
     .corner_radius(0.0)

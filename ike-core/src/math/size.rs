@@ -3,6 +3,8 @@ use std::{
     ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
+use crate::layout;
+
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct Size {
     pub width:  f32,
@@ -10,8 +12,6 @@ pub struct Size {
 }
 
 impl Size {
-    const EPSILON: f32 = 0.0001;
-
     pub const ZERO: Self = Self::all(0.0);
     pub const INFINITY: Self = Self::all(f32::INFINITY);
 
@@ -42,15 +42,29 @@ impl Size {
 
     pub const fn ceil(self) -> Self {
         Self {
-            width:  self.width.round(),
-            height: self.height.round(),
+            width:  self.width.ceil(),
+            height: self.height.ceil(),
+        }
+    }
+
+    pub const fn floor(self) -> Self {
+        Self {
+            width:  self.width.floor(),
+            height: self.height.floor(),
         }
     }
 
     pub const fn pixel_ceil(self, scale: f32) -> Self {
         Self {
-            width:  (self.width * scale - Self::EPSILON).ceil() / scale,
-            height: (self.height * scale - Self::EPSILON).ceil() / scale,
+            width:  layout::pixel_ceil(self.width, scale),
+            height: layout::pixel_ceil(self.height, scale),
+        }
+    }
+
+    pub const fn pixel_floor(self, scale: f32) -> Self {
+        Self {
+            width:  layout::pixel_floor(self.width, scale),
+            height: layout::pixel_floor(self.height, scale),
         }
     }
 
