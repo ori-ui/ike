@@ -38,10 +38,20 @@ pub(crate) fn pressed(
 
     let modifiers = window.modifiers;
 
-    let handled = match window.focused {
-        Some(target) => send_event(world, window_id, target, &event) == Propagate::Handled,
-        None => false,
+    let mut handled = if let Some(target) = window.focused
+        && let Propagate::Handled = send_event(world, window_id, target, &event)
+    {
+        true
+    } else {
+        false
     };
+
+    if !handled
+        && let Some(window) = world.window_mut(window_id)
+        && (window.on_key)(&event)
+    {
+        handled = true;
+    }
 
     if key == Key::Named(NamedKey::Tab) && pressed && !handled {
         passes::focus::next(world, window_id, !modifiers.shift());
@@ -61,20 +71,11 @@ pub(crate) fn send_event(
     target: WidgetId,
     event: &KeyEvent,
 ) -> Propagate {
-    let propagate = passes::event::send_event(
+    passes::event::send_event(
         world,
         window,
         target,
         Propagate::Bubble,
         |widget, cx| widget.on_key_event(cx, event),
-    );
-
-    if let Propagate::Bubble = propagate
-        && let Some(window) = world.window_mut(window)
-        && (window.on_key)(event)
-    {
-        return Propagate::Handled;
-    }
-
-    propagate
+    )
 }

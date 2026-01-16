@@ -53,13 +53,14 @@ pub(crate) fn moved(
 
     let hovered = update_pointer_hovered(world, window_id, pointer_id);
 
-    if let Some(target) = capturer.or(hovered) {
-        let event = PointerMoveEvent {
-            pointer: pointer_id,
-            position,
-        };
-        let event = PointerEvent::Move(event);
+    let event = PointerMoveEvent {
+        pointer: pointer_id,
+        position,
+    };
 
+    let event = PointerEvent::Move(event);
+
+    let mut handled = if let Some(target) = capturer.or(hovered) {
         match send_event(world, window_id, target, &event) {
             PointerPropagate::Bubble => false,
             PointerPropagate::Handled => true,
@@ -72,7 +73,16 @@ pub(crate) fn moved(
         }
     } else {
         false
+    };
+
+    if !handled
+        && let Some(window) = world.window_mut(window_id)
+        && (window.on_pointer)(&event)
+    {
+        handled = true;
     }
+
+    handled
 }
 
 pub(crate) fn pressed(
@@ -94,17 +104,19 @@ pub(crate) fn pressed(
     };
 
     let position = pointer.position;
-    let handled = pointer.target().is_some_and(|target| {
-        let event = PointerButtonEvent {
-            button,
-            position,
-            pointer: pointer_id,
-        };
-        let event = match pressed {
-            true => PointerEvent::Down(event),
-            false => PointerEvent::Up(event),
-        };
 
+    let event = PointerButtonEvent {
+        button,
+        position,
+        pointer: pointer_id,
+    };
+
+    let event = match pressed {
+        true => PointerEvent::Down(event),
+        false => PointerEvent::Up(event),
+    };
+
+    let mut handled = pointer.target().is_some_and(|target| {
         let handled = match send_event(world, window_id, target, &event) {
             PointerPropagate::Bubble => false,
             PointerPropagate::Handled => true,
@@ -148,6 +160,13 @@ pub(crate) fn pressed(
 
         handled
     });
+
+    if !handled
+        && let Some(window) = world.window_mut(window_id)
+        && (window.on_pointer)(&event)
+    {
+        handled = true;
+    }
 
     if pressed
         && !handled
@@ -209,22 +228,13 @@ pub(crate) fn send_event(
     target: WidgetId,
     event: &PointerEvent,
 ) -> PointerPropagate {
-    let propagate = passes::event::send_event(
+    passes::event::send_event(
         world,
         window,
         target,
         PointerPropagate::Bubble,
         |widget, cx| widget.on_pointer_event(cx, event),
-    );
-
-    if let PointerPropagate::Bubble = propagate
-        && let Some(window) = world.window_mut(window)
-        && (window.on_pointer)(event)
-    {
-        return PointerPropagate::Handled;
-    }
-
-    propagate
+    )
 }
 
 pub(crate) fn update_window_hovered(world: &mut World, window: WindowId) {
