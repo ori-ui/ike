@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::{
-    Color, CursorIcon, Modifiers, Padding, Point, Pointer, PointerId, Size, Touch, TouchId,
-    WidgetId, debug::debug_panic,
+    Color, CursorIcon, KeyEvent, Modifiers, Padding, Point, Pointer, PointerEvent, PointerId, Size,
+    Touch, TouchId, WidgetId, debug::debug_panic,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -76,7 +76,6 @@ impl Layer {
     }
 }
 
-#[derive(Debug)]
 pub struct Window {
     pub(crate) id:     WindowId,
     pub(crate) layers: Rc<Vec<Layer>>,
@@ -84,6 +83,9 @@ pub struct Window {
     pub(crate) modifiers: Modifiers,
     pub(crate) pointers:  Vec<Pointer>,
     pub(crate) touches:   Vec<Touch>,
+
+    pub(crate) on_key:     Box<dyn FnMut(&KeyEvent) -> bool>,
+    pub(crate) on_pointer: Box<dyn FnMut(&PointerEvent) -> bool>,
 
     pub(crate) focused: Option<WidgetId>,
 
@@ -103,6 +105,45 @@ pub struct Window {
 }
 
 impl Window {
+    pub(crate) fn new(id: WindowId, contents: WidgetId) -> Self {
+        Self {
+            id,
+            layers: Rc::new(vec![Layer {
+                id:       Layer::next_id(),
+                widget:   contents,
+                size:     Size::new(800.0, 600.0),
+                position: Point::ORIGIN,
+            }]),
+
+            modifiers: Modifiers::empty(),
+            pointers: Vec::new(),
+            touches: Vec::new(),
+
+            on_key: Box::new(|_| false),
+            on_pointer: Box::new(|_| false),
+
+            focused: None,
+
+            properties: Vec::new(),
+
+            scale: 1.0,
+            size: Size::new(800.0, 600.0),
+            insets: Padding::all(0.0),
+            is_visible: true,
+            is_focused: false,
+            is_decorated: true,
+
+            cursor: CursorIcon::Default,
+            title: String::new(),
+            sizing: WindowSizing::Resizable {
+                default_size: Size::new(800.0, 600.0),
+                min_size:     Size::all(0.0),
+                max_size:     Size::all(f32::INFINITY),
+            },
+            color: Color::WHITE,
+        }
+    }
+
     pub fn id(&self) -> WindowId {
         self.id
     }
@@ -154,6 +195,14 @@ impl Window {
 
     pub fn layers(&self) -> &[Layer] {
         &self.layers
+    }
+
+    pub fn set_on_key(&mut self, on_key: Box<dyn FnMut(&KeyEvent) -> bool>) {
+        self.on_key = on_key;
+    }
+
+    pub fn set_on_pointer(&mut self, on_pointer: Box<dyn FnMut(&PointerEvent) -> bool>) {
+        self.on_pointer = on_pointer;
     }
 
     pub fn layers_mut(&mut self) -> &mut [Layer] {

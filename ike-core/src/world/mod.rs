@@ -22,9 +22,9 @@ pub use widget_ref::WidgetRef;
 pub use widgets::{AnyWidget, GetError};
 
 use crate::{
-    AnyWidgetId, Builder, Canvas, Color, CursorIcon, Key, Layer, LayerId, Modifiers, Offset,
-    Padding, Point, PointerButton, PointerId, Recorder, ScrollDelta, Size, TouchId, Update,
-    WidgetId, Window, WindowId, WindowSizing, debug::debug_panic, passes,
+    AnyWidgetId, Builder, Canvas, Key, Layer, LayerId, Modifiers, Offset, Padding, Point,
+    PointerButton, PointerId, Recorder, ScrollDelta, Size, TouchId, Update, WidgetId, Window,
+    WindowId, debug::debug_panic, passes,
 };
 
 pub struct World {
@@ -67,40 +67,7 @@ impl World {
             data: NEXT_ID.fetch_add(1, Ordering::SeqCst),
         };
 
-        self.state.windows.push(Window {
-            id,
-            layers: Rc::new(vec![Layer {
-                id:       Layer::next_id(),
-                widget:   contents,
-                size:     Size::new(800.0, 600.0),
-                position: Point::ORIGIN,
-            }]),
-
-            modifiers: Modifiers::empty(),
-            pointers: Vec::new(),
-            touches: Vec::new(),
-
-            focused: None,
-
-            properties: Vec::new(),
-
-            scale: 1.0,
-            size: Size::new(800.0, 600.0),
-            insets: Padding::all(0.0),
-            is_visible: true,
-            is_focused: false,
-            is_decorated: true,
-
-            cursor: CursorIcon::Default,
-            title: String::new(),
-            sizing: WindowSizing::Resizable {
-                default_size: Size::new(800.0, 600.0),
-                min_size:     Size::all(0.0),
-                max_size:     Size::all(f32::INFINITY),
-            },
-            color: Color::WHITE,
-        });
-
+        self.state.windows.push(Window::new(id, contents));
         self.state.emit_signal(Signal::CreateWindow(id));
         passes::hierarchy::set_window(self, contents, Some(id));
 

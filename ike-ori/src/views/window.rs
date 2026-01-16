@@ -1,22 +1,30 @@
-use ike_core::{AnyWidgetId, Builder, Color, Size, WindowId, WindowSizing};
-use ori::{Action, Event, NoElement, Provider, View, ViewMarker};
+use ike_core::{AnyWidgetId, Builder, Color, KeyEvent, PointerEvent, Size, WindowId, WindowSizing};
+use ori::{Action, Event, NoElement, Provider, Proxied, Proxy, View, ViewMarker};
 
 use crate::Palette;
 
-pub fn window<V>(contents: V) -> Window<V> {
+pub fn window<V, T>(contents: V) -> Window<V, T> {
     Window::new(contents)
 }
 
-pub struct Window<V> {
-    contents:  V,
-    title:     String,
-    sizing:    WindowSizing,
-    visible:   bool,
-    decorated: bool,
-    color:     Option<Color>,
+#[allow(
+    clippy::type_complexity,
+    reason = "it's more clear to have the long types"
+)]
+pub struct Window<V, T> {
+    contents:       V,
+    title:          String,
+    sizing:         WindowSizing,
+    visible:        bool,
+    decorated:      bool,
+    color:          Option<Color>,
+    key_filter:     Option<Box<dyn FnMut(&KeyEvent) -> bool>>,
+    pointer_filter: Option<Box<dyn FnMut(&PointerEvent) -> bool>>,
+    on_key:         Option<Box<dyn FnMut(&mut T, &KeyEvent) -> Action>>,
+    on_pointer:     Option<Box<dyn FnMut(&mut T, &PointerEvent) -> Action>>,
 }
 
-impl<V> Window<V> {
+impl<V, T> Window<V, T> {
     pub fn new(contents: V) -> Self {
         Self {
             contents,
@@ -29,6 +37,10 @@ impl<V> Window<V> {
             visible: true,
             decorated: true,
             color: None,
+            key_filter: None,
+            pointer_filter: None,
+            on_key: None,
+            on_pointer: None,
         }
     }
 
@@ -71,12 +83,47 @@ impl<V> Window<V> {
         self.decorated = decorated;
         self
     }
+
+    pub fn on_key<A>(
+        mut self,
+        filter: impl FnMut(&KeyEvent) -> bool + 'static,
+        mut on_key: impl FnMut(&mut T, &KeyEvent) -> A + 'static,
+    ) -> Self
+    where
+        A: Into<Action>,
+    {
+        self.key_filter = Some(Box::new(filter));
+        self.on_key = Some(Box::new(move |data, event| {
+            on_key(data, event).into()
+        }));
+        self
+    }
+
+    pub fn on_pointer<A>(
+        mut self,
+        filter: impl FnMut(&PointerEvent) -> bool + 'static,
+        mut on_pointer: impl FnMut(&mut T, &PointerEvent) -> A + 'static,
+    ) -> Self
+    where
+        A: Into<Action>,
+    {
+        self.pointer_filter = Some(Box::new(filter));
+        self.on_pointer = Some(Box::new(move |data, event| {
+            on_pointer(data, event).into()
+        }));
+        self
+    }
 }
 
-impl<V> ViewMarker for Window<V> {}
-impl<C, T, V> View<C, T> for Window<V>
+enum WindowEvent {
+    Key(WindowId, KeyEvent),
+    Pointer(WindowId, PointerEvent),
+}
+
+impl<V, T> ViewMarker for Window<V, T> {}
+impl<C, T, V> View<C, T> for Window<V, T>
 where
-    C: Builder + Provider,
+    C: Builder + Provider + Proxied,
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = NoElement;
@@ -96,6 +143,45 @@ where
             id,
             self.color.unwrap_or(palette.background),
         );
+
+        let proxy = cx.proxy();
+
+        if let Some(window) = cx.world_mut().get_window_mut(id) {
+            let proxy = proxy.cloned();
+            let mut filter = self.key_filter.take();
+
+            window.set_on_key(Box::new(move |event| {
+                if let Some(ref mut filter) = filter
+                    && filter(event)
+                {
+                    proxy.event(Event::new(
+                        WindowEvent::Key(id, event.clone()),
+                        None,
+                    ));
+                    true
+                } else {
+                    false
+                }
+            }));
+        }
+
+        if let Some(window) = cx.world_mut().get_window_mut(id) {
+            let mut filter = self.pointer_filter.take();
+
+            window.set_on_pointer(Box::new(move |event| {
+                if let Some(ref mut filter) = filter
+                    && filter(event)
+                {
+                    proxy.event(Event::new(
+                        WindowEvent::Pointer(id, event.clone()),
+                        None,
+                    ));
+                    true
+                } else {
+                    false
+                }
+            }));
+        }
 
         (NoElement, (id, contents, state))
     }
@@ -167,6 +253,26 @@ where
         data: &mut T,
         event: &mut Event,
     ) -> Action {
+        match event.get() {
+            Some(WindowEvent::Key(target, event)) if target == id => {
+                return if let Some(ref mut on_key) = self.on_key {
+                    on_key(data, event)
+                } else {
+                    Action::new()
+                };
+            }
+
+            Some(WindowEvent::Pointer(target, event)) if target == id => {
+                return if let Some(ref mut on_pointer) = self.on_pointer {
+                    on_pointer(data, event)
+                } else {
+                    Action::new()
+                };
+            }
+
+            _ => {}
+        }
+
         let action = self.contents.event(contents, state, cx, data, event);
 
         if let Some(window) = cx.world().get_window(*id)

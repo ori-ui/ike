@@ -61,11 +61,20 @@ pub(crate) fn send_event(
     target: WidgetId,
     event: &KeyEvent,
 ) -> Propagate {
-    passes::event::send_event(
+    let propagate = passes::event::send_event(
         world,
         window,
         target,
         Propagate::Bubble,
         |widget, cx| widget.on_key_event(cx, event),
-    )
+    );
+
+    if let Propagate::Bubble = propagate
+        && let Some(window) = world.window_mut(window)
+        && (window.on_key)(event)
+    {
+        Propagate::Handled
+    } else {
+        Propagate::Bubble
+    }
 }

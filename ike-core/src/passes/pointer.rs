@@ -209,13 +209,22 @@ pub(crate) fn send_event(
     target: WidgetId,
     event: &PointerEvent,
 ) -> PointerPropagate {
-    passes::event::send_event(
+    let propagate = passes::event::send_event(
         world,
         window,
         target,
         PointerPropagate::Bubble,
         |widget, cx| widget.on_pointer_event(cx, event),
-    )
+    );
+
+    if let PointerPropagate::Bubble = propagate
+        && let Some(window) = world.window_mut(window)
+        && (window.on_pointer)(event)
+    {
+        PointerPropagate::Handled
+    } else {
+        PointerPropagate::Bubble
+    }
 }
 
 pub(crate) fn update_window_hovered(world: &mut World, window: WindowId) {
