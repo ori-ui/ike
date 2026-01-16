@@ -1,15 +1,26 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-feature
-        android:name="android.hardware.vulkan.level"
-        android:required="true"
-        android:version="1"/>
-
-    <application android:label="Ike Example">
+    <application android:label="${appName}">
         <activity
             android:name="org.ori.RustActivity"
             android:exported="true"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+            android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="adjustResize"
+            android:hardwareAccelerated="true"
+            android:theme="@android:style/Theme.DeviceDefault"
+            android:configChanges="
+                orientation
+                |keyboardHidden
+                |keyboard
+                |screenSize
+                |smallestScreenSize
+                |locale
+                |layoutDirection
+                |fontScale
+                |screenLayout
+                |density
+                |uiMode
+            ">
 
             <meta-data android:name="android.app.lib_name" android:value="rust" />
 
