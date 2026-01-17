@@ -228,6 +228,7 @@ impl Surface {
         window: WindowHandle,
         width: u32,
         height: u32,
+        hdr: bool,
     ) -> Result<Self> {
         let skia_context = unsafe {
             let get_proc = |gpo| match gpo {
@@ -303,7 +304,7 @@ impl Surface {
                 .map_err(|_| Error::Runtime("failed querying surface formats"))?
         };
 
-        let surface_format = if surface_formats.contains(&Self::HDR_FORMAT) {
+        let surface_format = if surface_formats.contains(&Self::HDR_FORMAT) && hdr {
             Self::HDR_FORMAT
         } else if surface_formats.contains(&Self::SDR_BGRA_FORMAT) {
             Self::SDR_BGRA_FORMAT

@@ -569,6 +569,7 @@ impl WindowState {
                 window.window_handle()?,
                 physical.width,
                 physical.height,
+                false,
             )?
         };
 

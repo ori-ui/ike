@@ -59,6 +59,7 @@ impl<'a, T> EventLoop<'a, T> {
                         window_handle,
                         width as u32,
                         height as u32,
+                        false,
                     )
                 };
 
