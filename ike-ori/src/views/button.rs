@@ -324,7 +324,7 @@ where
             cx.set_child(*element, 0, *contents);
         }
 
-        match event.get_targeted(*id) {
+        match event.take_targeted(*id) {
             Some(ButtonEvent::Clicked) => action | (self.on_click)(data),
             None => action,
         }

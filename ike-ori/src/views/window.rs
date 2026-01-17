@@ -2,7 +2,7 @@ use ike_core::{
     AnyWidgetId, Builder, Color, Key, KeyEvent, KeyPressEvent, Modifiers, PointerButton,
     PointerButtonEvent, PointerEvent, Size, WindowId, WindowSizing,
 };
-use ori::{Action, Event, NoElement, Provider, Proxied, Proxy, View, ViewMarker};
+use ori::{Action, Event, NoElement, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
 use crate::Palette;
 
@@ -169,9 +169,14 @@ impl<V, T> Window<V, T> {
         self
     }
 
-    fn register_on_key(&mut self, cx: &mut (impl Builder + Proxied), id: WindowId) {
+    fn register_on_key(
+        &mut self,
+        cx: &mut (impl Builder + Proxied),
+        window_id: WindowId,
+        view_id: ViewId,
+    ) {
         let proxy = cx.proxy();
-        if let Some(window) = cx.world_mut().get_window_mut(id) {
+        if let Some(window) = cx.world_mut().get_window_mut(window_id) {
             let mut filter = self.key_filter.take();
             let keys: Vec<_> = self
                 .on_keys
@@ -192,8 +197,8 @@ impl<V, T> Window<V, T> {
 
                 if is_key || filter.as_mut().is_some_and(|filter| filter(event)) {
                     proxy.event(Event::new(
-                        WindowEvent::Key(id, event.clone()),
-                        None,
+                        WindowEvent::Key(event.clone()),
+                        view_id,
                     ));
 
                     true
@@ -204,7 +209,7 @@ impl<V, T> Window<V, T> {
         }
 
         let proxy = cx.proxy();
-        if let Some(window) = cx.world_mut().get_window_mut(id) {
+        if let Some(window) = cx.world_mut().get_window_mut(window_id) {
             let buttons: Vec<_> = self.on_pointers.iter().map(|(btn, _)| *btn).collect();
             let mut filter = self.pointer_filter.take();
 
@@ -216,8 +221,8 @@ impl<V, T> Window<V, T> {
 
                 if is_button || filter.as_mut().is_some_and(|filter| filter(event)) {
                     proxy.event(Event::new(
-                        WindowEvent::Pointer(id, event.clone()),
-                        None,
+                        WindowEvent::Pointer(event.clone()),
+                        view_id,
                     ));
                     true
                 } else {
@@ -229,8 +234,8 @@ impl<V, T> Window<V, T> {
 }
 
 enum WindowEvent {
-    Key(WindowId, KeyEvent),
-    Pointer(WindowId, PointerEvent),
+    Key(KeyEvent),
+    Pointer(PointerEvent),
 }
 
 impl<V, T> ViewMarker for Window<V, T> {}
@@ -240,30 +245,34 @@ where
     V: View<C, T, Element: AnyWidgetId>,
 {
     type Element = NoElement;
-    type State = (WindowId, V::Element, V::State);
+    type State = (WindowId, ViewId, V::Element, V::State);
 
     fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
-        let id = cx.world_mut().create_window(contents.upcast());
+        let window_id = cx.world_mut().create_window(contents.upcast());
 
         let color = self.color.unwrap_or(palette.background);
 
-        cx.set_window_title(id, self.title.clone());
-        cx.set_window_sizing(id, self.sizing);
-        cx.set_window_visible(id, self.visible);
-        cx.set_window_decorated(id, self.decorated);
-        cx.set_window_color(id, color);
+        cx.set_window_title(window_id, self.title.clone());
+        cx.set_window_sizing(window_id, self.sizing);
+        cx.set_window_visible(window_id, self.visible);
+        cx.set_window_decorated(window_id, self.decorated);
+        cx.set_window_color(window_id, color);
 
-        self.register_on_key(cx, id);
-        (NoElement, (id, contents, state))
+        let view_id = ViewId::next();
+        self.register_on_key(cx, window_id, view_id);
+        (
+            NoElement,
+            (window_id, view_id, contents, state),
+        )
     }
 
     fn rebuild(
         &mut self,
         _element: &mut Self::Element,
-        (id, contents, state): &mut Self::State,
+        (window_id, view_id, contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
         old: &mut Self,
@@ -276,43 +285,43 @@ where
             &mut old.contents,
         );
 
-        self.register_on_key(cx, *id);
+        self.register_on_key(cx, *window_id, *view_id);
 
         let palette = cx.get_or_default::<Palette>();
 
-        if let Some(window) = cx.world().get_window(*id)
+        if let Some(window) = cx.world().get_window(*window_id)
             && let Some(layer) = window.layers().first()
             && layer.widget() != contents.upcast()
         {
-            cx.set_window_base_layer(*id, *contents);
+            cx.set_window_base_layer(*window_id, *contents);
         }
 
         if self.title != old.title {
-            cx.set_window_title(*id, self.title.clone());
+            cx.set_window_title(*window_id, self.title.clone());
         }
 
         if self.sizing != old.sizing {
-            cx.set_window_sizing(*id, self.sizing);
+            cx.set_window_sizing(*window_id, self.sizing);
         }
 
         if self.visible != old.visible {
-            cx.set_window_visible(*id, self.visible);
+            cx.set_window_visible(*window_id, self.visible);
         }
 
         if self.decorated != old.decorated {
-            cx.set_window_decorated(*id, self.decorated);
+            cx.set_window_decorated(*window_id, self.decorated);
         }
 
         if self.color != old.color {
             let color = self.color.unwrap_or(palette.background);
-            cx.set_window_color(*id, color);
+            cx.set_window_color(*window_id, color);
         }
     }
 
     fn teardown(
         &mut self,
         _element: Self::Element,
-        (window, _, _): Self::State,
+        (window, _, _, _): Self::State,
         cx: &mut C,
         _data: &mut T,
     ) {
@@ -322,15 +331,15 @@ where
     fn event(
         &mut self,
         _element: &mut Self::Element,
-        (id, contents, state): &mut Self::State,
+        (window_id, view_id, contents, state): &mut Self::State,
         cx: &mut C,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        match event.get() {
-            Some(WindowEvent::Key(target, event)) if target == id => {
+        match event.take_targeted(*view_id) {
+            Some(WindowEvent::Key(event)) => {
                 for (key, mods, on_key) in &mut self.on_keys {
-                    if let KeyEvent::Down(event) = event
+                    if let KeyEvent::Down(ref event) = event
                         && event.key == *key
                         && event.modifiers == *mods
                     {
@@ -338,26 +347,24 @@ where
                     }
                 }
 
-                return if let Some(ref mut on_key) = self.on_key {
-                    on_key(data, event)
-                } else {
-                    Action::new()
+                return match self.on_key {
+                    Some(ref mut on_key) => on_key(data, &event),
+                    None => Action::new(),
                 };
             }
 
-            Some(WindowEvent::Pointer(target, event)) if target == id => {
+            Some(WindowEvent::Pointer(event)) => {
                 for (button, on_button) in &mut self.on_pointers {
-                    if let PointerEvent::Down(event) = event
+                    if let PointerEvent::Down(ref event) = event
                         && event.button == *button
                     {
                         return on_button(data, event);
                     }
                 }
 
-                return if let Some(ref mut on_pointer) = self.on_pointer {
-                    on_pointer(data, event)
-                } else {
-                    Action::new()
+                return match self.on_pointer {
+                    Some(ref mut on_pointer) => on_pointer(data, &event),
+                    None => Action::new(),
                 };
             }
 
@@ -366,11 +373,11 @@ where
 
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if let Some(window) = cx.world().get_window(*id)
+        if let Some(window) = cx.world().get_window(*window_id)
             && let Some(layer) = window.layers().first()
             && layer.widget() != contents.upcast()
         {
-            cx.set_window_base_layer(*id, *contents);
+            cx.set_window_base_layer(*window_id, *contents);
         }
 
         action
