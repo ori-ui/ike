@@ -18,8 +18,8 @@ pub mod prelude {
 
     pub use ike_core::{
         Axis, BorderWidth, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Key, KeyEvent,
-        Offset, Padding, Point, PointerButton, PointerEvent, Size, Svg, SvgData, TextAlign,
-        TextWrap, Transition, WindowSizing, include_svg,
+        Modifiers, NamedKey, Offset, Padding, Point, PointerButton, PointerEvent, Size, Svg,
+        SvgData, TextAlign, TextWrap, Transition, WindowSizing, include_svg,
         widgets::{Align, Fit, Justify, NewlineBehaviour, Picturable, SubmitBehaviour},
     };
 
