@@ -47,6 +47,9 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
         prev.parent = None;
     }
 
+    // unset the window of the previous child
+    set_window(world, prev, None);
+
     // set the parent of the new child
     if let Some(child) = world.widgets.get_hierarchy_mut(child) {
         child.parent = Some(parent_id);
@@ -90,7 +93,12 @@ pub(crate) fn remove_child(world: &mut World, parent: WidgetId, index: usize) ->
         parent.cx.request_draw();
     }
 
-    // set the window to `None` to handle the removal of hover, focus, and active
+    // unset the parent of the child
+    if let Some(child) = world.widgets.get_hierarchy_mut(parent) {
+        child.parent = None;
+    }
+
+    // unset the window of the child
     set_window(world, child, None);
 
     Some(child)
