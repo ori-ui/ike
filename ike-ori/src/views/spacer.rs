@@ -1,6 +1,8 @@
 use ike_core::{Builder, Size, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
 
+use crate::Context;
+
 pub fn spacer(size: impl Into<Size>) -> Spacer {
     Spacer::new(size)
 }
@@ -24,14 +26,11 @@ impl Spacer {
 }
 
 impl ViewMarker for Spacer {}
-impl<C, T> View<C, T> for Spacer
-where
-    C: Builder,
-{
+impl<T> View<Context, T> for Spacer {
     type Element = WidgetId<widgets::Spacer>;
     type State = ();
 
-    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let mut widget = widgets::Spacer::new(cx);
 
         widgets::Spacer::set_size(&mut widget, self.size);
@@ -43,7 +42,7 @@ where
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -56,7 +55,7 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C) {
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 
@@ -64,7 +63,7 @@ where
         &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
-        _cx: &mut C,
+        _cx: &mut Context,
         _data: &mut T,
         _event: &mut Event,
     ) -> Action {

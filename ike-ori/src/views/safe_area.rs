@@ -1,5 +1,7 @@
-use ike_core::{AnyWidgetId, Builder, Transition, WidgetId, widgets};
+use ike_core::{Builder, Transition, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
+
+use crate::Context;
 
 pub fn safe_area<V>(contents: V) -> SafeArea<V> {
     SafeArea::new(contents)
@@ -26,15 +28,14 @@ impl<V> SafeArea<V> {
 }
 
 impl<V> ViewMarker for SafeArea<V> {}
-impl<C, T, V> View<C, T> for SafeArea<V>
+impl<T, V> View<Context, T> for SafeArea<V>
 where
-    C: Builder,
-    V: View<C, T, Element: AnyWidgetId>,
+    V: crate::View<T>,
 {
     type Element = WidgetId<widgets::SafeArea>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let mut widget = widgets::SafeArea::new(cx, contents);
@@ -48,7 +49,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -60,10 +61,6 @@ where
             &mut old.contents,
         );
 
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
-
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
@@ -73,25 +70,24 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, (contents, state): Self::State, cx: &mut C) {
+    fn teardown(
+        &mut self,
+        element: Self::Element,
+        (contents, state): Self::State,
+        cx: &mut Context,
+    ) {
         self.contents.teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 
     fn event(
         &mut self,
-        element: &mut Self::Element,
+        _element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        let action = self.contents.event(contents, state, cx, data, event);
-
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
-
-        action
+        self.contents.event(contents, state, cx, data, event)
     }
 }

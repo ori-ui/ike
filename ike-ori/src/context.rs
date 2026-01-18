@@ -1,7 +1,7 @@
-use std::{any::Any, sync::Arc};
+use std::{any::Any, mem, sync::Arc};
 
-use ike_core::{AnyWidgetId, Builder, WidgetId, World};
-use ori::{BaseElement, Provider, Proxied, Proxy, Super};
+use ike_core::{AnyWidgetId, Builder, Widget, WidgetId, World};
+use ori::{BaseElement, Element, Provider, Proxied, Proxy, Super};
 
 use crate::Resources;
 
@@ -51,28 +51,53 @@ impl Provider for Context {
     }
 }
 
-pub trait View<T>: ori::View<Context, T, Element: AnyWidgetId> {}
+pub trait View<T>: ori::View<Context, T, Element = WidgetId<Self::Widget>> {
+    type Widget: Widget + ?Sized;
+}
+
+impl<T, V, W> View<T> for V
+where
+    V: ori::View<Context, T, Element = WidgetId<W>>,
+    W: Widget + ?Sized,
+{
+    type Widget = W;
+}
+
 pub trait Effect<T>: ori::Effect<Context, T> {}
 
-impl<T, V> View<T> for V where V: ori::View<Context, T, Element: AnyWidgetId> {}
 impl<T, V> Effect<T> for V where V: ori::Effect<Context, T> {}
 
-impl<S> Super<Context, S> for WidgetId
+impl<T> Element<Context> for WidgetId<T>
 where
-    S: AnyWidgetId,
+    T: ?Sized,
 {
-    fn upcast(_cx: &mut Context, sub: S) -> Self {
+    type Mut<'a>
+        = &'a mut WidgetId<T>
+    where
+        T: 'a;
+}
+
+impl<T> Super<Context, WidgetId<T>> for WidgetId
+where
+    T: ?Sized,
+{
+    fn replace(cx: &mut Context, this: &mut Self, other: WidgetId<T>) -> Self {
+        cx.replace_widget(*this, other);
+        mem::replace(this, other.upcast())
+    }
+
+    fn upcast(_cx: &mut Context, sub: WidgetId<T>) -> Self {
         sub.upcast()
     }
 
-    fn downcast(self) -> S {
-        S::downcast_unchecked(self)
+    fn downcast(self) -> WidgetId<T> {
+        AnyWidgetId::downcast_unchecked(self)
     }
 
-    fn downcast_with<T>(&mut self, f: impl FnOnce(&mut S) -> T) -> T {
-        let mut id = self.downcast();
+    fn downcast_with<U>(this: &mut Self, f: impl FnOnce(&mut WidgetId<T>) -> U) -> U {
+        let mut id = this.downcast();
         let output = f(&mut id);
-        *self = id.upcast();
+        *this = id.upcast();
         output
     }
 }

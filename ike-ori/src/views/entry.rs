@@ -5,7 +5,7 @@ use ike_core::{
 };
 use ori::{Action, Event, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
-use crate::{Palette, views::TextTheme};
+use crate::{Context, Palette, views::TextTheme};
 
 #[derive(Clone, Debug)]
 pub struct EntryTheme {
@@ -378,14 +378,11 @@ enum EntryEvent {
 }
 
 impl<T> ViewMarker for Entry<T> {}
-impl<C, T> View<C, T> for Entry<T>
-where
-    C: Builder + Proxied + Provider,
-{
+impl<T> View<Context, T> for Entry<T> {
     type Element = WidgetId<widgets::Entry>;
     type State = ViewId;
 
-    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<EntryTheme>();
@@ -459,7 +456,7 @@ where
         &mut self,
         element: &mut Self::Element,
         _id: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -570,15 +567,11 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _id: Self::State, cx: &mut C) {
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         _element: &mut Self::Element,
         id: &mut Self::State,
-        _cx: &mut C,
+        _cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
@@ -587,5 +580,9 @@ where
             Some(EntryEvent::Submit(text)) => (self.on_submit)(data, text),
             None => Action::new(),
         }
+    }
+
+    fn teardown(&mut self, element: Self::Element, _id: Self::State, cx: &mut Context) {
+        cx.remove_widget(element);
     }
 }

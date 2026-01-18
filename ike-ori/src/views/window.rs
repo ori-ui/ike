@@ -4,7 +4,7 @@ use ike_core::{
 };
 use ori::{Action, Event, NoElement, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
-use crate::Palette;
+use crate::{Context, Palette};
 
 pub fn window<V, T>(contents: V) -> Window<V, T> {
     Window::new(contents)
@@ -239,15 +239,14 @@ enum WindowEvent {
 }
 
 impl<V, T> ViewMarker for Window<V, T> {}
-impl<C, T, V> View<C, T> for Window<V, T>
+impl<T, V> View<Context, T> for Window<V, T>
 where
-    C: Builder + Provider + Proxied,
-    V: View<C, T, Element: AnyWidgetId>,
+    V: crate::View<T>,
 {
     type Element = NoElement;
     type State = (WindowId, ViewId, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -271,9 +270,9 @@ where
 
     fn rebuild(
         &mut self,
-        _element: &mut Self::Element,
+        _element: (),
         (window_id, view_id, contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -318,15 +317,11 @@ where
         }
     }
 
-    fn teardown(&mut self, _element: Self::Element, (window, _, _, _): Self::State, cx: &mut C) {
-        cx.world_mut().remove_window(window);
-    }
-
     fn event(
         &mut self,
-        _element: &mut Self::Element,
+        _element: (),
         (window_id, view_id, contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
@@ -375,5 +370,9 @@ where
         }
 
         action
+    }
+
+    fn teardown(&mut self, _element: NoElement, (window, _, _, _): Self::State, cx: &mut Context) {
+        cx.world_mut().remove_window(window);
     }
 }

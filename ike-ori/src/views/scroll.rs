@@ -1,9 +1,7 @@
-use ike_core::{
-    AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
-};
+use ike_core::{BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets};
 use ori::{Action, Event, Provider, View, ViewMarker};
 
-use crate::Palette;
+use crate::{Context, Palette};
 
 pub fn vscroll<V>(contents: V) -> Scroll<V> {
     Scroll::new(contents).vertical(true)
@@ -178,15 +176,14 @@ impl<V> Scroll<V> {
 }
 
 impl<V> ViewMarker for Scroll<V> {}
-impl<C, T, V> View<C, T> for Scroll<V>
+impl<T, V> View<Context, T> for Scroll<V>
 where
-    C: Builder + Provider,
-    V: View<C, T, Element: AnyWidgetId>,
+    V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Scroll>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -224,7 +221,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -238,10 +235,6 @@ where
 
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ScrollTheme>();
-
-        if !widgets::Scroll::is_child(cx, *element, *contents) {
-            widgets::Scroll::set_child(cx, *element, *contents);
-        }
 
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
@@ -305,25 +298,24 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, (contents, state): Self::State, cx: &mut C) {
-        self.contents.teardown(contents, state, cx);
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
-        element: &mut Self::Element,
+        _element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        let action = self.contents.event(contents, state, cx, data, event);
+        self.contents.event(contents, state, cx, data, event)
+    }
 
-        if !widgets::Scroll::is_child(cx, *element, *contents) {
-            widgets::Scroll::set_child(cx, *element, *contents);
-        }
-
-        action
+    fn teardown(
+        &mut self,
+        element: Self::Element,
+        (contents, state): Self::State,
+        cx: &mut Context,
+    ) {
+        self.contents.teardown(contents, state, cx);
+        cx.remove_widget(element);
     }
 }

@@ -4,7 +4,7 @@ use ike_core::{
 };
 use ori::{Action, Provider, View, ViewId, ViewMarker};
 
-use crate::{Palette, views::TextTheme};
+use crate::{Context, Palette, views::TextTheme};
 
 #[derive(Clone, Debug)]
 pub struct ProseTheme {
@@ -212,14 +212,11 @@ impl Prose {
 }
 
 impl ViewMarker for Prose {}
-impl<C, T> View<C, T> for Prose
-where
-    C: Builder + Provider,
-{
+impl<T> View<Context, T> for Prose {
     type Element = WidgetId<widgets::TextArea<false>>;
     type State = ViewId;
 
-    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<ProseTheme>();
@@ -249,7 +246,7 @@ where
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -298,18 +295,18 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C) {
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         _element: &mut Self::Element,
         _id: &mut Self::State,
-        _cx: &mut C,
+        _cx: &mut Context,
         _data: &mut T,
         _event: &mut ori::Event,
     ) -> Action {
         Action::new()
+    }
+
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+        cx.remove_widget(element);
     }
 }

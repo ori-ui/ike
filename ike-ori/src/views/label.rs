@@ -4,7 +4,7 @@ use ike_core::{
 };
 use ori::{Action, Provider, View, ViewMarker};
 
-use crate::{Palette, views::TextTheme};
+use crate::{Context, Palette, views::TextTheme};
 
 pub fn label(text: impl ToString) -> Label {
     Label::new(text)
@@ -114,14 +114,11 @@ impl Label {
 }
 
 impl ViewMarker for Label {}
-impl<C, T> View<C, T> for Label
-where
-    C: Builder + Provider,
-{
+impl<T> View<Context, T> for Label {
     type Element = WidgetId<widgets::Label>;
     type State = ();
 
-    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<TextTheme>();
 
@@ -135,7 +132,7 @@ where
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -160,7 +157,7 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C) {
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 
@@ -168,7 +165,7 @@ where
         &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
-        _cx: &mut C,
+        _cx: &mut Context,
         _data: &mut T,
         _event: &mut ori::Event,
     ) -> Action {

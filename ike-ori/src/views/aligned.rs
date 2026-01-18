@@ -1,6 +1,8 @@
 use ike_core::{AnyWidgetId, Builder, WidgetId, widgets};
 use ori::{Action, Event, View, ViewMarker};
 
+use crate::Context;
+
 pub fn align<V>(x: f32, y: f32, contents: V) -> Aligned<V> {
     Aligned { contents, x, y }
 }
@@ -48,15 +50,14 @@ pub struct Aligned<V> {
 }
 
 impl<V> ViewMarker for Aligned<V> {}
-impl<C, T, V> View<C, T> for Aligned<V>
+impl<T, V> View<Context, T> for Aligned<V>
 where
-    C: Builder,
-    V: View<C, T, Element: AnyWidgetId>,
+    V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Aligned>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let element = widgets::Aligned::new(cx, self.x, self.y, contents.upcast());
@@ -68,7 +69,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -80,10 +81,6 @@ where
             &mut old.contents,
         );
 
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
-
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
@@ -93,25 +90,24 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, (contents, state): Self::State, cx: &mut C) {
-        self.contents.teardown(contents, state, cx);
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
-        element: &mut Self::Element,
+        _element: &mut Self::Element,
         (contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        let action = self.contents.event(contents, state, cx, data, event);
+        self.contents.event(contents, state, cx, data, event)
+    }
 
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
-
-        action
+    fn teardown(
+        &mut self,
+        element: Self::Element,
+        (contents, state): Self::State,
+        cx: &mut Context,
+    ) {
+        self.contents.teardown(contents, state, cx);
+        cx.remove_widget(element);
     }
 }

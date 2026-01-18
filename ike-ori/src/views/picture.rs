@@ -4,6 +4,8 @@ use ike_core::{
 };
 use ori::{Action, Event, View, ViewMarker};
 
+use crate::Context;
+
 pub fn picture(fit: Fit, content: impl Into<Picturable>) -> Picture {
     Picture::new(fit, content)
 }
@@ -30,14 +32,11 @@ impl Picture {
 }
 
 impl ViewMarker for Picture {}
-impl<C, T> View<C, T> for Picture
-where
-    C: Builder,
-{
+impl<T> View<Context, T> for Picture {
     type Element = WidgetId<widgets::Picture>;
     type State = ();
 
-    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let mut widget = widgets::Picture::new(cx, self.contents.clone());
         widgets::Picture::set_fit(&mut widget, self.fit);
         widgets::Picture::set_color(&mut widget, self.color);
@@ -49,7 +48,7 @@ where
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -70,18 +69,18 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C) {
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
-        _cx: &mut C,
+        _cx: &mut Context,
         _data: &mut T,
         _event: &mut Event,
     ) -> Action {
         Action::new()
+    }
+
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+        cx.remove_widget(element);
     }
 }

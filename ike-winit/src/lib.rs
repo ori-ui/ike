@@ -397,7 +397,7 @@ impl<T> AppState<'_, T> {
                 if let Some(ref mut state) = self.state {
                     let mut view = (self.build)(self.data);
                     view.any_rebuild(
-                        &mut ori::NoElement,
+                        (),
                         state,
                         &mut self.context,
                         self.data,
@@ -413,7 +413,7 @@ impl<T> AppState<'_, T> {
 
                 if let Some(ref mut state) = self.state {
                     let action = self.view.any_event(
-                        &mut ori::NoElement,
+                        (),
                         state,
                         &mut self.context,
                         self.data,

@@ -356,7 +356,7 @@ impl<'a, T> EventLoop<'a, T> {
                 let mut view = (self.build)(self.data);
                 ori::View::rebuild(
                     &mut view,
-                    &mut ori::NoElement,
+                    (),
                     &mut self.state,
                     &mut self.context,
                     self.data,
@@ -368,7 +368,7 @@ impl<'a, T> EventLoop<'a, T> {
             Event::Event(mut event) => {
                 let action = ori::View::event(
                     &mut self.view,
-                    &mut ori::NoElement,
+                    (),
                     &mut self.state,
                     &mut self.context,
                     self.data,

@@ -1,7 +1,7 @@
 use ike_core::{Axis, Builder, Color, CornerRadius, WidgetId, widgets};
 use ori::{Action, Event, Provider, View, ViewMarker};
 
-use crate::Palette;
+use crate::{Context, Palette};
 
 pub fn divider(axis: Axis) -> Divider {
     Divider::new(axis)
@@ -105,14 +105,11 @@ impl Divider {
 }
 
 impl ViewMarker for Divider {}
-impl<C, T> View<C, T> for Divider
-where
-    C: Builder + Provider,
-{
+impl<T> View<Context, T> for Divider {
     type Element = WidgetId<widgets::Divider>;
     type State = ();
 
-    fn build(&mut self, cx: &mut C, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<DividerTheme>();
 
@@ -138,7 +135,7 @@ where
         &mut self,
         element: &mut Self::Element,
         _state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         _data: &mut T,
         old: &mut Self,
     ) {
@@ -179,18 +176,18 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut C) {
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
-        _cx: &mut C,
+        _cx: &mut Context,
         _data: &mut T,
         _event: &mut Event,
     ) -> Action {
         Action::new()
+    }
+
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+        cx.remove_widget(element);
     }
 }

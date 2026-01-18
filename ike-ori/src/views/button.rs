@@ -1,9 +1,7 @@
-use ike_core::{
-    AnyWidgetId, BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets,
-};
+use ike_core::{BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets};
 use ori::{Action, Event, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
-use crate::Palette;
+use crate::{Context, Palette};
 
 pub fn button<T, V, A>(contents: V, on_click: impl FnMut(&mut T) -> A + 'static) -> Button<T, V>
 where
@@ -181,15 +179,14 @@ enum ButtonEvent {
 }
 
 impl<T, V> ViewMarker for Button<T, V> {}
-impl<C, T, V> View<C, T> for Button<T, V>
+impl<T, V> View<Context, T> for Button<T, V>
 where
-    C: Builder + Proxied + Provider,
-    V: View<C, T, Element: AnyWidgetId>,
+    V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Button>;
     type State = (ViewId, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -230,7 +227,7 @@ where
         &mut self,
         element: &mut Self::Element,
         (_id, contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -244,10 +241,6 @@ where
 
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ButtonTheme>();
-
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
 
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
@@ -299,33 +292,29 @@ where
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        (_id, contents, state): Self::State,
-        cx: &mut C,
-    ) {
-        self.contents.teardown(contents, state, cx);
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
-        element: &mut Self::Element,
+        _element: &mut Self::Element,
         (id, contents, state): &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
         let action = self.contents.event(contents, state, cx, data, event);
 
-        if !cx.is_child(*element, *contents) {
-            cx.set_child(*element, 0, *contents);
-        }
-
         match event.take_targeted(*id) {
             Some(ButtonEvent::Clicked) => action | (self.on_click)(data),
             None => action,
         }
+    }
+
+    fn teardown(
+        &mut self,
+        element: Self::Element,
+        (_id, contents, state): Self::State,
+        cx: &mut Context,
+    ) {
+        self.contents.teardown(contents, state, cx);
+        cx.remove_widget(element);
     }
 }

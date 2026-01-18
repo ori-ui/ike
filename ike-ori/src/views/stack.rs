@@ -1,8 +1,10 @@
+use std::mem;
+
 use ike_core::{
     AnyWidgetId, Axis, Builder, WidgetId,
     widgets::{self, Align, Justify},
 };
-use ori::{Action, ElementSeq, Event, Super, View, ViewMarker, ViewSeq};
+use ori::{Action, Element, Elements, Event, Super, View, ViewMarker, ViewSeq};
 
 use crate::context::Context;
 
@@ -54,18 +56,15 @@ impl<V> Stack<V> {
 }
 
 impl<V> ViewMarker for Stack<V> {}
-impl<C, T, V> View<C, T> for Stack<V>
+impl<T, V> View<Context, T> for Stack<V>
 where
-    C: Builder,
-    V: ViewSeq<C, T, Flex<WidgetId>>,
+    V: ViewSeq<Context, T, Flex<WidgetId>>,
 {
     type Element = WidgetId<widgets::Stack>;
-    type State = (V::Elements, V::State);
+    type State = (Vec<Flex<WidgetId>>, V::State);
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
-        let (children, states) = self.contents.seq_build(cx, data);
-
-        let widget = {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+        let element = {
             let mut widget = widgets::Stack::new(cx);
 
             widgets::Stack::set_axis(&mut widget, self.axis);
@@ -76,32 +75,31 @@ where
             widget.id()
         };
 
-        for child in children.iter() {
-            cx.add_child(widget, child.contents);
-        }
+        let mut elements = Vec::new();
+        let states = self.contents.seq_build(
+            &mut FlexElements::new(element, &mut elements),
+            cx,
+            data,
+        );
 
-        update_flex(cx, widget, &children);
-
-        (widget, (children, states))
+        (element, (elements, states))
     }
 
     fn rebuild(
         &mut self,
         element: &mut Self::Element,
-        (children, states): &mut Self::State,
-        cx: &mut C,
+        (elements, states): &mut Self::State,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
         self.contents.seq_rebuild(
-            children,
+            &mut FlexElements::new(*element, elements),
             states,
             cx,
             data,
             &mut old.contents,
         );
-
-        update_children(cx, *element, children);
 
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
@@ -124,79 +122,36 @@ where
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, (children, states): Self::State, cx: &mut C) {
-        self.contents.seq_teardown(children, states, cx);
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         element: &mut Self::Element,
-        (children, states): &mut Self::State,
-        cx: &mut C,
+        (elements, states): &mut Self::State,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        let action = self.contents.seq_event(children, states, cx, data, event);
-
-        update_children(cx, *element, children);
-
-        action
-    }
-}
-
-fn update_children(
-    cx: &mut impl Builder,
-    widget: WidgetId<widgets::Stack>,
-    children: &mut impl ElementSeq<Flex<WidgetId>>,
-) {
-    for child in children.iter() {
-        if !cx.is_child(widget, child.contents) {
-            cx.add_child(widget, child.contents);
-        }
+        self.contents.seq_event(
+            &mut FlexElements::new(*element, elements),
+            states,
+            cx,
+            data,
+            event,
+        )
     }
 
-    for (i, child) in children.iter().enumerate() {
-        let children = cx.children(widget);
+    fn teardown(
+        &mut self,
+        element: Self::Element,
+        (mut elements, states): Self::State,
+        cx: &mut Context,
+    ) {
+        self.contents.seq_teardown(
+            &mut FlexElements::new(element, &mut elements),
+            states,
+            cx,
+        );
 
-        if children[i] != child.contents {
-            let index = children
-                .iter()
-                .position(|c| *c == child.contents)
-                .expect("child should not have been removed");
-
-            cx.swap_children(widget, i, index);
-        }
-    }
-
-    let cur_len = cx.children(widget).len();
-    let new_len = children.count();
-
-    for _ in new_len..cur_len {
-        let child = *cx
-            .children(widget)
-            .last()
-            .expect("there should be at least one child");
-
-        cx.remove_widget(child);
-    }
-
-    update_flex(cx, widget, children);
-}
-
-fn update_flex(
-    cx: &mut impl Builder,
-    widget: WidgetId<widgets::Stack>,
-    children: &impl ElementSeq<Flex<WidgetId>>,
-) {
-    if let Ok(mut widget) = cx.get_widget_mut(widget) {
-        for (i, child) in children.iter().enumerate() {
-            let (flex, tight) = widget.widget.get_flex(i);
-
-            if flex != child.flex || tight != child.tight {
-                widgets::Stack::set_flex(&mut widget, i, child.flex, child.tight);
-            }
-        }
+        cx.remove_widget(element);
     }
 }
 
@@ -231,14 +186,14 @@ impl<V> Flex<V> {
 }
 
 impl<V> ViewMarker for Flex<V> {}
-impl<C, T, V> View<C, T> for Flex<V>
+impl<T, V> View<Context, T> for Flex<V>
 where
-    V: View<C, T>,
+    V: crate::View<T>,
 {
     type Element = Flex<V::Element>;
     type State = V::State;
 
-    fn build(&mut self, cx: &mut C, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
         let element = Flex {
             contents: element,
@@ -253,7 +208,7 @@ where
         &mut self,
         element: &mut Self::Element,
         state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         old: &mut Self,
     ) {
@@ -266,15 +221,11 @@ where
         );
     }
 
-    fn teardown(&mut self, element: Self::Element, state: Self::State, cx: &mut C) {
-        self.contents.teardown(element.contents, state, cx);
-    }
-
     fn event(
         &mut self,
         element: &mut Self::Element,
         state: &mut Self::State,
-        cx: &mut C,
+        cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
@@ -286,13 +237,101 @@ where
             event,
         )
     }
+
+    fn teardown(&mut self, element: Self::Element, state: Self::State, cx: &mut Context) {
+        self.contents.teardown(element.contents, state, cx);
+    }
 }
 
-impl<S> Super<Context, S> for Flex<WidgetId>
+struct FlexElements<'a> {
+    widget:   WidgetId<widgets::Stack>,
+    elements: &'a mut Vec<Flex<WidgetId>>,
+    index:    usize,
+}
+
+impl<'a> FlexElements<'a> {
+    fn new(widget: WidgetId<widgets::Stack>, elements: &'a mut Vec<Flex<WidgetId>>) -> Self {
+        Self {
+            widget,
+            elements,
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Elements<Context, Flex<WidgetId>> for FlexElements<'a> {
+    fn next(&mut self, cx: &mut Context) -> Option<&mut Flex<WidgetId>> {
+        let element = self.elements.get_mut(self.index)?;
+
+        if let Ok(mut widget) = cx.get_widget_mut(self.widget) {
+            widgets::Stack::set_flex(
+                &mut widget,
+                self.index,
+                element.flex,
+                element.tight,
+            );
+        }
+
+        self.index += 1;
+        Some(element)
+    }
+
+    fn insert(&mut self, cx: &mut Context, element: Flex<WidgetId>) {
+        cx.insert_child(
+            self.widget,
+            self.index,
+            element.contents,
+        );
+
+        if let Ok(mut widget) = cx.get_widget_mut(self.widget) {
+            widgets::Stack::set_flex(
+                &mut widget,
+                self.index,
+                element.flex,
+                element.tight,
+            );
+        }
+
+        self.elements.insert(self.index, element);
+        self.index += 1;
+    }
+
+    fn remove(&mut self, cx: &mut Context) -> Option<Flex<WidgetId>> {
+        cx.remove_child(self.widget, self.index);
+        Some(self.elements.remove(self.index))
+    }
+
+    fn swap(&mut self, cx: &mut Context, offset: usize) {
+        cx.swap_children(
+            self.widget,
+            self.index,
+            self.index + offset,
+        );
+
+        self.elements.swap(self.index, self.index + offset);
+    }
+}
+
+impl<V> Element<Context> for Flex<V> {
+    type Mut<'a>
+        = &'a mut Self
+    where
+        V: 'a;
+}
+
+impl<T> Super<Context, WidgetId<T>> for Flex<WidgetId>
 where
-    S: AnyWidgetId,
+    T: ?Sized,
 {
-    fn upcast(_cx: &mut Context, sub: S) -> Self {
+    fn replace(cx: &mut Context, this: &mut Self, other: WidgetId<T>) -> Self {
+        cx.replace_widget(this.contents, other);
+        this.contents = other.upcast();
+        this.flex = 0.0;
+        this.tight = false;
+        *this
+    }
+
+    fn upcast(_cx: &mut Context, sub: WidgetId<T>) -> Self {
         Flex {
             contents: sub.upcast(),
             flex:     0.0,
@@ -300,20 +339,28 @@ where
         }
     }
 
-    fn downcast(self) -> S {
+    fn downcast(self) -> WidgetId<T> {
         self.contents.downcast()
     }
 
-    fn downcast_with<T>(&mut self, f: impl FnOnce(&mut S) -> T) -> T {
-        self.contents.downcast_with(f)
+    fn downcast_with<U>(this: &mut Self, f: impl FnOnce(&mut WidgetId<T>) -> U) -> U {
+        let mut widget = this.downcast();
+        let output = f(&mut widget);
+        this.contents = widget.upcast();
+        output
     }
 }
 
-impl<S> Super<Context, Flex<S>> for Flex<WidgetId>
+impl<T> Super<Context, Flex<WidgetId<T>>> for Flex<WidgetId>
 where
-    S: AnyWidgetId,
+    T: ?Sized,
 {
-    fn upcast(_cx: &mut Context, sub: Flex<S>) -> Self {
+    fn replace(cx: &mut Context, this: &mut Flex<WidgetId>, other: Flex<WidgetId<T>>) -> Self {
+        cx.replace_widget(this.contents, other.contents);
+        mem::replace(this, Flex::upcast(cx, other))
+    }
+
+    fn upcast(_cx: &mut Context, sub: Flex<WidgetId<T>>) -> Self {
         Self {
             contents: sub.contents.upcast(),
             flex:     sub.flex,
@@ -321,7 +368,7 @@ where
         }
     }
 
-    fn downcast(self) -> Flex<S> {
+    fn downcast(self) -> Flex<WidgetId<T>> {
         Flex {
             contents: self.contents.downcast(),
             flex:     self.flex,
@@ -329,11 +376,12 @@ where
         }
     }
 
-    fn downcast_with<T>(&mut self, f: impl FnOnce(&mut Flex<S>) -> T) -> T {
-        let mut flex: Flex<S> = self.downcast();
-        let output = f(&mut flex);
-        self.contents = flex.contents.upcast();
-        self.flex = flex.flex;
+    fn downcast_with<U>(this: &mut Self, f: impl FnOnce(&mut Flex<WidgetId<T>>) -> U) -> U {
+        let mut widget = this.downcast();
+        let output = f(&mut widget);
+        this.contents = widget.contents.upcast();
+        this.flex = widget.flex;
+        this.tight = widget.tight;
         output
     }
 }

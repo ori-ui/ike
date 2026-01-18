@@ -55,9 +55,24 @@ pub trait Builder {
     where
         Self: Sized,
     {
-        passes::hierarchy::add_child(
+        let index = self.children(parent).len();
+
+        passes::hierarchy::insert_child(
             self.world_mut(),
             parent.upcast(),
+            index,
+            child.upcast(),
+        );
+    }
+
+    fn insert_child(&mut self, parent: impl AnyWidgetId, index: usize, child: impl AnyWidgetId)
+    where
+        Self: Sized,
+    {
+        passes::hierarchy::insert_child(
+            self.world_mut(),
+            parent.upcast(),
+            index,
             child.upcast(),
         );
     }
@@ -84,6 +99,40 @@ pub trait Builder {
             index_a,
             index_b,
         );
+    }
+
+    fn replace_widget(&mut self, widget: impl AnyWidgetId, other: impl AnyWidgetId)
+    where
+        Self: Sized,
+    {
+        let Ok((parent, window)) = self
+            .get_widget(widget.upcast())
+            .map(|widget| (widget.cx.parent(), widget.cx.window()))
+        else {
+            return;
+        };
+
+        if let Some(parent) = parent {
+            if let Some(index) = self
+                .children(parent)
+                .iter()
+                .position(|x| *x == other.upcast())
+            {
+                self.set_child(parent, index, other)
+            }
+        } else if let Some(window) = window {
+            self.set_window_base_layer(window, other);
+        }
+    }
+
+    fn remove_child(&mut self, parent: impl AnyWidgetId, index: usize) -> Option<WidgetId>
+    where
+        Self: Sized,
+    {
+        let world = self.world_mut();
+        let parent = parent.upcast();
+
+        passes::hierarchy::remove_child(world, parent, index)
     }
 
     fn set_stashed(&mut self, widget: impl AnyWidgetId, is_stashed: bool)

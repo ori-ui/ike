@@ -5,22 +5,22 @@ use crate::{
     debug::debug_panic, passes, world::Widgets,
 };
 
-pub(crate) fn add_child(world: &mut World, parent: WidgetId, child: WidgetId) {
+pub(crate) fn insert_child(world: &mut World, parent: WidgetId, index: usize, child: WidgetId) {
     if let Some(child) = world.widgets.get_hierarchy_mut(child) {
         child.parent = Some(parent);
     }
 
     if let Some(parent) = world.widgets.get_hierarchy_mut(parent) {
-        parent.children_mut().push(child);
+        parent.children_mut().insert(index, child);
     }
 
     propagate_up(world, parent);
 
     if let Ok(mut parent) = world.widget_mut(parent) {
-        let index = parent.cx.hierarchy.children.len() - 1;
-        let update = Update::Children(ChildUpdate::Added(index));
+        let update = Update::Children(ChildUpdate::Inserted(index));
         passes::update::widget(&mut parent, update);
         parent.cx.request_layout();
+        parent.cx.request_draw();
     }
 }
 
@@ -59,6 +59,7 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
         let update = Update::Children(ChildUpdate::Replaced(index));
         passes::update::widget(&mut parent, update);
         parent.cx.request_layout();
+        parent.cx.request_draw();
     }
 }
 
@@ -74,7 +75,25 @@ pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize,
         let update = Update::Children(ChildUpdate::Swapped(index_a, index_b));
         passes::update::widget(&mut parent, update);
         parent.cx.request_layout();
+        parent.cx.request_draw();
     }
+}
+
+pub(crate) fn remove_child(world: &mut World, parent: WidgetId, index: usize) -> Option<WidgetId> {
+    let hierarchy = world.widgets.get_hierarchy_mut(parent)?;
+    let child = hierarchy.children_mut().remove(index);
+
+    if let Ok(mut parent) = world.widget_mut(parent) {
+        let update = Update::Children(ChildUpdate::Removed(index));
+        passes::update::widget(&mut parent, update);
+        parent.cx.request_layout();
+        parent.cx.request_draw();
+    }
+
+    // set the window to `None` to handle the removal of hover, focus, and active
+    set_window(world, child, None);
+
+    Some(child)
 }
 
 pub(crate) fn remove(world: &mut World, widget: WidgetId) {
@@ -110,6 +129,7 @@ pub(crate) fn remove(world: &mut World, widget: WidgetId) {
             let update = Update::Children(ChildUpdate::Removed(index));
             passes::update::widget(&mut parent, update);
             parent.cx.request_layout();
+            parent.cx.request_draw();
         }
     }
 

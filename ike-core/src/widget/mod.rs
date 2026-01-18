@@ -150,7 +150,7 @@ pub enum Update {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ChildUpdate {
-    Added(usize),
+    Inserted(usize),
     Removed(usize),
     Replaced(usize),
     Swapped(usize, usize),
