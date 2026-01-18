@@ -63,10 +63,10 @@ impl App {
         let subscriber = tracing_subscriber::registry().with(filter);
 
         let subscriber = {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(backend = "android"))]
             let fmt_layer = tracing_subscriber::fmt::layer();
 
-            #[cfg(target_os = "android")]
+            #[cfg(backend = "android")]
             let fmt_layer = tracing_subscriber::fmt::layer() // android uses it's own logging
                 .with_writer(ike_android::MakeAndroidWriter);
 
