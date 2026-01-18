@@ -7,6 +7,11 @@ use crate::{
 
 pub(crate) fn insert_child(world: &mut World, parent: WidgetId, index: usize, child: WidgetId) {
     if let Some(child) = world.widgets.get_hierarchy_mut(child) {
+        debug_assert!(
+            child.parent.is_none(),
+            "insert_child `child` already has a parent",
+        );
+
         child.parent = Some(parent);
     }
 
@@ -24,20 +29,22 @@ pub(crate) fn insert_child(world: &mut World, parent: WidgetId, index: usize, ch
     }
 }
 
-pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child: WidgetId) {
-    debug_assert!(!world.is_child(parent, child));
+pub(crate) fn set_child(
+    world: &mut World,
+    parent: WidgetId,
+    index: usize,
+    child: WidgetId,
+) -> Option<WidgetId> {
+    debug_assert!(
+        !world.is_child(parent, child),
+        "set_child `child` is already a child of `parent`",
+    );
 
     let parent_id = parent;
-
-    let Some(parent) = world.widgets.get_hierarchy_mut(parent) else {
-        return;
-    };
+    let parent = world.widgets.get_hierarchy_mut(parent)?;
 
     // get the current child
-    let Some(current) = parent.children_mut().get_mut(index) else {
-        debug_panic!("set_child called with invalid index");
-        return;
-    };
+    let current = parent.children_mut().get_mut(index)?;
 
     // replace the current child with the new child
     let prev = mem::replace(current, child);
@@ -52,6 +59,11 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
 
     // set the parent of the new child
     if let Some(child) = world.widgets.get_hierarchy_mut(child) {
+        debug_assert!(
+            child.parent.is_none(),
+            "set_child `child` already has a parent",
+        );
+
         child.parent = Some(parent_id);
     }
 
@@ -64,6 +76,8 @@ pub(crate) fn set_child(world: &mut World, parent: WidgetId, index: usize, child
         parent.cx.request_layout();
         parent.cx.request_draw();
     }
+
+    Some(prev)
 }
 
 pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize, index_b: usize) {
@@ -82,9 +96,40 @@ pub(crate) fn swap_children(world: &mut World, parent: WidgetId, index_a: usize,
     }
 }
 
+pub(crate) fn replace_widget(world: &mut World, widget: WidgetId, other: WidgetId) {
+    let Ok((parent, window)) = world
+        .get_widget(widget)
+        .map(|widget| (widget.cx.parent(), widget.cx.window()))
+    else {
+        return;
+    };
+
+    if let Some(parent) = parent {
+        if let Some(index) = world.children(parent).iter().position(|x| *x == other) {
+            world.set_child(parent, index, other);
+        }
+    } else if let Some(window) = window {
+        if let Some(window) = world.window_mut(window)
+            && let Some(layer) = window
+                .layers_mut()
+                .iter_mut()
+                .find(|layer| layer.widget == widget)
+        {
+            layer.widget = other;
+        }
+
+        set_window(world, other, Some(window));
+
+        if let Ok(mut widget) = world.widget_mut(other) {
+            widget.cx.request_layout();
+            widget.cx.request_draw();
+        }
+    }
+}
+
 pub(crate) fn remove_child(world: &mut World, parent: WidgetId, index: usize) -> Option<WidgetId> {
     let hierarchy = world.widgets.get_hierarchy_mut(parent)?;
-    let child = hierarchy.children_mut().remove(index);
+    let child = *hierarchy.children_mut().get(index)?;
 
     if let Ok(mut parent) = world.widget_mut(parent) {
         let update = Update::Children(ChildUpdate::Removed(index));
@@ -93,8 +138,12 @@ pub(crate) fn remove_child(world: &mut World, parent: WidgetId, index: usize) ->
         parent.cx.request_draw();
     }
 
+    if let Some(parent) = world.widgets.get_hierarchy_mut(parent) {
+        parent.children_mut().remove(index);
+    }
+
     // unset the parent of the child
-    if let Some(child) = world.widgets.get_hierarchy_mut(parent) {
+    if let Some(child) = world.widgets.get_hierarchy_mut(child) {
         child.parent = None;
     }
 

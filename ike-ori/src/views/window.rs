@@ -372,7 +372,13 @@ where
         action
     }
 
-    fn teardown(&mut self, _element: NoElement, (window, _, _, _): Self::State, cx: &mut Context) {
+    fn teardown(
+        &mut self,
+        _element: NoElement,
+        (window, _, element, state): Self::State,
+        cx: &mut Context,
+    ) {
+        self.contents.teardown(element, state, cx);
         cx.world_mut().remove_window(window);
     }
 }

@@ -105,24 +105,11 @@ pub trait Builder {
     where
         Self: Sized,
     {
-        let Ok((parent, window)) = self
-            .get_widget(widget.upcast())
-            .map(|widget| (widget.cx.parent(), widget.cx.window()))
-        else {
-            return;
-        };
-
-        if let Some(parent) = parent {
-            if let Some(index) = self
-                .children(parent)
-                .iter()
-                .position(|x| *x == other.upcast())
-            {
-                self.set_child(parent, index, other)
-            }
-        } else if let Some(window) = window {
-            self.set_window_base_layer(window, other);
-        }
+        passes::hierarchy::replace_widget(
+            self.world_mut(),
+            widget.upcast(),
+            other.upcast(),
+        );
     }
 
     fn remove_child(&mut self, parent: impl AnyWidgetId, index: usize) -> Option<WidgetId>

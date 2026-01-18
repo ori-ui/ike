@@ -157,10 +157,6 @@ impl<T> View<Context, T> for Label {
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         _element: &mut Self::Element,
@@ -170,5 +166,9 @@ impl<T> View<Context, T> for Label {
         _event: &mut ori::Event,
     ) -> Action {
         Action::new()
+    }
+
+    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+        cx.remove_widget(element);
     }
 }

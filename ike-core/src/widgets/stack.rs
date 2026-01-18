@@ -234,7 +234,7 @@ impl Widget for Stack {
     fn update(&mut self, _cx: &mut UpdateCx<'_>, update: Update) {
         if let Update::Children(update) = update {
             match update {
-                ChildUpdate::Inserted(_) => {
+                ChildUpdate::Inserted(..) => {
                     self.flex.push((0.0, false));
                 }
 

@@ -70,16 +70,6 @@ where
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        (contents, state): Self::State,
-        cx: &mut Context,
-    ) {
-        self.contents.teardown(contents, state, cx);
-        cx.remove_widget(element);
-    }
-
     fn event(
         &mut self,
         _element: &mut Self::Element,
@@ -89,5 +79,15 @@ where
         event: &mut Event,
     ) -> Action {
         self.contents.event(contents, state, cx, data, event)
+    }
+
+    fn teardown(
+        &mut self,
+        element: Self::Element,
+        (contents, state): Self::State,
+        cx: &mut Context,
+    ) {
+        self.contents.teardown(contents, state, cx);
+        cx.remove_widget(element);
     }
 }
