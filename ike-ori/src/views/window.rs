@@ -318,13 +318,7 @@ where
         }
     }
 
-    fn teardown(
-        &mut self,
-        _element: Self::Element,
-        (window, _, _, _): Self::State,
-        cx: &mut C,
-        _data: &mut T,
-    ) {
+    fn teardown(&mut self, _element: Self::Element, (window, _, _, _): Self::State, cx: &mut C) {
         cx.world_mut().remove_window(window);
     }
 

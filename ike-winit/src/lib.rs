@@ -392,6 +392,8 @@ impl<T> AppState<'_, T> {
     fn handle_event(&mut self, event_loop: &ActiveEventLoop, event: Event) -> Result<(), Error> {
         match event {
             Event::Rebuild => {
+                tracing::trace!("view rebuild");
+
                 if let Some(ref mut state) = self.state {
                     let mut view = (self.build)(self.data);
                     view.any_rebuild(
@@ -407,6 +409,8 @@ impl<T> AppState<'_, T> {
             }
 
             Event::Event(mut event) => {
+                tracing::trace!(?event, "view event");
+
                 if let Some(ref mut state) = self.state {
                     let action = self.view.any_event(
                         &mut ori::NoElement,

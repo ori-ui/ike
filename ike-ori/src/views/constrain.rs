@@ -200,14 +200,8 @@ where
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        (contents, state): Self::State,
-        cx: &mut C,
-        data: &mut T,
-    ) {
-        self.contents.teardown(contents, state, cx, data);
+    fn teardown(&mut self, element: Self::Element, (contents, state): Self::State, cx: &mut C) {
+        self.contents.teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 

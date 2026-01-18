@@ -115,12 +115,6 @@ impl Recorder {
 
     pub fn remove(&mut self, widget: WidgetId) {
         if let Some(entry) = self.entries.remove(&widget) {
-            tracing::trace!(
-                ?widget,
-                size = ?entry.recording.size,
-                "removing recording",
-            );
-
             self.memory_usage -= entry.recording.memory;
         }
     }
@@ -144,13 +138,11 @@ impl Recorder {
         self.cleanup(widgets);
         self.frame_count += 1;
 
-        self.entries.retain(|widget, entry| {
+        self.entries.retain(|_widget, entry| {
             let frames_unused = self.frame_count - entry.frame_last_used;
             let should_remove = frames_unused >= settings.max_frames_unused;
 
             if should_remove {
-                tracing::trace!(?widget, "recording unused");
-
                 self.memory_usage -= entry.recording.memory;
             }
 
@@ -158,15 +150,6 @@ impl Recorder {
         });
 
         self.cull_memory(settings);
-
-        let memory_fraction = self.memory_usage as f32 / settings.max_memory_usage as f32;
-
-        tracing::trace!(
-            "recorder memory usage {:.1}% ({}/{})",
-            memory_fraction * 100.0,
-            DisplayMemorySize(self.memory_usage),
-            DisplayMemorySize(settings.max_memory_usage),
-        );
     }
 
     /// Cull recordings if memory usage exceeds `3/4` of `max_memory_usage`.
@@ -177,7 +160,7 @@ impl Recorder {
             return;
         }
 
-        tracing::debug!(
+        tracing::warn!(
             "recorder memory usage exceeds 75% ({}/{}), consider increasing",
             DisplayMemorySize(self.memory_usage),
             DisplayMemorySize(settings.max_memory_usage)

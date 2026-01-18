@@ -124,14 +124,8 @@ where
         }
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        (children, states): Self::State,
-        cx: &mut C,
-        data: &mut T,
-    ) {
-        self.contents.seq_teardown(children, states, cx, data);
+    fn teardown(&mut self, element: Self::Element, (children, states): Self::State, cx: &mut C) {
+        self.contents.seq_teardown(children, states, cx);
         cx.remove_widget(element);
     }
 
@@ -272,8 +266,8 @@ where
         );
     }
 
-    fn teardown(&mut self, element: Self::Element, state: Self::State, cx: &mut C, data: &mut T) {
-        self.contents.teardown(element.contents, state, cx, data);
+    fn teardown(&mut self, element: Self::Element, state: Self::State, cx: &mut C) {
+        self.contents.teardown(element.contents, state, cx);
     }
 
     fn event(

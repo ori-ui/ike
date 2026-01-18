@@ -304,9 +304,8 @@ where
         element: Self::Element,
         (_id, contents, state): Self::State,
         cx: &mut C,
-        data: &mut T,
     ) {
-        self.contents.teardown(contents, state, cx, data);
+        self.contents.teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 

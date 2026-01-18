@@ -39,12 +39,6 @@ fn record_widget(mut widget: WidgetMut<'_>, canvas: &mut dyn Canvas) {
         && widget.cx.size().area() > 256.0
         && total_memory_estimate < widget.cx.world.settings.record.max_memory_usage
     {
-        tracing::trace!(
-            widget = ?widget.cx.id(),
-            cost = draw_cost,
-            "recording",
-        );
-
         let recording = canvas.record(widget.cx.size(), &mut |canvas| {
             passes::draw::draw_widget_clipped(&mut widget, canvas);
         });
