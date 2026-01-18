@@ -89,7 +89,7 @@ pub trait Widget: Any {
             None => {}
         }
 
-        for child in cx.iter_children().flatten() {
+        for child in cx.iter_children().flatten().rev() {
             if let Some(widget) = child.widget.find_widget_at(&child.cx, point) {
                 return Some(widget);
             }
