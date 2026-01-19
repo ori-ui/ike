@@ -1,4 +1,4 @@
-use crate::{Canvas, WidgetMut, WindowId, World, passes};
+use crate::{Affine, Canvas, Point, WidgetMut, WindowId, World, passes};
 
 pub(crate) fn record_window(world: &mut World, window: WindowId, canvas: &mut dyn Canvas) {
     let Some(window) = world.window(window) else {
@@ -41,10 +41,13 @@ fn record_widget(mut widget: WidgetMut<'_>, canvas: &mut dyn Canvas, scale: f32)
         && bounds.size().area() > 256.0
         && total_memory_estimate < widget.cx.world.settings.record.max_memory_usage
     {
-        let rect = widget.cx.state.bounds.to_pixels(scale);
-        let recording = canvas.record(rect, &mut |canvas| {
+        let bounds = widget.cx.state.bounds;
+        let width = (bounds.width() * scale).round() as u32;
+        let height = (bounds.height() * scale).round() as u32;
+
+        let recording = canvas.record(width, height, &mut |canvas| {
             canvas.transform(
-                widget.cx.global_transform(),
+                Affine::scale(scale, scale) * Affine::translate(Point::ORIGIN - bounds.min),
                 &mut |canvas| passes::draw::draw_widget_clipped(&mut widget, canvas, scale),
             );
         });

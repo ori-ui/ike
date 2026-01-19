@@ -21,11 +21,16 @@ pub(crate) fn bounds_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn Can
         bounds_overlay_widget(&child, canvas);
     }
 
-    canvas.draw_border(
-        widget.cx.state.bounds,
-        BorderWidth::all(1.0),
-        CornerRadius::all(0.0),
-        &Paint::from(Color::RED),
+    canvas.transform(
+        widget.cx.global_transform(),
+        &mut |canvas| {
+            canvas.draw_border(
+                widget.cx.state.bounds,
+                BorderWidth::all(1.0),
+                CornerRadius::all(0.0),
+                &Paint::from(Color::RED),
+            );
+        },
     );
 }
 

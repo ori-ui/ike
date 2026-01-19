@@ -43,11 +43,12 @@ impl Canvas for SkiaCanvas<'_> {
         self.canvas.restore();
     }
 
-    fn record(&mut self, rect: PixelRect, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording> {
-        let matrix = self.canvas.local_to_device();
-
-        let width = rect.right - rect.left;
-        let height = rect.bottom - rect.top;
+    fn record(
+        &mut self,
+        width: u32,
+        height: u32,
+        f: &mut dyn FnMut(&mut dyn Canvas),
+    ) -> Option<Recording> {
         let memory = width as u64 * height as u64 * 4;
 
         let mut surface = self
@@ -62,11 +63,6 @@ impl Canvas for SkiaCanvas<'_> {
         };
 
         canvas.canvas.clear(skia_safe::Color::TRANSPARENT);
-        canvas.canvas.translate(skia_safe::Vector::new(
-            -(rect.left as f32),
-            -(rect.top as f32),
-        ));
-        canvas.canvas.concat_44(&matrix);
 
         f(&mut canvas);
 

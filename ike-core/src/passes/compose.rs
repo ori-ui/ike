@@ -22,14 +22,15 @@ pub(crate) fn compose_window(world: &mut World, window: WindowId) {
 
 pub(crate) fn compose_widget(
     mut widget: WidgetMut<'_>,
-    transform: Affine,
+    global_transform: Affine,
     scale: f32,
 ) -> WidgetMut<'_> {
     if widget.cx.is_stashed() {
         return widget;
     }
 
-    let global_transform = transform * widget.cx.state.transform;
+    let transform = widget.cx.state.transform;
+    let global_transform = global_transform * transform;
 
     if !widget.cx.hierarchy.needs_compose() && widget.cx.state.global_transform == global_transform
     {
@@ -44,16 +45,17 @@ pub(crate) fn compose_widget(
     let mut cx = widget.cx.as_compose_cx(scale);
     widget.widget.compose(&mut cx);
 
-    let mut bounds = widget.cx.rect().transform_bounds(global_transform);
+    let mut bounds = widget.cx.rect();
 
     let mut widget = passes::hierarchy::for_each_child(widget, |child| {
         if let Ok(child) = child
             && !child.cx.is_stashed()
         {
             let child = compose_widget(child, global_transform, scale);
+            let child_bounds = child.cx.state.bounds.transform_bounds(child.cx.transform());
 
-            bounds.min = bounds.min.min(child.cx.state.bounds.min);
-            bounds.max = bounds.max.max(child.cx.state.bounds.max);
+            bounds.min = bounds.min.min(child_bounds.min);
+            bounds.max = bounds.max.max(child_bounds.max);
         }
     });
 

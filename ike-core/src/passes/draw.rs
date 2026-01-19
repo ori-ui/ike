@@ -30,12 +30,9 @@ pub(crate) fn draw_widget(widget: &mut WidgetMut<'_>, canvas: &mut dyn Canvas, s
     }
 
     if let Some(recording) = widget.cx.world.recorder.get_recording_marked(widget.id()) {
-        canvas.transform(
-            widget.cx.transform() * widget.cx.global_transform().inverse(),
-            &mut |canvas| {
-                canvas.draw_recording(widget.cx.state.bounds, &recording);
-            },
-        );
+        canvas.transform(widget.cx.transform(), &mut |canvas| {
+            canvas.draw_recording(widget.cx.state.bounds, &recording);
+        });
     } else {
         let _span = widget.cx.enter_span();
         canvas.transform(widget.cx.transform(), &mut |canvas| {

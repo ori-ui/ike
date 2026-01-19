@@ -126,7 +126,12 @@ pub trait Canvas {
     fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas));
 
     #[must_use]
-    fn record(&mut self, rect: PixelRect, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording>;
+    fn record(
+        &mut self,
+        width: u32,
+        height: u32,
+        f: &mut dyn FnMut(&mut dyn Canvas),
+    ) -> Option<Recording>;
 
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas));
 
