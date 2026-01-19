@@ -26,7 +26,7 @@ pub mod widgets;
 
 pub use axis::Axis;
 pub use build::Builder;
-pub use canvas::{Blend, Canvas, Cap, Clip, Join, Paint, Shader, Stroke};
+pub use canvas::{Blend, Canvas, Cap, Clip, Join, Paint, PixelRect, Shader, Stroke};
 pub use color::Color;
 pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
 pub use curve::{Curve, CurveData, CurveSegment, CurveVerb, Fill, WeakCurve};

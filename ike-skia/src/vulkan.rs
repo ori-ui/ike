@@ -4,7 +4,7 @@ use ash::{
     LoadingError,
     vk::{self, Handle},
 };
-use ike_core::Color;
+use ike_core::{Color, PixelRect};
 use raw_window_handle::{DisplayHandle, WindowHandle};
 
 use crate::{SkiaCanvas, SkiaPainter};
@@ -603,6 +603,13 @@ impl Surface {
 
             // do rendering
             let (mut surface, skia_image) = self.skia_surfaces[image_index as usize].clone();
+            let rect = PixelRect {
+                left:   0,
+                top:    0,
+                right:  surface.width() as u32,
+                bottom: surface.height() as u32,
+            };
+
             let canvas = surface.canvas();
 
             canvas.reset_matrix();
@@ -619,6 +626,7 @@ impl Surface {
                     surface: self,
                     painter,
                     canvas,
+                    rect,
                 };
                 f(&mut canvas)
             };

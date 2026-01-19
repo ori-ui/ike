@@ -15,21 +15,25 @@ pub(crate) fn compose_window(world: &mut World, window: WindowId) {
             && let Some(layer) = window.layers().get(i)
             && let Ok(widget) = world.widget_mut(layer.widget)
         {
-            compose_widget(widget, Affine::IDENTITY, scale)
+            compose_widget(widget, Affine::IDENTITY, scale);
         }
     }
 }
 
-pub(crate) fn compose_widget(mut widget: WidgetMut<'_>, transform: Affine, scale: f32) {
+pub(crate) fn compose_widget(
+    mut widget: WidgetMut<'_>,
+    transform: Affine,
+    scale: f32,
+) -> WidgetMut<'_> {
     if widget.cx.is_stashed() {
-        return;
+        return widget;
     }
 
     let global_transform = transform * widget.cx.state.transform;
 
     if !widget.cx.hierarchy.needs_compose() && widget.cx.state.global_transform == global_transform
     {
-        return;
+        return widget;
     }
 
     let _span = widget.cx.enter_span();
@@ -40,11 +44,21 @@ pub(crate) fn compose_widget(mut widget: WidgetMut<'_>, transform: Affine, scale
     let mut cx = widget.cx.as_compose_cx(scale);
     widget.widget.compose(&mut cx);
 
-    passes::hierarchy::for_each_child(widget, |child| {
-        if let Ok(child) = child {
-            compose_widget(child, global_transform, scale);
+    let mut bounds = widget.cx.rect().transform_bounds(global_transform);
+
+    let mut widget = passes::hierarchy::for_each_child(widget, |child| {
+        if let Ok(child) = child
+            && !child.cx.is_stashed()
+        {
+            let child = compose_widget(child, global_transform, scale);
+
+            bounds.min = bounds.min.min(child.cx.state.bounds.min);
+            bounds.max = bounds.max.max(child.cx.state.bounds.max);
         }
     });
+
+    widget.cx.state.bounds = bounds;
+    widget
 }
 
 pub(crate) fn place_child(cx: &mut ComposeCx<'_>, child: WidgetId, mut transform: Affine) {

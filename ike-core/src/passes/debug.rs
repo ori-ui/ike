@@ -4,6 +4,31 @@ use crate::{
     record::DisplayMemorySize,
 };
 
+pub(crate) fn bounds_overlay_window(world: &World, window: WindowId, canvas: &mut dyn Canvas) {
+    let Some(window) = world.window(window) else {
+        return;
+    };
+
+    for layer in window.layers() {
+        if let Ok(widget) = world.widget(layer.widget) {
+            bounds_overlay_widget(&widget, canvas);
+        }
+    }
+}
+
+pub(crate) fn bounds_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn Canvas) {
+    for child in widget.cx.iter_children().flatten() {
+        bounds_overlay_widget(&child, canvas);
+    }
+
+    canvas.draw_border(
+        widget.cx.state.bounds,
+        BorderWidth::all(1.0),
+        CornerRadius::all(0.0),
+        &Paint::from(Color::RED),
+    );
+}
+
 pub(crate) fn recorder_overlay_window(world: &World, window: WindowId, canvas: &mut dyn Canvas) {
     let Some(window) = world.window(window) else {
         return;

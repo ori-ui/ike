@@ -9,7 +9,7 @@ use std::{
 
 use seahash::SeaHasher;
 
-use crate::{Size, WidgetId, world::Widgets};
+use crate::{WidgetId, world::Widgets};
 
 /// Settings that pertain to recording.
 #[derive(Debug)]
@@ -227,9 +227,6 @@ pub struct Recording {
 /// The data of a [`Recording`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecordingData {
-    /// Size in logical pixels.
-    pub size: Size,
-
     /// Width in device pixels.
     pub width: u32,
 

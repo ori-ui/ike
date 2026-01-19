@@ -14,6 +14,7 @@ mod scroll;
 mod spacer;
 mod stack;
 mod text;
+mod transform;
 mod window;
 
 pub use aligned::{
@@ -38,4 +39,5 @@ pub use scroll::{Scroll, hscroll, vscroll};
 pub use spacer::{Spacer, hspacer, spacer, vspacer};
 pub use stack::{Flex, Stack, expand, flex, hstack, stack, vstack};
 pub use text::TextTheme;
+pub use transform::{Transform, transform};
 pub use window::{Window, window};

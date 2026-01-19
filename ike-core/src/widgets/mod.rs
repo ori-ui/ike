@@ -13,6 +13,7 @@ mod spacer;
 mod stack;
 mod text;
 mod text_area;
+mod transform;
 
 pub use align::Aligned;
 pub use button::Button;
@@ -28,3 +29,4 @@ pub use scroll::Scroll;
 pub use spacer::Spacer;
 pub use stack::{Align, Justify, Stack};
 pub use text_area::{NewlineBehaviour, SubmitBehaviour, TextArea};
+pub use transform::Transform;

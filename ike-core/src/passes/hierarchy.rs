@@ -304,7 +304,9 @@ pub(crate) fn is_descendant(widgets: &Widgets, ancestor: WidgetId, descendant: W
 pub(crate) fn for_each_child(
     widget: WidgetMut<'_>,
     mut f: impl FnMut(Result<WidgetMut<'_>, GetError>),
-) {
+) -> WidgetMut<'_> {
+    let id = widget.cx.id();
+
     drop(widget.widget);
     drop(widget.cx.state);
 
@@ -313,6 +315,10 @@ pub(crate) fn for_each_child(
     }
 
     widget.cx.hierarchy.propagate_down(widget.cx.widgets);
+
+    (widget.cx.widgets)
+        .get_mut(widget.cx.world, id)
+        .expect("should be available")
 }
 
 pub(crate) fn propagate_up(world: &mut World, widget: WidgetId) {

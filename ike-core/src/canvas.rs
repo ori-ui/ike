@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::{
     Affine, BorderWidth, Color, CornerRadius, Curve, Offset, Painter, Paragraph, Recording, Rect,
-    Size, Svg,
+    Svg,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
@@ -110,6 +110,14 @@ impl From<Rect> for Option<Clip> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PixelRect {
+    pub left:   u32,
+    pub top:    u32,
+    pub right:  u32,
+    pub bottom: u32,
+}
+
 pub trait Canvas {
     fn painter(&mut self) -> &mut dyn Painter;
 
@@ -118,7 +126,7 @@ pub trait Canvas {
     fn layer(&mut self, f: &mut dyn FnMut(&mut dyn Canvas));
 
     #[must_use]
-    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording>;
+    fn record(&mut self, rect: PixelRect, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording>;
 
     fn clip(&mut self, clip: &Clip, f: &mut dyn FnMut(&mut dyn Canvas));
 
@@ -134,5 +142,5 @@ pub trait Canvas {
 
     fn draw_svg(&mut self, svg: &Svg);
 
-    fn draw_recording(&mut self, recording: &Recording);
+    fn draw_recording(&mut self, rect: PixelRect, recording: &Recording);
 }

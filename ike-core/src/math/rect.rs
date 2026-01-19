@@ -1,4 +1,4 @@
-use crate::{Point, Size};
+use crate::{Affine, PixelRect, Point, Size};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Rect {
@@ -99,5 +99,28 @@ impl Rect {
             && point.y >= self.min.y
             && point.x <= self.max.x
             && point.y <= self.max.y
+    }
+
+    pub fn to_pixels(self, scale: f32) -> PixelRect {
+        PixelRect {
+            left:   (self.left() * scale).floor() as u32,
+            top:    (self.top() * scale).floor() as u32,
+            right:  (self.right() * scale).ceil() as u32,
+            bottom: (self.bottom() * scale).ceil() as u32,
+        }
+    }
+
+    pub fn transform_bounds(mut self, transform: Affine) -> Self {
+        let tl = transform * self.top_left();
+        let tr = transform * self.top_right();
+        let bl = transform * self.bottom_left();
+        let br = transform * self.bottom_right();
+
+        self.min.x = tl.x.min(tr.x).min(bl.x).min(br.x);
+        self.min.y = tl.y.min(tr.y).min(bl.y).min(br.y);
+        self.max.x = tl.x.max(tr.x).max(bl.x).max(br.x);
+        self.max.y = tl.y.max(tr.y).max(bl.y).max(br.y);
+
+        self
     }
 }

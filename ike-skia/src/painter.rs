@@ -15,7 +15,7 @@ pub struct SkiaPainter {
     pub(crate) fonts:      skia_safe::textlayout::FontCollection,
     pub(crate) svgs:       HashMap<WeakSvg, Option<skia_safe::svg::Dom>, SeaHasher>,
     pub(crate) paragraphs: HashMap<WeakParagraph, CachedParagraph, SeaHasher>,
-    pub(crate) recordings: HashMap<WeakRecording, (skia_safe::Image, Size), SeaHasher>,
+    pub(crate) recordings: HashMap<WeakRecording, skia_safe::Image, SeaHasher>,
     pub(crate) paths:      HashMap<WeakCurve, skia_safe::Path, SeaHasher>,
     pub(crate) paints:     HashMap<Paint, skia_safe::Paint, SeaHasher>,
 }

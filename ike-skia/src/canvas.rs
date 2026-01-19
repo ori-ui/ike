@@ -1,6 +1,6 @@
 use ike_core::{
     Affine, BorderWidth, Canvas, Clip, CornerRadius, Curve, Offset, Paint, Painter, Paragraph,
-    Recording, RecordingData, Rect, Size, Svg,
+    PixelRect, Recording, RecordingData, Rect, Svg,
 };
 
 use crate::{painter::SkiaPainter, vulkan::Surface};
@@ -9,6 +9,7 @@ pub struct SkiaCanvas<'a> {
     pub(crate) surface: &'a mut Surface,
     pub(crate) painter: &'a mut SkiaPainter,
     pub(crate) canvas:  &'a skia_safe::Canvas,
+    pub(crate) rect:    PixelRect,
 }
 
 impl Canvas for SkiaCanvas<'_> {
@@ -43,13 +44,11 @@ impl Canvas for SkiaCanvas<'_> {
         self.canvas.restore();
     }
 
-    fn record(&mut self, size: Size, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording> {
-        let matrix = self.canvas.local_to_device_as_3x3();
-        let scale_x = matrix.scale_x();
-        let scale_y = matrix.scale_y();
+    fn record(&mut self, rect: PixelRect, f: &mut dyn FnMut(&mut dyn Canvas)) -> Option<Recording> {
+        let matrix = self.canvas.local_to_device();
 
-        let width = (size.width * scale_x).ceil() as u32;
-        let height = (size.height * scale_y).ceil() as u32;
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
         let memory = width as u64 * height as u64 * 4;
 
         let mut surface = self
@@ -60,25 +59,29 @@ impl Canvas for SkiaCanvas<'_> {
         let mut canvas = SkiaCanvas {
             surface: self.surface,
             painter: self.painter,
-            canvas:  surface.canvas(),
+            canvas: surface.canvas(),
+            rect,
         };
 
         canvas.canvas.clear(skia_safe::Color::TRANSPARENT);
-        canvas.canvas.scale((scale_x, scale_y));
+        canvas.canvas.translate(skia_safe::Vector::new(
+            -(rect.left as f32),
+            -(rect.top as f32),
+        ));
+        canvas.canvas.concat_44(&matrix);
 
         f(&mut canvas);
 
         let image = surface.image_snapshot();
 
         let recording = Recording::new(RecordingData {
-            size,
             width,
             height,
             memory,
         });
         let weak = Recording::downgrade(&recording);
 
-        self.painter.recordings.insert(weak, (image, size));
+        self.painter.recordings.insert(weak, image);
 
         Some(recording)
     }
@@ -195,20 +198,30 @@ impl Canvas for SkiaCanvas<'_> {
         }
     }
 
-    fn draw_recording(&mut self, recoding: &Recording) {
+    fn draw_recording(&mut self, rect: PixelRect, recoding: &Recording) {
         let weak = Recording::downgrade(recoding);
 
-        if let Some((image, size)) = self.painter.recordings.get(&weak) {
+        if let Some(image) = self.painter.recordings.get(&weak) {
+            self.canvas.save();
+            self.canvas.set_matrix(&skia_safe::M44::new_identity());
+
             self.canvas.draw_image_rect_with_sampling_options(
                 image,
                 None,
-                skia_safe::Rect::new(0.0, 0.0, size.width, size.height),
+                skia_safe::Rect::new(
+                    (rect.left - self.rect.left) as f32,
+                    (rect.top - self.rect.top) as f32,
+                    (rect.right - self.rect.left) as f32,
+                    (rect.bottom - self.rect.top) as f32,
+                ),
                 skia_safe::SamplingOptions::new(
-                    skia_safe::FilterMode::Linear,
+                    skia_safe::FilterMode::Nearest,
                     skia_safe::MipmapMode::None,
                 ),
                 &skia_safe::Paint::default(),
             );
+
+            self.canvas.restore();
         } else {
             tracing::error!("invalid recording drawn");
         }

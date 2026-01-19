@@ -21,6 +21,10 @@ impl Color {
     pub const GREEN: Self = Self::rgb(0.0, 1.0, 0.0);
     pub const BLUE: Self = Self::rgb(0.0, 0.0, 1.0);
 
+    pub const PURPLE: Self = Self::rgb(1.0, 0.0, 1.0);
+    pub const YELLOW: Self = Self::rgb(1.0, 1.0, 0.0);
+    pub const CYAN: Self = Self::rgb(0.0, 1.0, 1.0);
+
     pub const fn rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self { r, g, b, a }
     }

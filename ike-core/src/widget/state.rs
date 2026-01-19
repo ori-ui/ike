@@ -1,6 +1,8 @@
 use std::{cell::Cell, rc::Rc};
 
-use crate::{Affine, Clip, CursorIcon, Size, Space, Widget, WidgetId, WindowId, world::Widgets};
+use crate::{
+    Affine, Clip, CursorIcon, Rect, Size, Space, Widget, WidgetId, WindowId, world::Widgets,
+};
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -290,6 +292,7 @@ pub struct WidgetState {
     pub(crate) id:               WidgetId,
     pub(crate) transform:        Affine,
     pub(crate) global_transform: Affine,
+    pub(crate) bounds:           Rect,
     pub(crate) size:             Size,
     pub(crate) previous_space:   Option<Space>,
     pub(crate) cursor:           CursorIcon,
@@ -313,6 +316,7 @@ impl WidgetState {
 
             transform:        Affine::IDENTITY,
             global_transform: Affine::IDENTITY,
+            bounds:           Rect::default(),
             size:             Size::new(0.0, 0.0),
             previous_space:   None,
             cursor:           CursorIcon::Default,
