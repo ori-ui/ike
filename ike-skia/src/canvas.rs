@@ -9,7 +9,6 @@ pub struct SkiaCanvas<'a> {
     pub(crate) surface: &'a mut Surface,
     pub(crate) painter: &'a mut SkiaPainter,
     pub(crate) canvas:  &'a skia_safe::Canvas,
-    pub(crate) rect:    PixelRect,
 }
 
 impl Canvas for SkiaCanvas<'_> {
@@ -59,8 +58,7 @@ impl Canvas for SkiaCanvas<'_> {
         let mut canvas = SkiaCanvas {
             surface: self.surface,
             painter: self.painter,
-            canvas: surface.canvas(),
-            rect,
+            canvas:  surface.canvas(),
         };
 
         canvas.canvas.clear(skia_safe::Color::TRANSPARENT);
@@ -198,30 +196,25 @@ impl Canvas for SkiaCanvas<'_> {
         }
     }
 
-    fn draw_recording(&mut self, rect: PixelRect, recording: &Recording) {
+    fn draw_recording(&mut self, rect: Rect, recording: &Recording) {
         let weak = Recording::downgrade(recording);
 
         if let Some(image) = self.painter.recordings.get(&weak) {
-            self.canvas.save();
-            self.canvas.set_matrix(&skia_safe::M44::new_identity());
-
             self.canvas.draw_image_rect_with_sampling_options(
                 image,
                 None,
                 skia_safe::Rect::new(
-                    (rect.left - self.rect.left) as f32,
-                    (rect.top - self.rect.top) as f32,
-                    (rect.right - self.rect.left) as f32,
-                    (rect.bottom - self.rect.top) as f32,
+                    rect.left(),
+                    rect.top(),
+                    rect.right(),
+                    rect.bottom(),
                 ),
                 skia_safe::SamplingOptions::new(
-                    skia_safe::FilterMode::Nearest,
+                    skia_safe::FilterMode::Linear,
                     skia_safe::MipmapMode::None,
                 ),
                 &skia_safe::Paint::default(),
             );
-
-            self.canvas.restore();
         } else {
             tracing::error!("invalid recording drawn");
         }

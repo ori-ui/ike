@@ -29,15 +29,7 @@ pub(crate) fn compose_widget(
         return widget;
     }
 
-    let mut global_transform = transform * widget.cx.state.transform;
-
-    // if we're close to being pixel aligned, align ourselves.
-    // this is to combat floating point imprecession.
-    let rounded = global_transform.offset.pixel_round(scale);
-    let delta = global_transform.offset - rounded;
-    if delta.x.abs() < 0.01 || delta.y.abs() < 0.01 {
-        global_transform.offset = rounded;
-    }
+    let global_transform = transform * widget.cx.state.transform;
 
     if !widget.cx.hierarchy.needs_compose() && widget.cx.state.global_transform == global_transform
     {

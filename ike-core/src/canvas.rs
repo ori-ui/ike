@@ -142,5 +142,5 @@ pub trait Canvas {
 
     fn draw_svg(&mut self, svg: &Svg);
 
-    fn draw_recording(&mut self, rect: PixelRect, recording: &Recording);
+    fn draw_recording(&mut self, rect: Rect, recording: &Recording);
 }
