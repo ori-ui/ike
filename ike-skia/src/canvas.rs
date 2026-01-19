@@ -198,12 +198,17 @@ impl Canvas for SkiaCanvas<'_> {
         }
     }
 
-    fn draw_recording(&mut self, rect: PixelRect, recoding: &Recording) {
-        let weak = Recording::downgrade(recoding);
+    fn draw_recording(&mut self, rect: PixelRect, recording: &Recording) {
+        let weak = Recording::downgrade(recording);
 
         if let Some(image) = self.painter.recordings.get(&weak) {
             self.canvas.save();
             self.canvas.set_matrix(&skia_safe::M44::new_identity());
+
+            let width = rect.right - rect.left;
+            let height = rect.bottom - rect.top;
+            debug_assert_eq!(width, recording.width);
+            debug_assert_eq!(height, recording.height);
 
             self.canvas.draw_image_rect_with_sampling_options(
                 image,

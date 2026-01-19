@@ -102,11 +102,13 @@ impl Rect {
     }
 
     pub fn to_pixels(self, scale: f32) -> PixelRect {
+        const EPSILON: f32 = 0.001;
+
         PixelRect {
-            left:   (self.left() * scale).floor() as u32,
-            top:    (self.top() * scale).floor() as u32,
-            right:  (self.right() * scale).ceil() as u32,
-            bottom: (self.bottom() * scale).ceil() as u32,
+            left:   (self.left() * scale + EPSILON).floor().max(0.0) as u32,
+            top:    (self.top() * scale + EPSILON).floor().max(0.0) as u32,
+            right:  (self.right() * scale - EPSILON).ceil() as u32,
+            bottom: (self.bottom() * scale - EPSILON).ceil() as u32,
         }
     }
 

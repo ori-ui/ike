@@ -62,6 +62,11 @@ pub(crate) fn pressed(
         world.state.request_redraw(window_id);
     }
 
+    if key == Key::Named(NamedKey::F8) && pressed && !handled && cfg!(debug_assertions) {
+        world.settings_mut().debug.bounds_overlay ^= true;
+        world.state.request_redraw(window_id);
+    }
+
     handled
 }
 

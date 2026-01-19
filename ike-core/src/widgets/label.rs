@@ -32,7 +32,7 @@ impl Widget for Label {
         canvas.draw_text(
             &self.paragraph,
             cx.width(),
-            Offset::all(0.0),
+            Offset::ZERO,
         );
     }
 }
