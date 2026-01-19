@@ -1,6 +1,4 @@
-use ike_core::{
-    BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, WidgetMut, widgets,
-};
+use ike_core::{BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets};
 use ori::{Action, Event, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
 use crate::{Context, Palette};
@@ -186,59 +184,6 @@ impl<T> Properties<T> {
     fn get_transition(&self, theme: &ButtonTheme) -> Transition {
         self.transition.unwrap_or(theme.transition)
     }
-
-    fn rebuild(
-        &self,
-        prev: &Self,
-        widget: &mut WidgetMut<widgets::Button>,
-        theme: &ButtonTheme,
-        palette: &Palette,
-    ) {
-        if self.padding != prev.padding {
-            let padding = self.get_padding(theme);
-            widgets::Button::set_padding(widget, padding);
-        }
-
-        if self.border_width != prev.border_width {
-            let border_width = self.get_border_width(theme);
-            widgets::Button::set_border_width(widget, border_width);
-        }
-
-        if self.corner_radius != prev.corner_radius {
-            let corner_radius = self.get_corner_radius(theme);
-            widgets::Button::set_corner_radius(widget, corner_radius);
-        }
-
-        if self.idle_color != prev.idle_color {
-            let idle_color = self.get_idle_color(theme, palette);
-            widgets::Button::set_idle_color(widget, idle_color);
-        }
-
-        if self.hovered_color != prev.hovered_color {
-            let hovered_color = self.get_hovered_color(theme, palette);
-            widgets::Button::set_hovered_color(widget, hovered_color);
-        }
-
-        if self.active_color != prev.active_color {
-            let active_color = self.get_active_color(theme, palette);
-            widgets::Button::set_active_color(widget, active_color);
-        }
-
-        if self.border_color != prev.border_color {
-            let border_color = self.get_border_color(theme, palette);
-            widgets::Button::set_border_color(widget, border_color);
-        }
-
-        if self.focus_color != prev.focus_color {
-            let focus_color = self.get_focus_color(theme, palette);
-            widgets::Button::set_focus_color(widget, focus_color);
-        }
-
-        if self.transition != prev.transition {
-            let transition = self.get_transition(theme);
-            widgets::Button::set_transition(widget, transition);
-        }
-    }
 }
 
 impl<T, V> ViewMarker for Button<T, V> {}
@@ -309,12 +254,50 @@ where
             return;
         };
 
-        self.properties.rebuild(
-            properties,
-            &mut widget,
-            &theme,
-            &palette,
-        );
+        if self.properties.padding != properties.padding {
+            let padding = self.properties.get_padding(&theme);
+            widgets::Button::set_padding(&mut widget, padding);
+        }
+
+        if self.properties.border_width != properties.border_width {
+            let border_width = self.properties.get_border_width(&theme);
+            widgets::Button::set_border_width(&mut widget, border_width);
+        }
+
+        if self.properties.corner_radius != properties.corner_radius {
+            let corner_radius = self.properties.get_corner_radius(&theme);
+            widgets::Button::set_corner_radius(&mut widget, corner_radius);
+        }
+
+        if self.properties.idle_color != properties.idle_color {
+            let idle_color = self.properties.get_idle_color(&theme, &palette);
+            widgets::Button::set_idle_color(&mut widget, idle_color);
+        }
+
+        if self.properties.hovered_color != properties.hovered_color {
+            let hovered_color = self.properties.get_hovered_color(&theme, &palette);
+            widgets::Button::set_hovered_color(&mut widget, hovered_color);
+        }
+
+        if self.properties.active_color != properties.active_color {
+            let active_color = self.properties.get_active_color(&theme, &palette);
+            widgets::Button::set_active_color(&mut widget, active_color);
+        }
+
+        if self.properties.border_color != properties.border_color {
+            let border_color = self.properties.get_border_color(&theme, &palette);
+            widgets::Button::set_border_color(&mut widget, border_color);
+        }
+
+        if self.properties.focus_color != properties.focus_color {
+            let focus_color = self.properties.get_focus_color(&theme, &palette);
+            widgets::Button::set_focus_color(&mut widget, focus_color);
+        }
+
+        if self.properties.transition != properties.transition {
+            let transition = self.properties.get_transition(&theme);
+            widgets::Button::set_transition(&mut widget, transition);
+        }
 
         *properties = self.properties;
     }
