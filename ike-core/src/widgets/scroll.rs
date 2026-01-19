@@ -507,6 +507,8 @@ impl Widget for Portal {
 
         self.overflow = child_size - size;
         self.overflow = self.overflow.max(Size::ZERO);
+        self.offset.x = self.offset.x.min(self.overflow.width);
+        self.offset.y = self.offset.y.min(self.overflow.height);
         cx.set_clip(Rect::min_size(Point::ORIGIN, size));
 
         size

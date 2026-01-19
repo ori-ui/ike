@@ -205,11 +205,6 @@ impl Canvas for SkiaCanvas<'_> {
             self.canvas.save();
             self.canvas.set_matrix(&skia_safe::M44::new_identity());
 
-            let width = rect.right - rect.left;
-            let height = rect.bottom - rect.top;
-            debug_assert_eq!(width, recording.width);
-            debug_assert_eq!(height, recording.height);
-
             self.canvas.draw_image_rect_with_sampling_options(
                 image,
                 None,

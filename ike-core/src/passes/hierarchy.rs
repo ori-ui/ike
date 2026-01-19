@@ -386,6 +386,10 @@ where
             &mut widget.cx.as_update_cx(),
             Update::Stashed(is_stashed),
         );
+
+        widget.cx.hierarchy.request_layout();
+        widget.cx.hierarchy.request_compose();
+        widget.cx.hierarchy.request_draw();
     }
 
     widget.cx.hierarchy.set_stashed(is_stashed);

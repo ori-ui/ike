@@ -25,6 +25,20 @@ impl Offset {
         }
     }
 
+    pub const fn min(self, other: Self) -> Self {
+        Self {
+            x: self.x.min(other.x),
+            y: self.y.min(other.y),
+        }
+    }
+
+    pub const fn max(self, other: Self) -> Self {
+        Self {
+            x: self.x.max(other.x),
+            y: self.y.max(other.y),
+        }
+    }
+
     pub const fn floor(self) -> Self {
         Self {
             x: self.x.floor(),
