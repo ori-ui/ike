@@ -27,61 +27,56 @@ where
     V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Pad>;
-    type State = (V::Element, V::State);
+    type State = (Padding, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let mut widget = widgets::Pad::new(cx, contents);
 
         widgets::Pad::set_padding(&mut widget, self.padding);
 
-        (widget.id(), (contents, state))
+        (
+            widget.id(),
+            (self.padding, contents, state),
+        )
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        (contents, state): &mut Self::State,
+        (padding, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
-        self.contents.rebuild(
-            contents,
-            state,
-            cx,
-            data,
-            &mut old.contents,
-        );
+        self.contents.rebuild(contents, state, cx, data);
 
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
-        if self.padding != old.padding {
+        if self.padding != *padding {
+            *padding = self.padding;
             widgets::Pad::set_padding(&mut widget, self.padding);
         }
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
-        (contents, state): &mut Self::State,
+        (_padding, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.event(contents, state, cx, data, event)
+        V::event(contents, state, cx, data, event)
     }
 
     fn teardown(
-        &mut self,
         element: Self::Element,
-        (contents, state): Self::State,
+        (_padding, contents, state): Self::State,
         cx: &mut Context,
     ) {
-        self.contents.teardown(contents, state, cx);
+        V::teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 }

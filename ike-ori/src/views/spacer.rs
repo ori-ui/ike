@@ -28,39 +28,34 @@ impl Spacer {
 impl ViewMarker for Spacer {}
 impl<T> View<Context, T> for Spacer {
     type Element = WidgetId<widgets::Spacer>;
-    type State = ();
+    type State = Size;
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let mut widget = widgets::Spacer::new(cx);
 
         widgets::Spacer::set_size(&mut widget, self.size);
 
-        (widget.id(), ())
+        (widget.id(), self.size)
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        _state: &mut Self::State,
+        size: &mut Self::State,
         cx: &mut Context,
         _data: &mut T,
-        old: &mut Self,
     ) {
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
-        if self.size != old.size {
+        if self.size != *size {
+            *size = self.size;
             widgets::Spacer::set_size(&mut widget, self.size);
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
-        cx.remove_widget(element);
-    }
-
     fn event(
-        &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
         _cx: &mut Context,
@@ -68,5 +63,9 @@ impl<T> View<Context, T> for Spacer {
         _event: &mut Event,
     ) -> Action {
         Action::new()
+    }
+
+    fn teardown(element: Self::Element, _state: Self::State, cx: &mut Context) {
+        cx.remove_widget(element);
     }
 }

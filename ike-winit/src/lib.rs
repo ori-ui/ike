@@ -1,7 +1,6 @@
 #![warn(clippy::unwrap_used)]
 
 use std::{
-    any::Any,
     io,
     pin::Pin,
     sync::{Arc, mpsc::Receiver},
@@ -14,7 +13,7 @@ use ike_core::{
     WindowUpdate, World,
 };
 use ike_skia::{SkiaPainter, vulkan::Surface};
-use ori::Proxy as _;
+use ori::{AnyState, AnyView, Proxy as _, View};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
@@ -53,7 +52,7 @@ pub enum Error {
 
 pub fn run<T>(
     data: &mut T,
-    mut build: ike_ori::UiBuilder<T>,
+    build: ike_ori::UiBuilder<T>,
     settings: ike_core::Settings,
 ) -> Result<(), Error> {
     let rt;
@@ -91,13 +90,10 @@ pub fn run<T>(
         resources: ike_ori::Resources::new(),
     };
 
-    let view = build(data);
-
     let mut state = AppState {
         data,
 
         build,
-        view,
         state: None,
 
         runtime,
@@ -129,8 +125,7 @@ struct AppState<'a, T> {
     data: &'a mut T,
 
     build: ike_ori::UiBuilder<T>,
-    view:  ike_ori::AnyEffect<T>,
-    state: Option<Box<dyn Any>>,
+    state: Option<AnyState<ike_ori::Context, T, ori::NoElement>>,
 
     runtime:  tokio::runtime::Handle,
     receiver: Receiver<Event>,
@@ -160,7 +155,8 @@ impl<T> ApplicationHandler for AppState<'_, T> {
             return;
         }
 
-        let (_, state) = self.view.any_build(&mut self.context, self.data);
+        let view = (self.build)(self.data);
+        let (_, state) = view.build(&mut self.context, self.data);
 
         self.state = Some(state);
         self.handle_events(event_loop);
@@ -395,16 +391,8 @@ impl<T> AppState<'_, T> {
                 tracing::trace!("view rebuild");
 
                 if let Some(ref mut state) = self.state {
-                    let mut view = (self.build)(self.data);
-                    view.any_rebuild(
-                        (),
-                        state,
-                        &mut self.context,
-                        self.data,
-                        self.view.as_mut(),
-                    );
-
-                    self.view = view;
+                    let view = (self.build)(self.data);
+                    view.rebuild((), state, &mut self.context, self.data);
                 }
             }
 
@@ -412,7 +400,7 @@ impl<T> AppState<'_, T> {
                 tracing::trace!(?event, "view event");
 
                 if let Some(ref mut state) = self.state {
-                    let action = self.view.any_event(
+                    let action = Box::<dyn AnyView<_, _, _>>::event(
                         (),
                         state,
                         &mut self.context,

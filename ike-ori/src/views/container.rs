@@ -31,12 +31,8 @@ impl Default for ContainerTheme {
 }
 
 pub struct Container<V> {
-    contents:         V,
-    padding:          Option<Padding>,
-    border_width:     Option<BorderWidth>,
-    corner_radius:    Option<CornerRadius>,
-    background_color: Option<Color>,
-    border_color:     Option<Color>,
+    contents:   V,
+    properties: Properties,
 }
 
 impl<V> Container<V> {
@@ -44,39 +40,51 @@ impl<V> Container<V> {
         Self {
             contents,
 
-            padding: None,
-            border_width: None,
-            corner_radius: None,
-            background_color: None,
-            border_color: None,
+            properties: Properties {
+                padding:          None,
+                border_width:     None,
+                corner_radius:    None,
+                background_color: None,
+                border_color:     None,
+            },
         }
     }
 
     pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
-        self.padding = Some(padding.into());
+        self.properties.padding = Some(padding.into());
         self
     }
 
     pub fn border_width(mut self, border_width: impl Into<BorderWidth>) -> Self {
-        self.border_width = Some(border_width.into());
+        self.properties.border_width = Some(border_width.into());
         self
     }
 
     pub fn corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
-        self.corner_radius = Some(corner_radius.into());
+        self.properties.corner_radius = Some(corner_radius.into());
         self
     }
 
     pub fn background_color(mut self, color: Color) -> Self {
-        self.background_color = Some(color);
+        self.properties.background_color = Some(color);
         self
     }
 
     pub fn border_color(mut self, color: Color) -> Self {
-        self.border_color = Some(color);
+        self.properties.border_color = Some(color);
         self
     }
+}
 
+pub struct Properties {
+    padding:          Option<Padding>,
+    border_width:     Option<BorderWidth>,
+    corner_radius:    Option<CornerRadius>,
+    background_color: Option<Color>,
+    border_color:     Option<Color>,
+}
+
+impl Properties {
     fn get_padding(&self, theme: &ContainerTheme) -> Padding {
         self.padding.unwrap_or(theme.padding)
     }
@@ -106,9 +114,9 @@ where
     V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Container>;
-    type State = (V::Element, V::State);
+    type State = (Properties, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -116,11 +124,11 @@ where
 
         let mut widget = widgets::Container::new(cx, contents.upcast());
 
-        let padding = self.get_padding(&theme);
-        let border_width = self.get_border_width(&theme);
-        let corner_radius = self.get_corner_radius(&theme);
-        let background_color = self.get_background_color(&theme, &palette);
-        let border_color = self.get_border_color(&theme, &palette);
+        let padding = self.properties.get_padding(&theme);
+        let border_width = self.properties.get_border_width(&theme);
+        let corner_radius = self.properties.get_corner_radius(&theme);
+        let background_color = self.properties.get_background_color(&theme, &palette);
+        let border_color = self.properties.get_border_color(&theme, &palette);
 
         widgets::Container::set_padding(&mut widget, padding);
         widgets::Container::set_border_width(&mut widget, border_width);
@@ -128,24 +136,20 @@ where
         widgets::Container::set_background_color(&mut widget, background_color);
         widgets::Container::set_border_color(&mut widget, border_color);
 
-        (widget.id(), (contents, state))
+        (
+            widget.id(),
+            (self.properties, contents, state),
+        )
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        (contents, state): &mut Self::State,
+        (properties, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
-        self.contents.rebuild(
-            contents,
-            state,
-            cx,
-            data,
-            &mut old.contents,
-        );
+        self.contents.rebuild(contents, state, cx, data);
 
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ContainerTheme>();
@@ -154,50 +158,50 @@ where
             return;
         };
 
-        if self.padding != old.padding {
-            let padding = self.get_padding(&theme);
+        if self.properties.padding != properties.padding {
+            let padding = self.properties.get_padding(&theme);
             widgets::Container::set_padding(&mut widget, padding);
         }
 
-        if self.border_width != old.border_width {
-            let border_width = self.get_border_width(&theme);
+        if self.properties.border_width != properties.border_width {
+            let border_width = self.properties.get_border_width(&theme);
             widgets::Container::set_border_width(&mut widget, border_width);
         }
 
-        if self.corner_radius != old.corner_radius {
-            let corner_radius = self.get_corner_radius(&theme);
+        if self.properties.corner_radius != properties.corner_radius {
+            let corner_radius = self.properties.get_corner_radius(&theme);
             widgets::Container::set_corner_radius(&mut widget, corner_radius);
         }
 
-        if self.background_color != old.background_color {
-            let background = self.get_background_color(&theme, &palette);
+        if self.properties.background_color != properties.background_color {
+            let background = self.properties.get_background_color(&theme, &palette);
             widgets::Container::set_background_color(&mut widget, background);
         }
 
-        if self.border_color != old.border_color {
-            let border_color = self.get_border_color(&theme, &palette);
+        if self.properties.border_color != properties.border_color {
+            let border_color = self.properties.get_border_color(&theme, &palette);
             widgets::Container::set_border_color(&mut widget, border_color);
         }
+
+        *properties = self.properties;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
-        (contents, state): &mut Self::State,
+        (_properties, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.event(contents, state, cx, data, event)
+        V::event(contents, state, cx, data, event)
     }
 
     fn teardown(
-        &mut self,
         element: Self::Element,
-        (contents, state): Self::State,
+        (_properties, contents, state): Self::State,
         cx: &mut Context,
     ) {
-        self.contents.teardown(contents, state, cx);
+        V::teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 }

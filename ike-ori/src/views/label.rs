@@ -116,36 +116,35 @@ impl Label {
 impl ViewMarker for Label {}
 impl<T> View<Context, T> for Label {
     type Element = WidgetId<widgets::Label>;
-    type State = ();
+    type State = Self;
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<TextTheme>();
 
         let paragraph = self.build_paragraph(&palette, &theme);
         let widget = widgets::Label::new(cx, paragraph);
 
-        (widget.id(), ())
+        (widget.id(), self)
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        _state: &mut Self::State,
+        label: &mut Self::State,
         cx: &mut Context,
         _data: &mut T,
-        old: &mut Self,
     ) {
-        if self.text != old.text
-            || self.font_size != old.font_size
-            || self.font_family != old.font_family
-            || self.font_weight != old.font_weight
-            || self.font_stretch != old.font_stretch
-            || self.font_style != old.font_style
-            || self.line_height != old.line_height
-            || self.align != old.align
-            || self.wrap != old.wrap
-            || self.color != old.color
+        if self.text != label.text
+            || self.font_size != label.font_size
+            || self.font_family != label.font_family
+            || self.font_weight != label.font_weight
+            || self.font_stretch != label.font_stretch
+            || self.font_style != label.font_style
+            || self.line_height != label.line_height
+            || self.align != label.align
+            || self.wrap != label.wrap
+            || self.color != label.color
         {
             let palette = cx.get_or_default::<Palette>();
             let theme = cx.get_or_default::<TextTheme>();
@@ -155,10 +154,11 @@ impl<T> View<Context, T> for Label {
                 widgets::Label::set_text(&mut widget, paragraph);
             }
         }
+
+        *label = self;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
         _cx: &mut Context,
@@ -168,7 +168,7 @@ impl<T> View<Context, T> for Label {
         Action::new()
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+    fn teardown(element: Self::Element, _state: Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 }

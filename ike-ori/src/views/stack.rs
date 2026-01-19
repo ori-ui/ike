@@ -21,38 +21,44 @@ pub fn vstack<V>(contents: V) -> Stack<V> {
 }
 
 pub struct Stack<V> {
-    contents: V,
-    axis:     Axis,
-    justify:  Justify,
-    align:    Align,
-    gap:      f32,
+    contents:   V,
+    properties: Properties,
 }
 
 impl<V> Stack<V> {
     pub fn new(axis: Axis, contents: V) -> Self {
         Self {
             contents,
-            axis,
-            justify: Justify::Start,
-            align: Align::Center,
-            gap: 0.0,
+            properties: Properties {
+                axis,
+                justify: Justify::Start,
+                align: Align::Center,
+                gap: 0.0,
+            },
         }
     }
 
     pub fn justify(mut self, justify: Justify) -> Self {
-        self.justify = justify;
+        self.properties.justify = justify;
         self
     }
 
     pub fn align(mut self, align: Align) -> Self {
-        self.align = align;
+        self.properties.align = align;
         self
     }
 
     pub fn gap(mut self, gap: f32) -> Self {
-        self.gap = gap;
+        self.properties.gap = gap;
         self
     }
+}
+
+pub struct Properties {
+    axis:    Axis,
+    justify: Justify,
+    align:   Align,
+    gap:     f32,
 }
 
 impl<V> ViewMarker for Stack<V> {}
@@ -61,16 +67,20 @@ where
     V: ViewSeq<Context, T, Flex<WidgetId>>,
 {
     type Element = WidgetId<widgets::Stack>;
-    type State = (Vec<Flex<WidgetId>>, V::State);
+    type State = (
+        Properties,
+        Vec<Flex<WidgetId>>,
+        V::State,
+    );
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let element = {
             let mut widget = widgets::Stack::new(cx);
 
-            widgets::Stack::set_axis(&mut widget, self.axis);
-            widgets::Stack::set_justify(&mut widget, self.justify);
-            widgets::Stack::set_align(&mut widget, self.align);
-            widgets::Stack::set_gap(&mut widget, self.gap);
+            widgets::Stack::set_axis(&mut widget, self.properties.axis);
+            widgets::Stack::set_justify(&mut widget, self.properties.justify);
+            widgets::Stack::set_align(&mut widget, self.properties.align);
+            widgets::Stack::set_gap(&mut widget, self.properties.gap);
 
             widget.id()
         };
@@ -82,55 +92,57 @@ where
             data,
         );
 
-        (element, (elements, states))
+        (
+            element,
+            (self.properties, elements, states),
+        )
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        (elements, states): &mut Self::State,
+        (properties, elements, states): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
         self.contents.seq_rebuild(
             &mut FlexElements::new(*element, elements),
             states,
             cx,
             data,
-            &mut old.contents,
         );
 
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
-        if self.axis != old.axis {
-            widgets::Stack::set_axis(&mut widget, self.axis);
+        if self.properties.axis != properties.axis {
+            widgets::Stack::set_axis(&mut widget, self.properties.axis);
         }
 
-        if self.justify != old.justify {
-            widgets::Stack::set_justify(&mut widget, self.justify);
+        if self.properties.justify != properties.justify {
+            widgets::Stack::set_justify(&mut widget, self.properties.justify);
         }
 
-        if self.align != old.align {
-            widgets::Stack::set_align(&mut widget, self.align);
+        if self.properties.align != properties.align {
+            widgets::Stack::set_align(&mut widget, self.properties.align);
         }
 
-        if self.gap != old.gap {
-            widgets::Stack::set_gap(&mut widget, self.gap);
+        if self.properties.gap != properties.gap {
+            widgets::Stack::set_gap(&mut widget, self.properties.gap);
         }
+
+        *properties = self.properties;
     }
 
     fn event(
-        &mut self,
         element: &mut Self::Element,
-        (elements, states): &mut Self::State,
+        (_properties, elements, states): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.seq_event(
+        V::seq_event(
             &mut FlexElements::new(*element, elements),
             states,
             cx,
@@ -140,12 +152,11 @@ where
     }
 
     fn teardown(
-        &mut self,
         element: Self::Element,
-        (mut elements, states): Self::State,
+        (_properties, mut elements, states): Self::State,
         cx: &mut Context,
     ) {
-        self.contents.seq_teardown(
+        V::seq_teardown(
             &mut FlexElements::new(element, &mut elements),
             states,
             cx,
@@ -193,7 +204,7 @@ where
     type Element = Flex<V::Element>;
     type State = V::State;
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
         let element = Flex {
             contents: element,
@@ -205,31 +216,25 @@ where
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
         state: &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
-        self.contents.rebuild(
-            &mut element.contents,
-            state,
-            cx,
-            data,
-            &mut old.contents,
-        );
+        (self.contents).rebuild(&mut element.contents, state, cx, data);
+        element.flex = self.flex;
+        element.tight = self.tight;
     }
 
     fn event(
-        &mut self,
         element: &mut Self::Element,
         state: &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.event(
+        V::event(
             &mut element.contents,
             state,
             cx,
@@ -238,8 +243,8 @@ where
         )
     }
 
-    fn teardown(&mut self, element: Self::Element, state: Self::State, cx: &mut Context) {
-        self.contents.teardown(element.contents, state, cx);
+    fn teardown(element: Self::Element, state: Self::State, cx: &mut Context) {
+        V::teardown(element.contents, state, cx);
     }
 }
 

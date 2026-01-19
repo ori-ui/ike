@@ -41,7 +41,93 @@ impl Default for ScrollTheme {
 }
 
 pub struct Scroll<V> {
-    contents:           V,
+    contents:   V,
+    properties: Properties,
+}
+
+impl<V> Scroll<V> {
+    pub fn new(contents: V) -> Self {
+        Self {
+            contents,
+            properties: Properties {
+                vertical:           false,
+                horizontal:         false,
+                overlay:            false,
+                bar_width:          None,
+                bar_padding:        None,
+                bar_border_width:   None,
+                bar_corner_radius:  None,
+                knob_corner_radius: None,
+                transition:         None,
+                bar_border_color:   None,
+                bar_color:          None,
+                knob_color:         None,
+            },
+        }
+    }
+
+    pub fn vertical(mut self, vertical: bool) -> Self {
+        self.properties.vertical = vertical;
+        self
+    }
+
+    pub fn horizontal(mut self, horizontal: bool) -> Self {
+        self.properties.horizontal = horizontal;
+        self
+    }
+
+    pub fn overlay(mut self, overlay: bool) -> Self {
+        self.properties.overlay = overlay;
+        self
+    }
+
+    pub fn bar_width(mut self, width: f32) -> Self {
+        self.properties.bar_width = Some(width);
+        self
+    }
+
+    pub fn bar_padding(mut self, padding: impl Into<Padding>) -> Self {
+        self.properties.bar_padding = Some(padding.into());
+        self
+    }
+
+    pub fn bar_border_width(mut self, border_width: impl Into<BorderWidth>) -> Self {
+        self.properties.bar_border_width = Some(border_width.into());
+        self
+    }
+
+    pub fn bar_corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
+        self.properties.bar_corner_radius = Some(corner_radius.into());
+        self
+    }
+
+    pub fn knob_corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
+        self.properties.knob_corner_radius = Some(corner_radius.into());
+        self
+    }
+
+    pub fn bar_border_color(mut self, color: Color) -> Self {
+        self.properties.bar_border_color = Some(color);
+        self
+    }
+
+    pub fn bar_color(mut self, color: Color) -> Self {
+        self.properties.bar_color = Some(color);
+        self
+    }
+
+    pub fn knob_color(mut self, color: Color) -> Self {
+        self.properties.knob_color = Some(color);
+        self
+    }
+
+    pub fn transition(mut self, transition: Transition) -> Self {
+        self.properties.transition = Some(transition);
+        self
+    }
+}
+
+pub struct Properties {
     vertical:           bool,
     horizontal:         bool,
     overlay:            bool,
@@ -56,85 +142,7 @@ pub struct Scroll<V> {
     knob_color:         Option<Color>,
 }
 
-impl<V> Scroll<V> {
-    pub fn new(contents: V) -> Self {
-        Self {
-            contents,
-            vertical: false,
-            horizontal: false,
-            overlay: false,
-            bar_width: None,
-            bar_padding: None,
-            bar_border_width: None,
-            bar_corner_radius: None,
-            knob_corner_radius: None,
-            transition: None,
-            bar_border_color: None,
-            bar_color: None,
-            knob_color: None,
-        }
-    }
-
-    pub fn vertical(mut self, vertical: bool) -> Self {
-        self.vertical = vertical;
-        self
-    }
-
-    pub fn horizontal(mut self, horizontal: bool) -> Self {
-        self.horizontal = horizontal;
-        self
-    }
-
-    pub fn overlay(mut self, overlay: bool) -> Self {
-        self.overlay = overlay;
-        self
-    }
-
-    pub fn bar_width(mut self, width: f32) -> Self {
-        self.bar_width = Some(width);
-        self
-    }
-
-    pub fn bar_padding(mut self, padding: impl Into<Padding>) -> Self {
-        self.bar_padding = Some(padding.into());
-        self
-    }
-
-    pub fn bar_border_width(mut self, border_width: impl Into<BorderWidth>) -> Self {
-        self.bar_border_width = Some(border_width.into());
-        self
-    }
-
-    pub fn bar_corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
-        self.bar_corner_radius = Some(corner_radius.into());
-        self
-    }
-
-    pub fn knob_corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
-        self.knob_corner_radius = Some(corner_radius.into());
-        self
-    }
-
-    pub fn bar_border_color(mut self, color: Color) -> Self {
-        self.bar_border_color = Some(color);
-        self
-    }
-
-    pub fn bar_color(mut self, color: Color) -> Self {
-        self.bar_color = Some(color);
-        self
-    }
-
-    pub fn knob_color(mut self, color: Color) -> Self {
-        self.knob_color = Some(color);
-        self
-    }
-
-    pub fn transition(mut self, transition: Transition) -> Self {
-        self.transition = Some(transition);
-        self
-    }
-
+impl Properties {
     fn get_bar_width(&self, theme: &ScrollTheme) -> f32 {
         self.bar_width.unwrap_or(theme.bar_width)
     }
@@ -181,9 +189,9 @@ where
     V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Scroll>;
-    type State = (V::Element, V::State);
+    type State = (Properties, V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (element, state) = self.contents.build(cx, data);
 
         let palette = cx.get_or_default::<Palette>();
@@ -191,19 +199,19 @@ where
 
         let mut widget = widgets::Scroll::new(cx, element);
 
-        let bar_width = self.get_bar_width(&theme);
-        let bar_padding = self.get_bar_padding(&theme);
-        let bar_border_width = self.get_bar_border_width(&theme);
-        let bar_corner_radius = self.get_bar_corner_radius(&theme);
-        let knob_corner_radius = self.get_knob_corner_radius(&theme);
-        let transition = self.get_transition(&theme);
-        let bar_border_color = self.get_bar_border_paint(&theme, &palette);
-        let bar_color = self.get_bar_paint(&theme, &palette);
-        let knob_color = self.get_knob_paint(&theme, &palette);
+        let bar_width = self.properties.get_bar_width(&theme);
+        let bar_padding = self.properties.get_bar_padding(&theme);
+        let bar_border_width = self.properties.get_bar_border_width(&theme);
+        let bar_corner_radius = self.properties.get_bar_corner_radius(&theme);
+        let knob_corner_radius = self.properties.get_knob_corner_radius(&theme);
+        let transition = self.properties.get_transition(&theme);
+        let bar_border_color = self.properties.get_bar_border_paint(&theme, &palette);
+        let bar_color = self.properties.get_bar_paint(&theme, &palette);
+        let knob_color = self.properties.get_knob_paint(&theme, &palette);
 
-        widgets::Scroll::set_overlay(&mut widget, self.overlay);
-        widgets::Scroll::set_vertical(&mut widget, self.vertical);
-        widgets::Scroll::set_horizontal(&mut widget, self.horizontal);
+        widgets::Scroll::set_overlay(&mut widget, self.properties.overlay);
+        widgets::Scroll::set_vertical(&mut widget, self.properties.vertical);
+        widgets::Scroll::set_horizontal(&mut widget, self.properties.horizontal);
         widgets::Scroll::set_bar_thickness(&mut widget, bar_width);
         widgets::Scroll::set_bar_padding(&mut widget, bar_padding);
         widgets::Scroll::set_bar_border_width(&mut widget, bar_border_width);
@@ -214,24 +222,20 @@ where
         widgets::Scroll::set_bar_paint(&mut widget, bar_color.into());
         widgets::Scroll::set_knob_paint(&mut widget, knob_color.into());
 
-        (widget.id(), (element, state))
+        (
+            widget.id(),
+            (self.properties, element, state),
+        )
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        (contents, state): &mut Self::State,
+        (properties, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
-        self.contents.rebuild(
-            contents,
-            state,
-            cx,
-            data,
-            &mut old.contents,
-        );
+        self.contents.rebuild(contents, state, cx, data);
 
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ScrollTheme>();
@@ -240,82 +244,82 @@ where
             return;
         };
 
-        if self.overlay != old.overlay {
-            widgets::Scroll::set_overlay(&mut widget, self.overlay);
+        if self.properties.overlay != properties.overlay {
+            widgets::Scroll::set_overlay(&mut widget, self.properties.overlay);
         }
 
-        if self.vertical != old.vertical {
-            widgets::Scroll::set_vertical(&mut widget, self.vertical);
+        if self.properties.vertical != properties.vertical {
+            widgets::Scroll::set_vertical(&mut widget, self.properties.vertical);
         }
 
-        if self.horizontal != old.horizontal {
-            widgets::Scroll::set_horizontal(&mut widget, self.horizontal);
+        if self.properties.horizontal != properties.horizontal {
+            widgets::Scroll::set_horizontal(&mut widget, self.properties.horizontal);
         }
 
-        if self.bar_width != old.bar_width {
-            let bar_width = self.get_bar_width(&theme);
+        if self.properties.bar_width != properties.bar_width {
+            let bar_width = self.properties.get_bar_width(&theme);
             widgets::Scroll::set_bar_thickness(&mut widget, bar_width);
         }
 
-        if self.bar_padding != old.bar_padding {
-            let bar_padding = self.get_bar_padding(&theme);
+        if self.properties.bar_padding != properties.bar_padding {
+            let bar_padding = self.properties.get_bar_padding(&theme);
             widgets::Scroll::set_bar_padding(&mut widget, bar_padding);
         }
 
-        if self.bar_border_width != old.bar_border_width {
-            let bar_border_width = self.get_bar_border_width(&theme);
+        if self.properties.bar_border_width != properties.bar_border_width {
+            let bar_border_width = self.properties.get_bar_border_width(&theme);
             widgets::Scroll::set_bar_border_width(&mut widget, bar_border_width);
         }
 
-        if self.bar_corner_radius != old.bar_corner_radius {
-            let bar_corner_radius = self.get_bar_corner_radius(&theme);
+        if self.properties.bar_corner_radius != properties.bar_corner_radius {
+            let bar_corner_radius = self.properties.get_bar_corner_radius(&theme);
             widgets::Scroll::set_bar_corner_radius(&mut widget, bar_corner_radius);
         }
 
-        if self.knob_corner_radius != old.knob_corner_radius {
-            let knob_corner_radius = self.get_knob_corner_radius(&theme);
+        if self.properties.knob_corner_radius != properties.knob_corner_radius {
+            let knob_corner_radius = self.properties.get_knob_corner_radius(&theme);
             widgets::Scroll::set_knob_corner_radius(&mut widget, knob_corner_radius);
         }
 
-        if self.transition != old.transition {
-            let transition = self.get_transition(&theme);
+        if self.properties.transition != properties.transition {
+            let transition = self.properties.get_transition(&theme);
             widgets::Scroll::set_transition(&mut widget, transition);
         }
 
-        if self.bar_border_color != old.bar_border_color {
-            let bar_border_color = self.get_bar_border_paint(&theme, &palette);
+        if self.properties.bar_border_color != properties.bar_border_color {
+            let bar_border_color = self.properties.get_bar_border_paint(&theme, &palette);
             widgets::Scroll::set_bar_border_paint(&mut widget, bar_border_color.into());
         }
 
-        if self.bar_color != old.bar_color {
-            let bar_color = self.get_bar_paint(&theme, &palette);
+        if self.properties.bar_color != properties.bar_color {
+            let bar_color = self.properties.get_bar_paint(&theme, &palette);
             widgets::Scroll::set_bar_paint(&mut widget, bar_color.into());
         }
 
-        if self.knob_color != old.knob_color {
-            let knob_color = self.get_knob_paint(&theme, &palette);
+        if self.properties.knob_color != properties.knob_color {
+            let knob_color = self.properties.get_knob_paint(&theme, &palette);
             widgets::Scroll::set_knob_paint(&mut widget, knob_color.into());
         }
+
+        *properties = self.properties;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
-        (contents, state): &mut Self::State,
+        (_properties, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.event(contents, state, cx, data, event)
+        V::event(contents, state, cx, data, event)
     }
 
     fn teardown(
-        &mut self,
         element: Self::Element,
-        (contents, state): Self::State,
+        (_properties, contents, state): Self::State,
         cx: &mut Context,
     ) {
-        self.contents.teardown(contents, state, cx);
+        V::teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 }

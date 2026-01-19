@@ -380,9 +380,9 @@ enum EntryEvent {
 impl<T> ViewMarker for Entry<T> {}
 impl<T> View<Context, T> for Entry<T> {
     type Element = WidgetId<widgets::Entry>;
-    type State = ViewId;
+    type State = (ViewId, Self);
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<EntryTheme>();
@@ -449,16 +449,15 @@ impl<T> View<Context, T> for Entry<T> {
             ))
         });
 
-        (widget.id(), id)
+        (widget.id(), (id, self))
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        _id: &mut Self::State,
+        (_id, entry): &mut Self::State,
         cx: &mut Context,
         _data: &mut T,
-        old: &mut Self,
     ) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
@@ -468,16 +467,16 @@ impl<T> View<Context, T> for Entry<T> {
             return;
         };
 
-        if self.text != old.text
-            || self.font_size != old.font_size
-            || self.font_family != old.font_family
-            || self.font_weight != old.font_weight
-            || self.font_stretch != old.font_stretch
-            || self.font_style != old.font_style
-            || self.line_height != old.line_height
-            || self.align != old.align
-            || self.wrap != old.wrap
-            || self.color != old.color
+        if self.text != entry.text
+            || self.font_size != entry.font_size
+            || self.font_family != entry.font_family
+            || self.font_weight != entry.font_weight
+            || self.font_stretch != entry.font_stretch
+            || self.font_style != entry.font_style
+            || self.line_height != entry.line_height
+            || self.align != entry.align
+            || self.wrap != entry.wrap
+            || self.color != entry.color
         {
             let text = match self.text {
                 Some(ref text) => text.clone(),
@@ -492,7 +491,9 @@ impl<T> View<Context, T> for Entry<T> {
             widgets::Entry::set_text(&mut widget, paragraph);
         }
 
-        if self.placeholder != old.placeholder || self.placeholder_color != old.placeholder_color {
+        if self.placeholder != entry.placeholder
+            || self.placeholder_color != entry.placeholder_color
+        {
             let placeholder_color = self.get_placeholder_color(&palette, &theme);
             let placeholder = self.build_paragraph(
                 &self.placeholder,
@@ -503,86 +504,87 @@ impl<T> View<Context, T> for Entry<T> {
             widgets::Entry::set_placeholder(&mut widget, placeholder);
         }
 
-        if self.min_width != old.min_width {
+        if self.min_width != entry.min_width {
             let min_width = self.min_width.unwrap_or(theme.min_width);
             widgets::Entry::set_min_width(&mut widget, min_width);
         }
 
-        if self.max_width != old.max_width {
+        if self.max_width != entry.max_width {
             let max_width = self.max_width.unwrap_or(theme.max_width);
             widgets::Entry::set_max_width(&mut widget, max_width);
         }
 
-        if self.padding != old.padding {
+        if self.padding != entry.padding {
             let padding = self.padding.unwrap_or(theme.padding);
             widgets::Entry::set_padding(&mut widget, padding);
         }
 
-        if self.border_width != old.border_width {
+        if self.border_width != entry.border_width {
             let border_width = self.border_width.unwrap_or(theme.border_width);
             widgets::Entry::set_border_width(&mut widget, border_width);
         }
 
-        if self.corner_radius != old.corner_radius {
+        if self.corner_radius != entry.corner_radius {
             let corner_radius = self.corner_radius.unwrap_or(theme.corner_radius);
             widgets::Entry::set_corner_radius(&mut widget, corner_radius);
         }
 
-        if self.background_color != old.background_color {
+        if self.background_color != entry.background_color {
             let background_color = self.get_background_color(&palette, &theme);
             widgets::Entry::set_background_color(&mut widget, background_color);
         }
 
-        if self.border_color != old.border_color {
+        if self.border_color != entry.border_color {
             let border_color = self.get_border_color(&palette, &theme);
             widgets::Entry::set_border_color(&mut widget, border_color);
         }
 
-        if self.focus_color != old.focus_color {
+        if self.focus_color != entry.focus_color {
             let focus_color = self.get_focus_color(&palette, &theme);
             widgets::Entry::set_focus_color(&mut widget, focus_color);
         }
 
-        if self.cursor_color != old.cursor_color {
+        if self.cursor_color != entry.cursor_color {
             let cursor_color = self.get_cursor_color(&palette, &theme);
             widgets::Entry::set_cursor_color(&mut widget, cursor_color);
         }
 
-        if self.selection_color != old.selection_color {
+        if self.selection_color != entry.selection_color {
             let selection_color = self.get_selection_color(&palette, &theme);
             widgets::Entry::set_selection_color(&mut widget, selection_color);
         }
 
-        if self.blink_rate != old.blink_rate {
+        if self.blink_rate != entry.blink_rate {
             let blink_rate = self.blink_rate.unwrap_or(theme.blink_rate);
             widgets::Entry::set_blink_rate(&mut widget, blink_rate);
         }
 
-        if self.newline_behaviour != old.newline_behaviour {
+        if self.newline_behaviour != entry.newline_behaviour {
             widgets::Entry::set_newline_behaviour(&mut widget, self.newline_behaviour);
         }
 
-        if self.submit_behaviour != old.submit_behaviour {
+        if self.submit_behaviour != entry.submit_behaviour {
             widgets::Entry::set_submit_behaviour(&mut widget, self.submit_behaviour);
         }
+
+        *entry = self;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
-        id: &mut Self::State,
+        (id, entry): &mut Self::State,
         _cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
         match event.take_targeted(*id) {
-            Some(EntryEvent::Change(text)) => (self.on_change)(data, text),
-            Some(EntryEvent::Submit(text)) => (self.on_submit)(data, text),
+            Some(EntryEvent::Change(text)) => (entry.on_change)(data, text),
+            Some(EntryEvent::Submit(text)) => (entry.on_submit)(data, text),
             None => Action::new(),
         }
     }
 
-    fn teardown(&mut self, element: Self::Element, _id: Self::State, cx: &mut Context) {
+    fn teardown(element: Self::Element, (_id, _entry): Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 }

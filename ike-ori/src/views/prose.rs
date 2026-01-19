@@ -2,7 +2,7 @@ use ike_core::{
     Builder, Color, FontStretch, FontStyle, FontWeight, Paint, Paragraph, TextAlign, TextStyle,
     TextWrap, WidgetId, widgets,
 };
-use ori::{Action, Provider, View, ViewId, ViewMarker};
+use ori::{Action, Provider, View, ViewMarker};
 
 use crate::{Context, Palette, views::TextTheme};
 
@@ -214,13 +214,12 @@ impl Prose {
 impl ViewMarker for Prose {}
 impl<T> View<Context, T> for Prose {
     type Element = WidgetId<widgets::TextArea<false>>;
-    type State = ViewId;
+    type State = Self;
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
         let theme = cx.get_or_default::<ProseTheme>();
-        let id = ViewId::next();
 
         let paragraph = self.build_paragraph(
             &self.text,
@@ -239,16 +238,15 @@ impl<T> View<Context, T> for Prose {
         widgets::TextArea::set_selection_color(&mut widget, selection_color);
         widgets::TextArea::set_blink_rate(&mut widget, blink_rate);
 
-        (widget.id(), id)
+        (widget.id(), self)
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        _state: &mut Self::State,
+        prose: &mut Self::State,
         cx: &mut Context,
         _data: &mut T,
-        old: &mut Self,
     ) {
         let palette = cx.get_or_default::<Palette>();
         let text_theme = cx.get_or_default::<TextTheme>();
@@ -258,16 +256,16 @@ impl<T> View<Context, T> for Prose {
             return;
         };
 
-        if self.text != old.text
-            || self.font_size != old.font_size
-            || self.font_family != old.font_family
-            || self.font_weight != old.font_weight
-            || self.font_stretch != old.font_stretch
-            || self.font_style != old.font_style
-            || self.line_height != old.line_height
-            || self.align != old.align
-            || self.wrap != old.wrap
-            || self.color != old.color
+        if self.text != prose.text
+            || self.font_size != prose.font_size
+            || self.font_family != prose.font_family
+            || self.font_weight != prose.font_weight
+            || self.font_stretch != prose.font_stretch
+            || self.font_style != prose.font_style
+            || self.line_height != prose.line_height
+            || self.align != prose.align
+            || self.wrap != prose.wrap
+            || self.color != prose.color
         {
             let paragraph = self.build_paragraph(
                 &self.text,
@@ -279,26 +277,27 @@ impl<T> View<Context, T> for Prose {
             widgets::TextArea::set_text(&mut widget, paragraph);
         }
 
-        if self.cursor_color != old.cursor_color {
+        if self.cursor_color != prose.cursor_color {
             let cursor_color = self.cursor_color.unwrap_or(palette.contrast);
             widgets::TextArea::set_cursor_color(&mut widget, cursor_color);
         }
 
-        if self.selection_color != old.selection_color {
+        if self.selection_color != prose.selection_color {
             let selection_color = self.selection_color.unwrap_or(palette.info);
             widgets::TextArea::set_selection_color(&mut widget, selection_color);
         }
 
-        if self.blink_rate != old.blink_rate {
+        if self.blink_rate != prose.blink_rate {
             let blink_rate = self.blink_rate.unwrap_or(theme.blink_rate);
             widgets::TextArea::set_blink_rate(&mut widget, blink_rate);
         }
+
+        *prose = self;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
-        _id: &mut Self::State,
+        _prose: &mut Self::State,
         _cx: &mut Context,
         _data: &mut T,
         _event: &mut ori::Event,
@@ -306,7 +305,7 @@ impl<T> View<Context, T> for Prose {
         Action::new()
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+    fn teardown(element: Self::Element, _prose: Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 }

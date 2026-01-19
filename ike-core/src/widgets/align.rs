@@ -18,9 +18,11 @@ impl Aligned {
     }
 
     pub fn set_alignment(this: &mut WidgetMut<Self>, x: f32, y: f32) {
-        this.widget.x = x;
-        this.widget.y = y;
-        this.cx.request_layout();
+        if this.widget.x != x || this.widget.y != y {
+            this.widget.x = x;
+            this.widget.y = y;
+            this.cx.request_layout();
+        }
     }
 }
 

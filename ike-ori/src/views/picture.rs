@@ -34,43 +34,43 @@ impl Picture {
 impl ViewMarker for Picture {}
 impl<T> View<Context, T> for Picture {
     type Element = WidgetId<widgets::Picture>;
-    type State = ();
+    type State = Self;
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let mut widget = widgets::Picture::new(cx, self.contents.clone());
         widgets::Picture::set_fit(&mut widget, self.fit);
         widgets::Picture::set_color(&mut widget, self.color);
 
-        (widget.id(), ())
+        (widget.id(), self)
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        _state: &mut Self::State,
+        picture: &mut Self::State,
         cx: &mut Context,
         _data: &mut T,
-        old: &mut Self,
     ) {
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
-        if self.contents != old.contents {
+        if self.contents != picture.contents {
             widgets::Picture::set_contents(&mut widget, self.contents.clone());
         }
 
-        if self.fit != old.fit {
+        if self.fit != picture.fit {
             widgets::Picture::set_fit(&mut widget, self.fit);
         }
 
-        if self.color != old.color {
+        if self.color != picture.color {
             widgets::Picture::set_color(&mut widget, self.color);
         }
+
+        *picture = self;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
         _cx: &mut Context,
@@ -80,7 +80,7 @@ impl<T> View<Context, T> for Picture {
         Action::new()
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+    fn teardown(element: Self::Element, _state: Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 }

@@ -57,7 +57,7 @@ where
     type Element = WidgetId<widgets::Aligned>;
     type State = (V::Element, V::State);
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let (contents, state) = self.contents.build(cx, data);
 
         let element = widgets::Aligned::new(cx, self.x, self.y, contents.upcast());
@@ -66,48 +66,33 @@ where
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
         (contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
-        self.contents.rebuild(
-            contents,
-            state,
-            cx,
-            data,
-            &mut old.contents,
-        );
+        self.contents.rebuild(contents, state, cx, data);
 
         let Ok(mut widget) = cx.get_widget_mut(*element) else {
             return;
         };
 
-        if self.x != old.x || self.y != old.y {
-            widgets::Aligned::set_alignment(&mut widget, self.x, self.y);
-        }
+        widgets::Aligned::set_alignment(&mut widget, self.x, self.y);
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
         (contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        self.contents.event(contents, state, cx, data, event)
+        V::event(contents, state, cx, data, event)
     }
 
-    fn teardown(
-        &mut self,
-        element: Self::Element,
-        (contents, state): Self::State,
-        cx: &mut Context,
-    ) {
-        self.contents.teardown(contents, state, cx);
+    fn teardown(element: Self::Element, (contents, state): Self::State, cx: &mut Context) {
+        V::teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 }

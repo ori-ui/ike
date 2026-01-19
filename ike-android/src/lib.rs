@@ -1,7 +1,6 @@
 #![warn(clippy::unwrap_used)]
 
 use std::{
-    any::Any,
     ffi::{self, CString},
     fmt, io,
     pin::Pin,
@@ -25,7 +24,7 @@ use jni::JavaVM;
 pub use log::MakeAndroidWriter;
 
 use ike_core::{Padding, Signal, Size, WindowId, WindowUpdate, World};
-use ori::Proxied;
+use ori::{AnyState, AnyView, Proxied, View};
 use parking_lot::Mutex;
 use raw_window_handle::DisplayHandle;
 
@@ -187,15 +186,14 @@ pub fn run<T>(
         move || proxy.wake()
     }));
 
-    let mut view = build(data);
-    let (_, state) = view.any_build(&mut context, data);
+    let view = build(data);
+    let (_, state) = view.build(&mut context, data);
 
     let jvm = unsafe { JavaVM::from_raw(global_state.activity.as_ref().vm)? };
 
     let mut event_loop = EventLoop {
         data,
         build,
-        view,
         state,
 
         runtime,
@@ -232,8 +230,7 @@ pub fn run<T>(
 struct EventLoop<'a, T> {
     data:  &'a mut T,
     build: ike_ori::UiBuilder<T>,
-    view:  ike_ori::AnyEffect<T>,
-    state: Box<dyn Any>,
+    state: AnyState<ike_ori::Context, T, ori::NoElement>,
 
     runtime: tokio::runtime::Handle,
     context: ike_ori::Context,
@@ -353,21 +350,17 @@ impl<'a, T> EventLoop<'a, T> {
             Event::Signal(signal) => self.handle_signal(signal),
 
             Event::Rebuild => {
-                let mut view = (self.build)(self.data);
-                ori::View::rebuild(
-                    &mut view,
+                let view = (self.build)(self.data);
+                view.rebuild(
                     (),
                     &mut self.state,
                     &mut self.context,
                     self.data,
-                    &mut self.view,
                 );
-                self.view = view;
             }
 
             Event::Event(mut event) => {
-                let action = ori::View::event(
-                    &mut self.view,
+                let action = Box::<dyn AnyView<_, _, _>>::event(
                     (),
                     &mut self.state,
                     &mut self.context,

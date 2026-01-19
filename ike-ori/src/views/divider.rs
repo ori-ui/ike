@@ -37,6 +37,50 @@ impl Default for DividerTheme {
 }
 
 pub struct Divider {
+    properties: Properties,
+}
+
+impl Divider {
+    pub fn new(axis: Axis) -> Self {
+        Self {
+            properties: Properties {
+                axis,
+                thickness: None,
+                inset: None,
+                padding: None,
+                corner_radius: None,
+                color: None,
+            },
+        }
+    }
+
+    pub fn thickness(mut self, thickness: f32) -> Self {
+        self.properties.thickness = Some(thickness);
+        self
+    }
+
+    pub fn inset(mut self, inset: f32) -> Self {
+        self.properties.inset = Some(inset);
+        self
+    }
+
+    pub fn padding(mut self, padding: f32) -> Self {
+        self.properties.padding = Some(padding);
+        self
+    }
+
+    pub fn corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
+        self.properties.corner_radius = Some(corner_radius.into());
+        self
+    }
+
+    pub fn color(mut self, color: Color) -> Self {
+        self.properties.color = Some(color);
+        self
+    }
+}
+
+pub struct Properties {
     axis:          Axis,
     thickness:     Option<f32>,
     inset:         Option<f32>,
@@ -45,43 +89,7 @@ pub struct Divider {
     color:         Option<Color>,
 }
 
-impl Divider {
-    pub fn new(axis: Axis) -> Self {
-        Self {
-            axis,
-            thickness: None,
-            inset: None,
-            padding: None,
-            corner_radius: None,
-            color: None,
-        }
-    }
-
-    pub fn thickness(mut self, thickness: f32) -> Self {
-        self.thickness = Some(thickness);
-        self
-    }
-
-    pub fn inset(mut self, inset: f32) -> Self {
-        self.inset = Some(inset);
-        self
-    }
-
-    pub fn padding(mut self, padding: f32) -> Self {
-        self.padding = Some(padding);
-        self
-    }
-
-    pub fn corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
-        self.corner_radius = Some(corner_radius.into());
-        self
-    }
-
-    pub fn color(mut self, color: Color) -> Self {
-        self.color = Some(color);
-        self
-    }
-
+impl Properties {
     fn get_thickness(&self, theme: &DividerTheme) -> f32 {
         self.thickness.unwrap_or(theme.thickness)
     }
@@ -107,37 +115,36 @@ impl Divider {
 impl ViewMarker for Divider {}
 impl<T> View<Context, T> for Divider {
     type Element = WidgetId<widgets::Divider>;
-    type State = ();
+    type State = Properties;
 
-    fn build(&mut self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
+    fn build(self, cx: &mut Context, _data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<DividerTheme>();
 
         let mut widget = widgets::Divider::new(cx);
 
-        let thickness = self.get_thickness(&theme);
-        let inset = self.get_inset(&theme);
-        let padding = self.get_padding(&theme);
-        let corner_radius = self.get_corner_radius(&theme);
-        let color = self.get_color(&theme, &palette);
+        let thickness = self.properties.get_thickness(&theme);
+        let inset = self.properties.get_inset(&theme);
+        let padding = self.properties.get_padding(&theme);
+        let corner_radius = self.properties.get_corner_radius(&theme);
+        let color = self.properties.get_color(&theme, &palette);
 
-        widgets::Divider::set_axis(&mut widget, self.axis);
+        widgets::Divider::set_axis(&mut widget, self.properties.axis);
         widgets::Divider::set_thickness(&mut widget, thickness);
         widgets::Divider::set_inset(&mut widget, inset);
         widgets::Divider::set_padding(&mut widget, padding);
         widgets::Divider::set_corner_radius(&mut widget, corner_radius);
         widgets::Divider::set_color(&mut widget, color);
 
-        (widget.id(), ())
+        (widget.id(), self.properties)
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        _state: &mut Self::State,
+        properties: &mut Self::State,
         cx: &mut Context,
         _data: &mut T,
-        old: &mut Self,
     ) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<DividerTheme>();
@@ -146,38 +153,39 @@ impl<T> View<Context, T> for Divider {
             return;
         };
 
-        if self.axis != old.axis {
-            widgets::Divider::set_axis(&mut widget, self.axis);
+        if self.properties.axis != properties.axis {
+            widgets::Divider::set_axis(&mut widget, self.properties.axis);
         }
 
-        if self.thickness != old.thickness {
-            let thickness = self.get_thickness(&theme);
+        if self.properties.thickness != properties.thickness {
+            let thickness = self.properties.get_thickness(&theme);
             widgets::Divider::set_thickness(&mut widget, thickness);
         }
 
-        if self.inset != old.inset {
-            let inset = self.get_inset(&theme);
+        if self.properties.inset != properties.inset {
+            let inset = self.properties.get_inset(&theme);
             widgets::Divider::set_inset(&mut widget, inset);
         }
 
-        if self.padding != old.padding {
-            let padding = self.get_padding(&theme);
+        if self.properties.padding != properties.padding {
+            let padding = self.properties.get_padding(&theme);
             widgets::Divider::set_padding(&mut widget, padding);
         }
 
-        if self.corner_radius != old.corner_radius {
-            let corner_radius = self.get_corner_radius(&theme);
+        if self.properties.corner_radius != properties.corner_radius {
+            let corner_radius = self.properties.get_corner_radius(&theme);
             widgets::Divider::set_corner_radius(&mut widget, corner_radius);
         }
 
-        if self.color != old.color {
-            let color = self.get_color(&theme, &palette);
+        if self.properties.color != properties.color {
+            let color = self.properties.get_color(&theme, &palette);
             widgets::Divider::set_color(&mut widget, color);
         }
+
+        *properties = self.properties;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
         _state: &mut Self::State,
         _cx: &mut Context,
@@ -187,7 +195,7 @@ impl<T> View<Context, T> for Divider {
         Action::new()
     }
 
-    fn teardown(&mut self, element: Self::Element, _state: Self::State, cx: &mut Context) {
+    fn teardown(element: Self::Element, _state: Self::State, cx: &mut Context) {
         cx.remove_widget(element);
     }
 }

@@ -1,4 +1,6 @@
-use ike_core::{BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, widgets};
+use ike_core::{
+    BorderWidth, Builder, Color, CornerRadius, Padding, Transition, WidgetId, WidgetMut, widgets,
+};
 use ori::{Action, Event, Provider, Proxied, Proxy, View, ViewId, ViewMarker};
 
 use crate::{Context, Palette};
@@ -40,7 +42,90 @@ impl Default for ButtonTheme {
 }
 
 pub struct Button<T, V> {
-    contents: V,
+    contents:   V,
+    properties: Properties<T>,
+}
+
+impl<T, V> Button<T, V> {
+    pub fn new<A>(contents: V, mut on_click: impl FnMut(&mut T) -> A + 'static) -> Self
+    where
+        A: Into<Action>,
+    {
+        Button {
+            contents,
+            properties: Properties {
+                on_click:      Box::new(move |data| on_click(data).into()),
+                padding:       None,
+                border_width:  None,
+                corner_radius: None,
+                idle_color:    None,
+                hovered_color: None,
+                active_color:  None,
+                border_color:  None,
+                focus_color:   None,
+                transition:    None,
+            },
+        }
+    }
+
+    pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
+        self.properties.padding = Some(padding.into());
+        self
+    }
+
+    pub fn border_width(mut self, border_width: impl Into<BorderWidth>) -> Self {
+        self.properties.border_width = Some(border_width.into());
+        self
+    }
+
+    pub fn corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
+        self.properties.corner_radius = Some(corner_radius.into());
+        self
+    }
+
+    pub fn transition(mut self, transition: Transition) -> Self {
+        self.properties.transition = Some(transition);
+        self
+    }
+
+    pub fn color(mut self, color: Color) -> Self {
+        self.properties.idle_color = Some(color);
+        self.properties.hovered_color = Some(color.lighten(0.04).desaturate(0.02));
+        self.properties.active_color = Some(color.darken(0.04).desaturate(0.02));
+        self
+    }
+
+    pub fn idle_color(mut self, color: Color) -> Self {
+        self.properties.idle_color = Some(color);
+        self
+    }
+
+    pub fn hovered_color(mut self, color: Color) -> Self {
+        self.properties.hovered_color = Some(color);
+        self
+    }
+
+    pub fn active_color(mut self, color: Color) -> Self {
+        self.properties.active_color = Some(color);
+        self
+    }
+
+    pub fn border_color(mut self, color: Color) -> Self {
+        self.properties.border_color = Some(color);
+        self
+    }
+
+    pub fn focus_color(mut self, color: Color) -> Self {
+        self.properties.focus_color = Some(color);
+        self
+    }
+}
+
+enum ButtonEvent {
+    Clicked,
+}
+
+pub struct Properties<T> {
     on_click: Box<dyn FnMut(&mut T) -> Action>,
 
     padding:       Option<Padding>,
@@ -54,78 +139,7 @@ pub struct Button<T, V> {
     transition:    Option<Transition>,
 }
 
-impl<T, V> Button<T, V> {
-    pub fn new<A>(contents: V, mut on_click: impl FnMut(&mut T) -> A + 'static) -> Self
-    where
-        A: Into<Action>,
-    {
-        Button {
-            contents,
-            on_click: Box::new(move |data| on_click(data).into()),
-            padding: None,
-            border_width: None,
-            corner_radius: None,
-            idle_color: None,
-            hovered_color: None,
-            active_color: None,
-            border_color: None,
-            focus_color: None,
-            transition: None,
-        }
-    }
-
-    pub fn padding(mut self, padding: impl Into<Padding>) -> Self {
-        self.padding = Some(padding.into());
-        self
-    }
-
-    pub fn border_width(mut self, border_width: impl Into<BorderWidth>) -> Self {
-        self.border_width = Some(border_width.into());
-        self
-    }
-
-    pub fn corner_radius(mut self, corner_radius: impl Into<CornerRadius>) -> Self {
-        self.corner_radius = Some(corner_radius.into());
-        self
-    }
-
-    pub fn transition(mut self, transition: Transition) -> Self {
-        self.transition = Some(transition);
-        self
-    }
-
-    pub fn color(mut self, color: Color) -> Self {
-        self.idle_color = Some(color);
-        self.hovered_color = Some(color.lighten(0.04).desaturate(0.02));
-        self.active_color = Some(color.darken(0.04).desaturate(0.02));
-        self
-    }
-
-    pub fn idle_color(mut self, color: Color) -> Self {
-        self.idle_color = Some(color);
-        self
-    }
-
-    pub fn hovered_color(mut self, color: Color) -> Self {
-        self.hovered_color = Some(color);
-        self
-    }
-
-    pub fn active_color(mut self, color: Color) -> Self {
-        self.active_color = Some(color);
-        self
-    }
-
-    pub fn border_color(mut self, color: Color) -> Self {
-        self.border_color = Some(color);
-        self
-    }
-
-    pub fn focus_color(mut self, color: Color) -> Self {
-        self.focus_color = Some(color);
-        self
-    }
-
+impl<T> Properties<T> {
     fn get_padding(&self, theme: &ButtonTheme) -> Padding {
         self.padding.unwrap_or(theme.padding)
     }
@@ -172,10 +186,59 @@ impl<T, V> Button<T, V> {
     fn get_transition(&self, theme: &ButtonTheme) -> Transition {
         self.transition.unwrap_or(theme.transition)
     }
-}
 
-enum ButtonEvent {
-    Clicked,
+    fn rebuild(
+        &self,
+        prev: &Self,
+        widget: &mut WidgetMut<widgets::Button>,
+        theme: &ButtonTheme,
+        palette: &Palette,
+    ) {
+        if self.padding != prev.padding {
+            let padding = self.get_padding(theme);
+            widgets::Button::set_padding(widget, padding);
+        }
+
+        if self.border_width != prev.border_width {
+            let border_width = self.get_border_width(theme);
+            widgets::Button::set_border_width(widget, border_width);
+        }
+
+        if self.corner_radius != prev.corner_radius {
+            let corner_radius = self.get_corner_radius(theme);
+            widgets::Button::set_corner_radius(widget, corner_radius);
+        }
+
+        if self.idle_color != prev.idle_color {
+            let idle_color = self.get_idle_color(theme, palette);
+            widgets::Button::set_idle_color(widget, idle_color);
+        }
+
+        if self.hovered_color != prev.hovered_color {
+            let hovered_color = self.get_hovered_color(theme, palette);
+            widgets::Button::set_hovered_color(widget, hovered_color);
+        }
+
+        if self.active_color != prev.active_color {
+            let active_color = self.get_active_color(theme, palette);
+            widgets::Button::set_active_color(widget, active_color);
+        }
+
+        if self.border_color != prev.border_color {
+            let border_color = self.get_border_color(theme, palette);
+            widgets::Button::set_border_color(widget, border_color);
+        }
+
+        if self.focus_color != prev.focus_color {
+            let focus_color = self.get_focus_color(theme, palette);
+            widgets::Button::set_focus_color(widget, focus_color);
+        }
+
+        if self.transition != prev.transition {
+            let transition = self.get_transition(theme);
+            widgets::Button::set_transition(widget, transition);
+        }
+    }
 }
 
 impl<T, V> ViewMarker for Button<T, V> {}
@@ -184,27 +247,31 @@ where
     V: crate::View<T>,
 {
     type Element = WidgetId<widgets::Button>;
-    type State = (ViewId, V::Element, V::State);
+    type State = (
+        ViewId,
+        Properties<T>,
+        V::Element,
+        V::State,
+    );
 
-    fn build(&mut self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
-        let (contents, state) = self.contents.build(cx, data);
-
+    fn build(self, cx: &mut Context, data: &mut T) -> (Self::Element, Self::State) {
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ButtonTheme>();
         let proxy = cx.proxy();
         let id = ViewId::next();
 
-        let mut widget = widgets::Button::new(cx, contents);
+        let padding = self.properties.get_padding(&theme);
+        let border_width = self.properties.get_border_width(&theme);
+        let corner_radius = self.properties.get_corner_radius(&theme);
+        let idle_color = self.properties.get_idle_color(&theme, &palette);
+        let hovered_color = self.properties.get_hovered_color(&theme, &palette);
+        let active_color = self.properties.get_active_color(&theme, &palette);
+        let border_color = self.properties.get_border_color(&theme, &palette);
+        let focus_color = self.properties.get_focus_color(&theme, &palette);
+        let transition = self.properties.get_transition(&theme);
 
-        let padding = self.get_padding(&theme);
-        let border_width = self.get_border_width(&theme);
-        let corner_radius = self.get_corner_radius(&theme);
-        let idle_color = self.get_idle_color(&theme, &palette);
-        let hovered_color = self.get_hovered_color(&theme, &palette);
-        let active_color = self.get_active_color(&theme, &palette);
-        let border_color = self.get_border_color(&theme, &palette);
-        let focus_color = self.get_focus_color(&theme, &palette);
-        let transition = self.get_transition(&theme);
+        let (contents, state) = self.contents.build(cx, data);
+        let mut widget = widgets::Button::new(cx, contents);
 
         widgets::Button::set_padding(&mut widget, padding);
         widgets::Button::set_border_width(&mut widget, border_width);
@@ -220,24 +287,20 @@ where
             proxy.event(Event::new(ButtonEvent::Clicked, id));
         });
 
-        (widget.id(), (id, contents, state))
+        (
+            widget.id(),
+            (id, self.properties, contents, state),
+        )
     }
 
     fn rebuild(
-        &mut self,
+        self,
         element: &mut Self::Element,
-        (_id, contents, state): &mut Self::State,
+        (_id, properties, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
-        old: &mut Self,
     ) {
-        self.contents.rebuild(
-            contents,
-            state,
-            cx,
-            data,
-            &mut old.contents,
-        );
+        (self.contents).rebuild(contents, state, cx, data);
 
         let palette = cx.get_or_default::<Palette>();
         let theme = cx.get_or_default::<ButtonTheme>();
@@ -246,75 +309,37 @@ where
             return;
         };
 
-        if self.padding != old.padding {
-            let padding = self.get_padding(&theme);
-            widgets::Button::set_padding(&mut widget, padding);
-        }
+        self.properties.rebuild(
+            properties,
+            &mut widget,
+            &theme,
+            &palette,
+        );
 
-        if self.border_width != old.border_width {
-            let border_width = self.get_border_width(&theme);
-            widgets::Button::set_border_width(&mut widget, border_width);
-        }
-
-        if self.corner_radius != old.corner_radius {
-            let corner_radius = self.get_corner_radius(&theme);
-            widgets::Button::set_corner_radius(&mut widget, corner_radius);
-        }
-
-        if self.idle_color != old.idle_color {
-            let idle_color = self.get_idle_color(&theme, &palette);
-            widgets::Button::set_idle_color(&mut widget, idle_color);
-        }
-
-        if self.hovered_color != old.hovered_color {
-            let hovered_color = self.get_hovered_color(&theme, &palette);
-            widgets::Button::set_hovered_color(&mut widget, hovered_color);
-        }
-
-        if self.active_color != old.active_color {
-            let active_color = self.get_active_color(&theme, &palette);
-            widgets::Button::set_active_color(&mut widget, active_color);
-        }
-
-        if self.border_color != old.border_color {
-            let border_color = self.get_border_color(&theme, &palette);
-            widgets::Button::set_border_color(&mut widget, border_color);
-        }
-
-        if self.focus_color != old.focus_color {
-            let focus_color = self.get_focus_color(&theme, &palette);
-            widgets::Button::set_focus_color(&mut widget, focus_color);
-        }
-
-        if self.transition != old.transition {
-            let transition = self.get_transition(&theme);
-            widgets::Button::set_transition(&mut widget, transition);
-        }
+        *properties = self.properties;
     }
 
     fn event(
-        &mut self,
         _element: &mut Self::Element,
-        (id, contents, state): &mut Self::State,
+        (id, properties, contents, state): &mut Self::State,
         cx: &mut Context,
         data: &mut T,
         event: &mut Event,
     ) -> Action {
-        let action = self.contents.event(contents, state, cx, data, event);
+        let action = V::event(contents, state, cx, data, event);
 
         match event.take_targeted(*id) {
-            Some(ButtonEvent::Clicked) => action | (self.on_click)(data),
+            Some(ButtonEvent::Clicked) => action | (properties.on_click)(data),
             None => action,
         }
     }
 
     fn teardown(
-        &mut self,
         element: Self::Element,
-        (_id, contents, state): Self::State,
+        (_id, _properties, contents, state): Self::State,
         cx: &mut Context,
     ) {
-        self.contents.teardown(contents, state, cx);
+        V::teardown(contents, state, cx);
         cx.remove_widget(element);
     }
 }
