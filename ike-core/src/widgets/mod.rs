@@ -14,6 +14,7 @@ mod stack;
 mod text;
 mod text_area;
 mod transform;
+mod zstack;
 
 pub use align::Aligned;
 pub use button::Button;
@@ -30,3 +31,4 @@ pub use spacer::Spacer;
 pub use stack::{Align, Justify, Stack};
 pub use text_area::{NewlineBehaviour, SubmitBehaviour, TextArea};
 pub use transform::Transform;
+pub use zstack::ZStack;

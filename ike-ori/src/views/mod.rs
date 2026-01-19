@@ -16,6 +16,7 @@ mod stack;
 mod text;
 mod transform;
 mod window;
+mod zstack;
 
 pub use aligned::{
     Aligned, align, bottom, bottom_left, bottom_right, center, left, right, top, top_left,
@@ -41,3 +42,4 @@ pub use stack::{Flex, Stack, expand, flex, hstack, stack, vstack};
 pub use text::TextTheme;
 pub use transform::{Transform, transform};
 pub use window::{Window, window};
+pub use zstack::{ZStack, zstack};
