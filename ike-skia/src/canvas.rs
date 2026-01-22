@@ -19,9 +19,9 @@ impl Canvas for SkiaCanvas<'_> {
     fn transform(&mut self, affine: Affine, f: &mut dyn FnMut(&mut dyn Canvas)) {
         let matrix = skia_safe::Matrix::new_all(
             affine.matrix.matrix[0],
-            affine.matrix.matrix[2],
-            affine.offset.x,
             affine.matrix.matrix[1],
+            affine.offset.x,
+            affine.matrix.matrix[2],
             affine.matrix.matrix[3],
             affine.offset.y,
             0.0,

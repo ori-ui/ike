@@ -19,7 +19,9 @@ impl Matrix {
     }
 
     pub fn rotate(r: f32) -> Self {
-        Self::new([r.cos(), r.sin(), -r.sin(), r.cos()])
+        let (sin, cos) = r.sin_cos();
+
+        Self::new([cos, -sin, sin, cos])
     }
 
     pub const fn determinant(self) -> f32 {
@@ -125,10 +127,10 @@ impl Affine {
     }
 
     pub fn inverse(self) -> Self {
-        Self {
-            matrix: self.matrix.inverse(),
-            offset: -self.offset,
-        }
+        let matrix = self.matrix.inverse();
+        let offset = matrix * -self.offset;
+
+        Self { matrix, offset }
     }
 }
 
