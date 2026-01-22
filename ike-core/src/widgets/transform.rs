@@ -68,11 +68,11 @@ impl Widget for Transform {
     }
 
     fn compose(&mut self, cx: &mut ComposeCx<'_>) {
-        let transform = Affine::translate(cx.rect().center() - Point::ORIGIN)
+        let transform = Affine::translate(Point::ORIGIN - cx.rect().center())
             * Affine::scale(*self.scale_x, *self.scale_y)
             * Affine::rotate(*self.rotation)
             * Affine::translate(*self.translation)
-            * Affine::translate(Point::ORIGIN - cx.rect().center());
+            * Affine::translate(cx.rect().center() - Point::ORIGIN);
 
         cx.place_nth_child(0, transform);
     }
