@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::{
-    Affine, AnyWidgetId, Builder, ComposeCx, LayoutCx, Offset, Size, Space, Transition,
+    Affine, AnyWidgetId, Builder, ComposeCx, LayoutCx, Offset, Point, Size, Space, Transition,
     Transitioned, UpdateCx, Widget, WidgetMut,
 };
 
@@ -68,9 +68,11 @@ impl Widget for Transform {
     }
 
     fn compose(&mut self, cx: &mut ComposeCx<'_>) {
-        let transform = Affine::scale(*self.scale_x, *self.scale_y)
+        let transform = Affine::translate(cx.rect().center() - Point::ORIGIN)
+            * Affine::scale(*self.scale_x, *self.scale_y)
             * Affine::rotate(*self.rotation)
-            * Affine::translate(*self.translation);
+            * Affine::translate(*self.translation)
+            * Affine::translate(Point::ORIGIN - cx.rect().center());
 
         cx.place_nth_child(0, transform);
     }
