@@ -1,6 +1,6 @@
 use crate::{
-    BorderWidth, Canvas, Clip, Color, CornerRadius, FontStretch, FontStyle, FontWeight, Offset,
-    Paint, Paragraph, TextAlign, TextStyle, TextWrap, WidgetRef, WindowId, World,
+    Affine, BorderWidth, Canvas, Clip, Color, CornerRadius, FontStretch, FontStyle, FontWeight,
+    Offset, Paint, Paragraph, Point, TextAlign, TextStyle, TextWrap, WidgetRef, WindowId, World,
     record::DisplayMemorySize,
 };
 
@@ -87,27 +87,26 @@ pub(crate) fn recorder_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn C
                 let color = Color::GREEN.mix(Color::RED, spoilage);
 
                 canvas.draw_rect(
-                    widget.cx.rect().shrink(1.0),
+                    widget.cx.bounds().shrink(1.0),
                     CornerRadius::all(0.0),
                     &Paint::from(color.fade(0.2)),
                 );
 
                 canvas.draw_border(
-                    widget.cx.rect(),
+                    widget.cx.bounds(),
                     BorderWidth::all(1.0),
                     CornerRadius::all(0.0),
                     &Paint::from(Color::BLUE.fade(0.8)),
                 );
 
+                let total_memory_usage = widget.cx.world.recorder.memory_usage();
+                let memory_usage = recording.memory as f32 / total_memory_usage as f32 * 100.0;
+
                 let mut paragraph = Paragraph::new(1.0, TextAlign::Start, TextWrap::Word);
                 paragraph.push(
                     format!(
                         "{}x{} - {:.2}% mem - {:.2} cost",
-                        recording.width,
-                        recording.height,
-                        recording.memory as f32 / widget.cx.world.recorder.memory_usage() as f32
-                            * 100.0,
-                        cost_estimate,
+                        recording.width, recording.height, memory_usage, cost_estimate
                     ),
                     TextStyle {
                         font_size:    12.0,
@@ -119,17 +118,22 @@ pub(crate) fn recorder_overlay_widget(widget: &WidgetRef<'_>, canvas: &mut dyn C
                     },
                 );
 
-                canvas.clip(
-                    &Clip::Rect(
-                        widget.cx.rect().shrink(2.0),
-                        CornerRadius::all(0.0),
-                    ),
+                canvas.transform(
+                    Affine::translate(widget.cx.bounds().top_left() - Point::ORIGIN),
                     &mut |canvas| {
-                        canvas.draw_text(
-                            &paragraph,
-                            widget.cx.width() - 4.0,
-                            Offset::new(2.0, 0.0),
-                        );
+                        canvas.clip(
+                            &Clip::Rect(
+                                widget.cx.bounds().shrink(2.0),
+                                CornerRadius::all(0.0),
+                            ),
+                            &mut |canvas| {
+                                canvas.draw_text(
+                                    &paragraph,
+                                    widget.cx.width() - 4.0,
+                                    Offset::new(2.0, 0.0),
+                                );
+                            },
+                        )
                     },
                 );
             },

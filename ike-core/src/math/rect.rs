@@ -101,6 +101,16 @@ impl Rect {
             && point.y <= self.max.y
     }
 
+    pub const fn intersection(mut self, other: Self) -> Self {
+        self.min.x = self.min.x.max(other.min.x);
+        self.min.y = self.min.y.max(other.min.y);
+
+        self.max.x = self.max.x.min(other.max.x);
+        self.max.y = self.max.y.min(other.max.y);
+
+        self
+    }
+
     pub fn to_pixels(self, scale: f32) -> PixelRect {
         const EPSILON: f32 = 0.001;
 

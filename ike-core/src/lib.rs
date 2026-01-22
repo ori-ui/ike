@@ -2,11 +2,10 @@
 
 mod axis;
 mod build;
-mod canvas;
 mod color;
 mod context;
-mod curve;
 mod debug;
+mod draw;
 mod event;
 mod image;
 mod layout;
@@ -26,11 +25,13 @@ pub mod widgets;
 
 pub use axis::Axis;
 pub use build::Builder;
-pub use canvas::{Blend, Canvas, Cap, Clip, Join, Paint, PixelRect, Shader, Stroke};
 pub use color::Color;
 pub use context::{ComposeCx, DrawCx, EventCx, LayoutCx, MutCx, RefCx, UpdateCx};
-pub use curve::{Curve, CurveData, CurveSegment, CurveVerb, Fill, WeakCurve};
 pub use debug::DebugSettings;
+pub use draw::{
+    Blend, Canvas, Cap, Clip, Curve, CurveData, CurveSegment, CurveVerb, Fill, Join, Paint,
+    PixelRect, Shader, Stroke, WeakCurve,
+};
 pub use event::{
     CursorIcon, Gesture, ImeEvent, Key, KeyEvent, KeyPressEvent, Modifiers, NamedKey, PanGesture,
     Pointer, PointerButton, PointerButtonEvent, PointerEvent, PointerId, PointerMoveEvent,

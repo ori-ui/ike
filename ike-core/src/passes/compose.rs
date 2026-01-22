@@ -59,6 +59,10 @@ pub(crate) fn compose_widget(
         }
     });
 
+    if let Some(clip) = widget.cx.clip() {
+        bounds = bounds.intersection(clip.bounds());
+    }
+
     widget.cx.state.bounds = bounds;
     widget
 }

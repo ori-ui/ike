@@ -593,6 +593,10 @@ impl_contexts! {
     UpdateCx<'_>,
     ComposeCx<'_>,
     DrawCx<'_> {
+        pub fn bounds(&self) -> Rect {
+            self.state.bounds
+        }
+
         pub fn transform(&self) -> Affine {
             self.state.transform
         }

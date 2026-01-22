@@ -1,6 +1,6 @@
 use ike_core::{
     Affine, BorderWidth, Canvas, Clip, CornerRadius, Curve, Offset, Paint, Painter, Paragraph,
-    PixelRect, Recording, RecordingData, Rect, Svg,
+    Recording, RecordingData, Rect, Svg,
 };
 
 use crate::{painter::SkiaPainter, vulkan::Surface};
