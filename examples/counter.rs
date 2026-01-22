@@ -5,14 +5,10 @@ struct Data {
 }
 
 fn counter(data: &Data) -> impl View<Data> + use<> {
-    center(
-        transform(button(
-            label(format!("count {}", data.count)),
-            |data: &mut Data| data.count += 1,
-        ))
-        .rotation(data.count as f32)
-        .transition(Transition::linear(0.5)),
-    )
+    center(button(
+        label(format!("count {}", data.count)),
+        |data: &mut Data| data.count += 1,
+    ))
 }
 
 fn ui(data: &Data) -> impl Effect<Data> + use<> {

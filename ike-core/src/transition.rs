@@ -1,4 +1,4 @@
-use std::{ops::Deref, time::Duration};
+use std::{f32::consts::PI, ops::Deref, time::Duration};
 
 use crate::{Color, Offset, Padding, Size};
 
@@ -6,13 +6,44 @@ use crate::{Color, Offset, Padding, Size};
 pub enum TransitionCurve {
     Linear,
     Ease,
+    ElasticIn,
+    ElasticOut,
+    BackIn,
+    BackOut,
+    Back,
 }
 
 impl TransitionCurve {
-    pub fn apply(self, x: f32) -> f32 {
+    pub fn apply(self, t: f32) -> f32 {
+        const C: f32 = 1.70158;
+        const C2: f32 = C * 1.525;
+
         match self {
-            TransitionCurve::Linear => x,
-            TransitionCurve::Ease => x * x * (3.0 - 2.0 * x),
+            TransitionCurve::Linear => t,
+
+            TransitionCurve::Ease => t * t * (3.0 - 2.0 * t),
+
+            TransitionCurve::ElasticIn => {
+                -f32::powf(2.0, 10.0 * t - 10.0) * f32::sin((10.0 * t - 10.75) * PI * 2.0 / 3.0)
+            }
+
+            TransitionCurve::ElasticOut => {
+                1.0 + f32::powf(2.0, -10.0 * t) * f32::sin((10.0 * t - 0.75) * PI * 2.0 / 3.0)
+            }
+
+            TransitionCurve::Back => {
+                if t < 0.5 {
+                    (f32::powi(2.0 * t, 2) * ((C2 + 1.0) * 2.0 * t - C2)) / 2.0
+                } else {
+                    (f32::powi(2.0 * t - 2.0, 2) * ((C2 + 1.0) * (2.0 * t - 2.0) + C2) + 2.0) / 2.0
+                }
+            }
+
+            TransitionCurve::BackIn => (C + 1.0) * f32::powi(t, 3) - C * f32::powi(t, 2),
+
+            TransitionCurve::BackOut => {
+                1.0 + (C + 1.0) * f32::powi(t - 1.0, 3) + C * f32::powi(t - 1.0, 2)
+            }
         }
     }
 }
@@ -37,6 +68,41 @@ impl Transition {
     pub const fn ease(duration: f32) -> Self {
         Self {
             curve: TransitionCurve::Ease,
+            duration,
+        }
+    }
+
+    pub const fn elastic_in(duration: f32) -> Self {
+        Self {
+            curve: TransitionCurve::ElasticIn,
+            duration,
+        }
+    }
+
+    pub const fn elastic_out(duration: f32) -> Self {
+        Self {
+            curve: TransitionCurve::ElasticOut,
+            duration,
+        }
+    }
+
+    pub const fn back_in(duration: f32) -> Self {
+        Self {
+            curve: TransitionCurve::BackIn,
+            duration,
+        }
+    }
+
+    pub const fn back_out(duration: f32) -> Self {
+        Self {
+            curve: TransitionCurve::BackOut,
+            duration,
+        }
+    }
+
+    pub const fn back(duration: f32) -> Self {
+        Self {
+            curve: TransitionCurve::Back,
             duration,
         }
     }
